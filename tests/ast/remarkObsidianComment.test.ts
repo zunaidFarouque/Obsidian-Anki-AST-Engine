@@ -72,6 +72,25 @@ describe("remarkObsidianComment", () => {
     }
   });
 
+  test("stripObsidianCommentsFromNodes keeps paragraph with only an image", () => {
+    const ast = parseMarkdown("![](assets/nested/path.png)", "/vault");
+    const stripped = stripObsidianCommentsFromNodes(ast.children);
+
+    expect(stripped).toHaveLength(1);
+    expect(stripped[0]?.type).toBe("paragraph");
+    if (stripped[0]?.type === "paragraph") {
+      expect(stripped[0].children[0]?.type).toBe("image");
+    }
+  });
+
+  test("compileCardField keeps markdown image after comment stripping", () => {
+    const ast = parseMarkdown("![](assets/nested/path.png)", "/vault");
+    const stripped = stripObsidianCommentsFromNodes(ast.children);
+    const html = compileCardField(stripped);
+
+    expect(html).toContain('<img src="assets/nested/path.png"');
+  });
+
   test("compileCardFields omits obsidian comments from anki html", () => {
     const rawText = [
       "#### Card",

@@ -146,6 +146,14 @@ function isEmptyParagraph(node: Content): boolean {
     return false;
   }
 
+  if (node.children.length === 0) {
+    return true;
+  }
+
+  if (node.children.some((child) => child.type !== "text")) {
+    return false;
+  }
+
   return flattenBlockText(node).trim().length === 0;
 }
 

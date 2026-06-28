@@ -35,7 +35,21 @@ These behaviors are documented in full in [Engine-Architecture.md](Engine-Archit
 | `[[Note#Heading]]` | Link to heading section |
 | `[[Note#^block-id]]` | Link to block |
 | `[[#^block-id]]` | Same-note block link |
-| `![[...]]` | Embed (transclusion) |
+| `![[...]]` | Embed — note transclusion or image media (see below) |
+
+## Image vs note embeds
+
+| `![[target]]` resolves to | Behavior |
+|---------------------------|----------|
+| Note (`.md`) | Transclusion — content grafted inline via [`transclusionGraft.ts`](../src/ast/transclusionGraft.ts) |
+| Image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) | Media embed — converted to `image` mdast node; file uploaded to Anki on sync |
+| Missing file | Literal `![[...]]` kept in HTML + listed in `unresolvedEmbeds` |
+
+Note transclusion with subpaths (`![[Note#^block]]`, `![[Note#Heading]]`) is unchanged. Image paths with block/heading subpaths are not treated as images.
+
+Markdown images `![](path)` use the same media resolver and upload path as wiki image embeds.
+
+Test fixture: [`tests/fixtures/complex-media-paths.md`](../tests/fixtures/complex-media-paths.md). Run `bun run setup:fixtures` to download or generate minimal binary placeholders offline.
 
 ## File resolution (`getFirstLinkpathDest`)
 

@@ -9,6 +9,7 @@ import {
 } from "../../src/ast/transclusionGraft";
 import { findBlockById } from "../../src/ast/blockIdTagging";
 import { buildVaultFileIndex } from "../../src/obsidian/vaultIndex";
+import { assertFixtureMediaReady } from "../helpers/fixtureMedia";
 import { isObsidianEmbed } from "../../src/ast/obsidianLinks";
 
 const FIXTURES_DIR = join(import.meta.dir, "../fixtures");
@@ -115,5 +116,28 @@ describe("transclusionGraft", () => {
 
     expect(context.unresolvedEmbeds.length).toBeGreaterThan(0);
     expect(collectTextFromAst(ast)).toContain("![[Does Not Exist#^missing]]");
+  });
+
+  test("converts wiki image embed to image node when file exists", async () => {
+    const vaultPath = FIXTURES_DIR;
+    await assertFixtureMediaReady(vaultPath, ["Cell Diagram final.png"]);
+    const vaultIndex = await buildVaultFileIndex(vaultPath);
+    const ast = parseMarkdown("![[Cell Diagram final.png]]", vaultPath);
+    const unresolvedEmbeds: string[] = [];
+
+    await graftTransclusions(ast, {
+      vaultPath,
+      sourcePath: "complex-media-paths.md",
+      vaultIndex,
+      unresolvedEmbeds,
+    });
+
+    const image = ast.children.find((child) => child.type === "image");
+    expect(image).toBeDefined();
+    if (image?.type === "image") {
+      expect(image.url).toBe("Cell Diagram final.png");
+    }
+    expect(unresolvedEmbeds).toEqual([]);
+    expect(collectTextFromAst(ast)).not.toContain("![[");
   });
 });

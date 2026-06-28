@@ -148,7 +148,7 @@ Syntax: `: #{1,6} title text` (colon, space, hashes, space, title).
 - **Parse time** ([`processor.ts`](../src/ast/processor.ts)): `remark-math` turns `$E=mc^2$` and `$$...$$` into `inlineMath` / `math` mdast nodes. Delimiters inside math are ignored by [`delimiterCheck.ts`](../src/parser/delimiterCheck.ts).
 - **Compile time** ([`cardCompiler.ts`](../src/ast/cardCompiler.ts)): math nodes become lightweight HTML with LaTeX delimiters Anki MathJax already understands:
   - Inline: `<span class="math-inline">\(E=mc^2\)</span>`
-  - Display: `<div class="math-display">\[...\]</div>`
+  - Display: `<p>\[...\]</p>` (plain paragraph, not a custom wrapper div — Anki MathJax ignores display math inside non-standard containers)
 - **No SVG pre-render** — Anki (and Obsidian) render math at display time, same as `$...$` in source. Keeps `frontHtml`/`backHtml` small and readable in dry-run JSON.
 
 ## Obsidian callouts
@@ -202,6 +202,31 @@ flowchart BT
   week2 --> chapter
   chapter --> fileRoot
 ```
+
+## Images and media embeds
+
+Obsidian image embeds are resolved **before** card compile and uploaded to the Anki collection media folder during live sync.
+
+| Vault syntax | Engine behavior | Anki field |
+|--------------|-----------------|------------|
+| `![[photo.png]]` | Resolved as attachment (not note transclusion) → `image` mdast node | `<img src="photo.png">` |
+| `![[folder/photo.jpg]]` | Same; `src` is basename only (`photo.jpg`) | `<img src="photo.jpg">` |
+| `![](relative/path.png)` | Standard markdown image; URL rewritten to basename | `<img src="path.png">` |
+
+Filenames with spaces are rewritten for Anki (`Cell Diagram final.png` → `Cell_Diagram_final.png` in both `src` and the uploaded collection media name). Vault files keep their original names.
+
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` (see [`vaultIndex.ts`](../src/obsidian/vaultIndex.ts)). SVG, PDF, audio, and video are out of scope for V2.
+
+Pipeline:
+
+1. [`transclusionGraft.ts`](../src/ast/transclusionGraft.ts) — wiki image embeds short-circuit to `image` nodes when the file exists (note transclusion unchanged for `![[Note]]` / block refs).
+2. [`mediaResolver.ts`](../src/ast/mediaResolver.ts) — rewrites any remaining wiki media to `image` nodes and queues upload plans.
+3. [`cardCompiler.ts`](../src/ast/cardCompiler.ts) — `image` → `<img>` with literal `src` (spaces preserved; no `%20` encoding).
+4. [`mediaQueue.ts`](../src/anki/mediaQueue.ts) — live sync uploads files before card notes are sent.
+
+Paragraph-only images (`![](path.png)` on its own line) are hoisted to root-level `image` nodes before compile so they render as `<img>` rather than empty `<p>` elements.
+
+Fixture assets for tests: `bun run setup:fixtures` (see [`scripts/download-fixture-assets.ts`](../scripts/download-fixture-assets.ts)). Committed images under `tests/fixtures/assets/` must be real files (not empty placeholders); tests refuse to upload media smaller than 1 KB. You can drop manual downloads in `assets/media/` or `assets/nested/` and re-run setup to copy them to canonical names (`sample.jpg`, `path.png`, etc.).
 
 ## Wikilinks in card bodies
 

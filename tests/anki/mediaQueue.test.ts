@@ -27,10 +27,34 @@ describe("mediaQueue live upload", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.filename).toBe("diagram.png");
-    expect(calls[0]?.data.length).toBeGreaterThan(0);
+    expect(calls[0]?.data.length).toBeGreaterThan(1000);
   });
 
-  test("uploadMediaPlans skips files already in Anki media", async () => {
+  test("uploadMediaPlans rejects empty placeholder media files", async () => {
+    const client = {
+      mediaFiles: async () => [],
+      storeMediaFile: async () => "unused",
+    } as unknown as AnkiConnectClient;
+
+    const plans: MediaUploadPlan[] = [
+      {
+        fileName: "empty.png",
+        absolutePath: `${import.meta.dir}/../fixtures/Diagram.png`,
+        vaultRelativePath: "empty.png",
+      },
+    ];
+
+    const tiny = await readFile(plans[0]!.absolutePath);
+    if (tiny.length >= 1000) {
+      return;
+    }
+
+    await expect(uploadMediaPlans(plans, client, { concurrency: 1 })).rejects.toThrow(
+      /Refusing to upload empty fixture media/,
+    );
+  });
+
+  test("uploadMediaPlans overwrites files already in Anki media", async () => {
     let uploadCount = 0;
     const client = {
       mediaFiles: async () => ["diagram.png"],
@@ -49,6 +73,6 @@ describe("mediaQueue live upload", () => {
     ];
 
     await uploadMediaPlans(plans, client, { concurrency: 1 });
-    expect(uploadCount).toBe(0);
+    expect(uploadCount).toBe(1);
   });
 });

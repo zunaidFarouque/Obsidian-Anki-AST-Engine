@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { Content, Root } from "mdast";
+import type { Content, Image, Root } from "mdast";
 import type { Parent } from "unist";
 import { visit } from "unist-util-visit";
 import { parseMarkdown } from "./processor";
@@ -12,12 +12,17 @@ import {
   resolveSubpath,
 } from "../obsidian/linkResolver";
 import type { VaultFileIndex } from "../obsidian/vaultIndex";
+import {
+  isImageMediaPath,
+  resolveAttachmentPath,
+} from "../obsidian/vaultIndex";
 import { stripFrontmatter } from "../io/frontmatterFilter";
 
 export type GraftContext = {
   vaultPath: string;
   sourcePath: string;
   vaultIndex: VaultFileIndex;
+  attachmentFolder?: string;
   visiting?: Set<string>;
   unresolvedEmbeds?: string[];
 };
@@ -36,7 +41,9 @@ export async function graftTransclusions(
 
 async function resolveEmbedsInChildren(
   parent: Parent,
-  context: Required<Pick<GraftContext, "vaultPath" | "sourcePath" | "vaultIndex">> & {
+  context: Required<
+    Pick<GraftContext, "vaultPath" | "sourcePath" | "vaultIndex" | "attachmentFolder">
+  > & {
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
@@ -98,6 +105,7 @@ async function resolveObsidianEmbed(
     vaultPath: string;
     sourcePath: string;
     vaultIndex: VaultFileIndex;
+    attachmentFolder?: string;
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
@@ -147,10 +155,15 @@ async function resolveParsedEmbed(
   context: {
     vaultPath: string;
     vaultIndex: VaultFileIndex;
+    attachmentFolder?: string;
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
 ): Promise<Content[]> {
+  if (isImageMediaPath(parsed.path) && !parsed.subpath) {
+    return resolveImageMediaEmbed(parsed, before, after, sourcePath, context);
+  }
+
   const destPath = getFirstLinkpathDest(
     parsed.path,
     sourcePath,
@@ -196,6 +209,40 @@ async function resolveParsedEmbed(
 
   context.visiting.delete(visitKey);
   return buildReplacementNodes(before, wrapper.children, after);
+}
+
+function resolveImageMediaEmbed(
+  parsed: ReturnType<typeof parseLinktext>,
+  before: string,
+  after: string,
+  sourcePath: string,
+  context: {
+    vaultIndex: VaultFileIndex;
+    attachmentFolder?: string;
+    unresolvedEmbeds: string[];
+  },
+): Content[] {
+  const resolved = resolveAttachmentPath(
+    parsed.path,
+    sourcePath,
+    context.vaultIndex,
+    context.attachmentFolder,
+  );
+
+  if (!resolved) {
+    const marker = formatWikilink(parsed);
+    context.unresolvedEmbeds.push(marker);
+    return buildReplacementNodes(before, [createTextParagraph(marker)], after);
+  }
+
+  const fileName = resolved.split("/").pop() ?? resolved;
+  const image: Image = {
+    type: "image",
+    url: fileName,
+    alt: parsed.displayText ?? "",
+  };
+
+  return buildReplacementNodes(before, [image], after);
 }
 
 async function loadFileNodes(

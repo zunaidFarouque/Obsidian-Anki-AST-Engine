@@ -1,4 +1,4 @@
-import type { Content, FootnoteDefinition, Parents, Root } from "mdast";
+import type { Content, FootnoteDefinition, Image, Parents, Root } from "mdast";
 import rehypeStringify from "rehype-stringify";
 import type { State } from "mdast-util-to-hast";
 import type { Element } from "hast";
@@ -83,16 +83,30 @@ const compiler = unified()
         const mathNode = node as { value: string };
         const result: Element = {
           type: "element",
-          tagName: "div",
-          properties: { className: ["math-display"] },
+          tagName: "p",
+          properties: {},
           children: [{ type: "text", value: `\\[${mathNode.value}\\]` }],
         };
         state.patch(node, result);
-        return result;
+        return state.applyData(node, result);
+      },
+      image(state: State, node): Element {
+        const imageNode = node as Image;
+        const result: Element = {
+          type: "element",
+          tagName: "img",
+          properties: {
+            src: imageNode.url,
+            alt: imageNode.alt ?? "",
+          },
+          children: [],
+        };
+        state.patch(node, result);
+        return state.applyData(node, result);
       },
     },
   } as Parameters<typeof remarkRehype>[0])
-  .use(rehypeStringify);
+  .use(rehypeStringify, { allowDangerousHtml: true });
 
 export type CompiledCardFields = {
   frontHtml: string;
@@ -103,10 +117,66 @@ function compileRoot(root: Root): string {
   return String(compiler.stringify(compiler.runSync(root))).trim();
 }
 
+function stripMathHastAliases(nodes: Content[]): Content[] {
+  const result: Content[] = [];
+
+  for (const node of nodes) {
+    if (node.type === "math" || node.type === "inlineMath") {
+      const mathNode = node as Content & { data?: Record<string, unknown> };
+      if (mathNode.data) {
+        const { hName, hChildren, hProperties, ...remainingData } = mathNode.data;
+        const cleaned: Content & { data?: Record<string, unknown> } = {
+          ...mathNode,
+        };
+        if (Object.keys(remainingData).length > 0) {
+          cleaned.data = remainingData;
+        } else {
+          delete cleaned.data;
+        }
+        result.push(cleaned);
+        continue;
+      }
+    }
+
+    if ("children" in node && Array.isArray(node.children)) {
+      result.push({
+        ...node,
+        children: stripMathHastAliases(node.children as Content[]),
+      } as Content);
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
+function hoistParagraphImages(nodes: Content[]): Content[] {
+  const result: Content[] = [];
+
+  for (const node of nodes) {
+    if (
+      node.type === "paragraph" &&
+      node.children.length === 1 &&
+      node.children[0]?.type === "image"
+    ) {
+      result.push(node.children[0] as Content);
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
 export function compileCardField(nodes: Content[]): string {
   return compileRoot({
     type: "root",
-    children: stripObsidianCommentsFromNodes(nodes),
+    children: hoistParagraphImages(
+      stripMathHastAliases(stripObsidianCommentsFromNodes(nodes)),
+    ),
   });
 }
 
@@ -119,8 +189,12 @@ export function compileCardFields(
   backNodes: Content[],
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
-  const strippedFront = stripObsidianCommentsFromNodes(frontNodes);
-  const strippedBack = stripObsidianCommentsFromNodes(backNodes);
+  const strippedFront = hoistParagraphImages(
+    stripMathHastAliases(stripObsidianCommentsFromNodes(frontNodes)),
+  );
+  const strippedBack = hoistParagraphImages(
+    stripMathHastAliases(stripObsidianCommentsFromNodes(backNodes)),
+  );
   const context = buildFootnoteEmbedContext(strippedFront, strippedBack, {
     inheritedDefs: options.inheritedFootnoteDefs,
   });

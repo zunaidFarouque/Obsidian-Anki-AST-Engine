@@ -1,4 +1,4 @@
-import { relative } from "node:path";
+import { relative, resolve } from "node:path";
 import type { Config } from "./config/configParser";
 import { scanVault } from "./io/scanner";
 import { readMarkdownFile } from "./io/reader";
@@ -93,8 +93,9 @@ export async function runSync(
   options: SyncOptions,
 ): Promise<SyncRunResult> {
   clearMediaDryRunQueue();
-  const vaultIndex = await buildVaultFileIndex(config.vaultPath);
-  const filePaths = await scanVault(config.vaultPath, config.scanFolders);
+  const vaultPath = resolve(config.vaultPath);
+  const vaultIndex = await buildVaultFileIndex(vaultPath);
+  const filePaths = await scanVault(vaultPath, config.scanFolders);
   const actions: SyncAction[] = [];
   const collisionSources: DuplicateCardSource[] = [];
   const ankiDuplicateWarnings: DuplicateWarning[] = [];
@@ -119,11 +120,11 @@ export async function runSync(
     const deck = getTargetAnkiDeck(rawText, config.defaultAnkiDeck);
     const fileAnkiTags = getFileAnkiTags(rawText);
 
-    const sourcePath = relative(config.vaultPath, absolutePath).replace(
+    const sourcePath = relative(vaultPath, absolutePath).replace(
       /\\/g,
       "/",
     );
-    const ast = parseMarkdown(rawText, config.vaultPath);
+    const ast = parseMarkdown(rawText, vaultPath);
     const unresolvedEmbeds: string[] = [];
 
     const delimiter = getDelimiter(rawText, config.delimiter);
@@ -143,14 +144,15 @@ export async function runSync(
     const sourceCards = extractCards(ast, delimiter, extractOptions);
 
     await graftTransclusions(ast, {
-      vaultPath: config.vaultPath,
+      vaultPath,
       sourcePath,
       vaultIndex,
+      attachmentFolder: config.attachmentFolder,
       unresolvedEmbeds,
     });
 
     const mediaResult = await resolveMedia(ast, {
-      vaultPath: config.vaultPath,
+      vaultPath,
       sourcePath,
       vaultIndex,
       attachmentFolder: config.attachmentFolder,

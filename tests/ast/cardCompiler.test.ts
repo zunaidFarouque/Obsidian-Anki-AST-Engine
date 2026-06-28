@@ -123,7 +123,8 @@ describe("cardCompiler", () => {
     expect(backHtml).not.toContain("$E=mc^2$");
     expect(backHtml).toContain("\\(E=mc^2\\)");
     expect(backHtml).toContain("F = ma");
-    expect(backHtml).toMatch(/\\\[|math-display/);
+    expect(backHtml).toContain("\\[F = ma\\]");
+    expect(backHtml).not.toContain("math-display");
   });
 
   test("card-math fixture keeps delimiter inside display math from splitting card", async () => {

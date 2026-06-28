@@ -3,6 +3,8 @@ import pLimit from "p-limit";
 import type { MediaUploadPlan } from "../ast/mediaResolver";
 import type { AnkiConnectClient } from "./client";
 
+const MIN_UPLOAD_BYTES = 1000;
+
 const dryRunQueue: MediaUploadPlan[] = [];
 
 export function enqueueMediaDryRun(plan: MediaUploadPlan): void {
@@ -39,20 +41,20 @@ export async function uploadMediaPlans(
   }
 
   const limit = pLimit(options.concurrency ?? 3);
-  const existing = new Set(await client.mediaFiles());
   const uniquePlans = dedupePlans(plans);
 
   await Promise.all(
     uniquePlans.map((plan) =>
       limit(async () => {
-        if (existing.has(plan.fileName)) {
-          return;
+        const buffer = await readFile(plan.absolutePath);
+        if (buffer.length < MIN_UPLOAD_BYTES) {
+          throw new Error(
+            `Refusing to upload empty fixture media ${plan.fileName} (${buffer.length} bytes at ${plan.absolutePath}). Run: bun run setup:fixtures`,
+          );
         }
 
-        const buffer = await readFile(plan.absolutePath);
         const data = buffer.toString("base64");
         await client.storeMediaFile(plan.fileName, data);
-        existing.add(plan.fileName);
       }),
     ),
   );

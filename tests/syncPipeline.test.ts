@@ -198,14 +198,32 @@ describe("syncPipeline", () => {
     const root = await mkdtemp(join(tmpdir(), "anki-media-"));
     const vaultPath = join(root, "vault");
     const notesDir = join(vaultPath, "Notes");
-    const assetsDir = join(notesDir, "assets", "nested");
-    await mkdir(assetsDir, { recursive: true });
+    const nestedDir = join(notesDir, "assets", "nested", "another folderrrr");
+    await mkdir(nestedDir, { recursive: true });
+    await mkdir(join(notesDir, "assets", "media"), { recursive: true });
 
     const fixturePath = join(import.meta.dir, "fixtures/complex-media-paths.md");
     const notePath = join(notesDir, "complex-media-paths.md");
     await copyFile(fixturePath, notePath);
-    await writeFile(join(notesDir, "Cell Diagram final.png"), "png");
-    await writeFile(join(assetsDir, "path.png"), "png");
+    await copyFile(
+      join(
+        import.meta.dir,
+        "fixtures/assets/nested/another folderrrr/toppng.com-cartoon-1254x1254.png",
+      ),
+      join(nestedDir, "toppng.com-cartoon-1254x1254.png"),
+    );
+    await copyFile(
+      join(import.meta.dir, "fixtures/assets/nested/path.png"),
+      join(notesDir, "assets", "nested", "path.png"),
+    );
+    await copyFile(
+      join(import.meta.dir, "fixtures/assets/media/jpeg-home.jpg"),
+      join(notesDir, "assets", "media", "jpeg-home.jpg"),
+    );
+    await copyFile(
+      join(import.meta.dir, "fixtures/assets/media/koala.webp"),
+      join(notesDir, "assets", "media", "koala.webp"),
+    );
 
     const config: Config = {
       vaultPath,
