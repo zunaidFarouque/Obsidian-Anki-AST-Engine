@@ -10,6 +10,13 @@ export const COMPLEX_MEDIA_FIXTURE_FILES = [
   "assets/media/koala.webp",
 ] as const;
 
+export const NON_IMAGE_MEDIA_FIXTURE_FILES = [
+  "assets/media/sample.svg",
+  "assets/media/sample.pdf",
+  "assets/media/sample.mp3",
+  "assets/media/sample.mp4",
+] as const;
+
 export async function assertFixtureMediaReady(
   fixturesDir: string,
   files: readonly string[] = COMPLEX_MEDIA_FIXTURE_FILES,

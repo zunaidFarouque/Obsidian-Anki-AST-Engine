@@ -1,24 +1,26 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
-import type { AnkiConnectClient } from "../../src/anki/client";
+import type { AnkiConnectClient, StoreMediaFileParams } from "../../src/anki/client";
 import { uploadMediaPlans } from "../../src/anki/mediaQueue";
 import type { MediaUploadPlan } from "../../src/ast/mediaResolver";
 
 describe("mediaQueue live upload", () => {
-  test("uploadMediaPlans calls storeMediaFile with base64 data", async () => {
-    const calls: Array<{ filename: string; data: string }> = [];
+  test("uploadMediaPlans calls storeMediaFile with local path for vault files", async () => {
+    const calls: StoreMediaFileParams[] = [];
     const client = {
       mediaFiles: async () => [],
-      storeMediaFile: async (filename: string, data: string) => {
-        calls.push({ filename, data });
-        return filename;
+      storeMediaFile: async (params: StoreMediaFileParams) => {
+        calls.push(params);
+        return "diagram.png";
       },
     } as unknown as AnkiConnectClient;
 
+    const absolutePath = `${import.meta.dir}/../fixtures/Cell Diagram final.png`;
     const plans: MediaUploadPlan[] = [
       {
         fileName: "diagram.png",
-        absolutePath: `${import.meta.dir}/../fixtures/Cell Diagram final.png`,
+        transport: "path",
+        absolutePath,
         vaultRelativePath: "diagram.png",
       },
     ];
@@ -26,8 +28,72 @@ describe("mediaQueue live upload", () => {
     await uploadMediaPlans(plans, client, { concurrency: 1 });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.filename).toBe("diagram.png");
-    expect(calls[0]?.data.length).toBeGreaterThan(1000);
+    expect(calls[0]).toEqual({
+      filename: "diagram.png",
+      path: absolutePath,
+    });
+  });
+
+  test("uploadMediaPlans falls back to base64 when path upload fails", async () => {
+    const calls: StoreMediaFileParams[] = [];
+    const client = {
+      mediaFiles: async () => [],
+      storeMediaFile: async (params: StoreMediaFileParams) => {
+        calls.push(params);
+        if ("path" in params) {
+          throw new Error("path rejected");
+        }
+        return "diagram.png";
+      },
+    } as unknown as AnkiConnectClient;
+
+    const absolutePath = `${import.meta.dir}/../fixtures/Cell Diagram final.png`;
+    const plans: MediaUploadPlan[] = [
+      {
+        fileName: "diagram.png",
+        transport: "path",
+        absolutePath,
+        vaultRelativePath: "diagram.png",
+      },
+    ];
+
+    await uploadMediaPlans(plans, client, { concurrency: 1 });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual({
+      filename: "diagram.png",
+      path: absolutePath,
+    });
+    expect(calls[1]?.filename).toBe("diagram.png");
+    expect(calls[1]).toHaveProperty("data");
+    expect((calls[1] as { data: string }).data.length).toBeGreaterThan(1000);
+  });
+
+  test("uploadMediaPlans calls storeMediaFile with url for remote markdown images", async () => {
+    const calls: StoreMediaFileParams[] = [];
+    const client = {
+      mediaFiles: async () => [],
+      storeMediaFile: async (params: StoreMediaFileParams) => {
+        calls.push(params);
+        return "remote.png";
+      },
+    } as unknown as AnkiConnectClient;
+
+    const plans: MediaUploadPlan[] = [
+      {
+        fileName: "remote.png",
+        transport: "url",
+        sourceUrl: "https://example.com/remote.png",
+      },
+    ];
+
+    await uploadMediaPlans(plans, client, { concurrency: 1 });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({
+      filename: "remote.png",
+      url: "https://example.com/remote.png",
+    });
   });
 
   test("uploadMediaPlans rejects empty placeholder media files", async () => {
@@ -39,12 +105,13 @@ describe("mediaQueue live upload", () => {
     const plans: MediaUploadPlan[] = [
       {
         fileName: "empty.png",
+        transport: "path",
         absolutePath: `${import.meta.dir}/../fixtures/Diagram.png`,
         vaultRelativePath: "empty.png",
       },
     ];
 
-    const tiny = await readFile(plans[0]!.absolutePath);
+    const tiny = await readFile(plans[0]!.absolutePath!);
     if (tiny.length >= 1000) {
       return;
     }
@@ -67,6 +134,7 @@ describe("mediaQueue live upload", () => {
     const plans: MediaUploadPlan[] = [
       {
         fileName: "diagram.png",
+        transport: "path",
         absolutePath: `${import.meta.dir}/../fixtures/Cell Diagram final.png`,
         vaultRelativePath: "diagram.png",
       },

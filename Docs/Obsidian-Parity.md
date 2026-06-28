@@ -37,23 +37,27 @@ These behaviors are documented in full in [Engine-Architecture.md](Engine-Archit
 | `[[#^block-id]]` | Same-note block link |
 | `![[...]]` | Embed — note transclusion or image media (see below) |
 
-## Image vs note embeds
+## Media vs note embeds
 
 | `![[target]]` resolves to | Behavior |
 |---------------------------|----------|
 | Note (`.md`) | Transclusion — content grafted inline via [`transclusionGraft.ts`](../src/ast/transclusionGraft.ts) |
-| Image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) | Media embed — converted to `image` mdast node; file uploaded to Anki on sync |
+| Raster image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) | `image` mdast node → `<img>`; uploaded to Anki |
+| SVG (`.svg`) | `image` mdast node → `<img>`; uploaded to Anki |
+| Audio (`.mp3`) | `[sound:basename.mp3]` paragraph; uploaded to Anki |
+| Video (`.mp4`) | `[sound:basename.mp4]` paragraph; uploaded to Anki |
+| PDF (`.pdf`) | Link paragraph; uploaded to Anki |
 | Missing file | Literal `![[...]]` kept in HTML + listed in `unresolvedEmbeds` |
 
-Note transclusion with subpaths (`![[Note#^block]]`, `![[Note#Heading]]`) is unchanged. Image paths with block/heading subpaths are not treated as images.
+Note transclusion with subpaths (`![[Note#^block]]`, `![[Note#Heading]]`) is unchanged. Media paths with block/heading subpaths are not treated as attachable media.
 
-Markdown images `![](path)` use the same media resolver and upload path as wiki image embeds.
+Markdown images `![](path)` use the same media resolver and upload path as wiki image embeds for raster formats. Wiki `![[…]]` is required for SVG, PDF, audio, and video.
 
 Basename-only wiki embeds (`![[photo.jpg]]`) are resolved vault-wide via [`resolveAttachmentPath`](../src/obsidian/vaultIndex.ts): same directory as the source note, paths under the note’s folder, configured `attachmentFolder` (default `attachments`), then shortest unique path when `linkFormat` is `shortest`. Ambiguous matches stay unresolved.
 
 Anki upload names may gain a content-hash suffix (`photo_=_a3f9b2c1.jpg`) when multiple vault files share the same basename in one sync — see [`mediaNaming.ts`](../src/anki/mediaNaming.ts).
 
-Test fixture: [`tests/fixtures/complex-media-paths.md`](../tests/fixtures/complex-media-paths.md). Run `bun run setup:fixtures` to download or generate minimal binary placeholders offline.
+Test fixtures: [`complex-media-paths.md`](../tests/fixtures/complex-media-paths.md) (raster images), [`complex-media-non-image.md`](../tests/fixtures/complex-media-non-image.md) (SVG, PDF, MP3, MP4). Run `bun run setup:fixtures` to download real sample files.
 
 ## File resolution (`getFirstLinkpathDest`)
 

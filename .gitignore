@@ -106,3 +106,8 @@ Thumbs.db
 
 # Project specific
 config.json
+
+# Obsidian plugin build output
+plugin/main.js
+plugin/main.js.map
+plugin/node_modules

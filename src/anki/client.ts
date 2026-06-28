@@ -34,6 +34,11 @@ export type NoteInfo = {
   fields: Record<string, { value: string; order: number }>;
 };
 
+export type StoreMediaFileParams =
+  | { filename: string; path: string }
+  | { filename: string; data: string }
+  | { filename: string; url: string };
+
 export class AnkiConnectClient {
   private readonly url: string;
   private readonly apiKey?: string;
@@ -147,11 +152,8 @@ export class AnkiConnectClient {
     });
   }
 
-  async storeMediaFile(filename: string, data: string): Promise<string> {
-    return this.invoke<string>("storeMediaFile", {
-      filename,
-      data,
-    });
+  async storeMediaFile(params: StoreMediaFileParams): Promise<string> {
+    return this.invoke<string>("storeMediaFile", params);
   }
 
   async mediaFiles(): Promise<string[]> {

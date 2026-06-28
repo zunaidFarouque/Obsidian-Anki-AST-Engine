@@ -87,4 +87,69 @@ describe("syncPipeline media collision", () => {
 
     await rm(vaultPath, { recursive: true, force: true });
   });
+
+  test("disambiguates colliding pdf basenames with distinct anki uploads", async () => {
+    const vaultPath = await mkdtemp(join(tmpdir(), "media-collision-pdf-"));
+    await mkdir(join(vaultPath, "notes", "a"), { recursive: true });
+    await mkdir(join(vaultPath, "notes", "b"), { recursive: true });
+
+    const pdfFixture = join(import.meta.dir, "fixtures/assets/media/sample.pdf");
+    const svgFixture = join(import.meta.dir, "fixtures/assets/media/sample.svg");
+    await copyFile(pdfFixture, join(vaultPath, "notes", "a", "sample.pdf"));
+    await copyFile(svgFixture, join(vaultPath, "notes", "b", "sample.pdf"));
+
+    const cardTemplate = (title: string) =>
+      [
+        "---",
+        "AnkiSync: on",
+        "cardDeclarationHeadingLevel: 4",
+        "---",
+        "",
+        `# ${title}`,
+        "",
+        "#### PDF card",
+        "",
+        "Open the slides.",
+        "",
+        "![[sample.pdf]]",
+        "",
+        ":::",
+        "",
+        "Answer.",
+      ].join("\n");
+
+    await writeFile(
+      join(vaultPath, "notes", "a", "card-a.md"),
+      cardTemplate("Folder A"),
+    );
+    await writeFile(
+      join(vaultPath, "notes", "b", "card-b.md"),
+      cardTemplate("Folder B"),
+    );
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["notes"],
+      defaultAnkiDeck: "Media Collision",
+      ...baseConfig,
+    };
+
+    const { actions, mediaWarnings } = await runSync(config, { dryRun: true });
+
+    const cardA = actions.find((action) => action.tag.includes("Folder A"));
+    const cardB = actions.find((action) => action.tag.includes("Folder B"));
+
+    expect(cardA).toBeDefined();
+    expect(cardB).toBeDefined();
+    expect(mediaWarnings).toHaveLength(1);
+
+    const hrefA = cardA?.frontHtml?.match(/href="([^"]+\.pdf)"/)?.[1];
+    const hrefB = cardB?.frontHtml?.match(/href="([^"]+\.pdf)"/)?.[1];
+    expect(hrefA).toContain(MEDIA_HASH_SEPARATOR);
+    expect(hrefB).toContain(MEDIA_HASH_SEPARATOR);
+    expect(hrefA).not.toBe(hrefB);
+
+    await rm(vaultPath, { recursive: true, force: true });
+  });
 });

@@ -130,7 +130,7 @@ Further detail on failure modes and mutex locking: [Starter Arch DR.md](Starter%
 
 For each sync-eligible file ([`syncPipeline.ts`](../src/syncPipeline.ts)):
 
-1. **Media upload** — `storeMediaFile` with concurrency 3. If upload fails, no cards in that file are synced or injected.
+1. **Media upload** — `storeMediaFile` with concurrency 3: local `path` first, base64 `data` fallback, `url` for external `![](https://...)` images. If upload fails, no cards in that file are synced or injected.
 2. **Per-card Anki sync** — each card is synced independently; one card’s failure does not abort siblings.
 3. **Batch ID injection** — successful cards without an `anki-id` receive `<!--anki-id-->` in **reverse offset order** so earlier splices do not shift later offsets.
 

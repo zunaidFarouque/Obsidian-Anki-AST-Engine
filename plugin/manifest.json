@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-anki-ast-sync",
+	"name": "Obsidian Anki AST Sync",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Sync Obsidian flashcards to Anki using the AST engine (AnkiConnect).",
+	"author": "zunaidFarouque",
+	"authorUrl": "https://github.com/zunaidFarouque",
+	"isDesktopOnly": true
+}

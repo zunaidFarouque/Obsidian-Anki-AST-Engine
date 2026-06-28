@@ -1,5 +1,5 @@
 ---
-AnkiSync: on
+AnkiSync: off
 cardDeclarationHeadingLevel: 4
 target_anki_deck: VISA
 file_anki_tags: VISAF1

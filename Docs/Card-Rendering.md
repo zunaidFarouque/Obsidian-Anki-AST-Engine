@@ -205,7 +205,9 @@ flowchart BT
 
 ## Images and media embeds
 
-Obsidian image embeds are resolved **before** card compile and uploaded to the Anki collection media folder during live sync.
+Obsidian wiki media embeds are resolved **before** card compile and uploaded to the Anki collection media folder during live sync.
+
+### Raster images
 
 | Vault syntax | Engine behavior | Anki field |
 |--------------|-----------------|------------|
@@ -213,22 +215,38 @@ Obsidian image embeds are resolved **before** card compile and uploaded to the A
 | `![[folder/photo.jpg]]` | Explicit path when provided; `src` is basename only (`photo.jpg`) | `<img src="photo.jpg">` |
 | `![](relative/path.png)` | Standard markdown image; URL rewritten to basename | `<img src="path.png">` |
 
+Supported raster extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`.
+
+### SVG, audio, video, and PDF
+
+| Kind | Vault syntax | Anki field HTML |
+|------|--------------|-----------------|
+| SVG | `![[icon.svg]]` | `<img src="icon.svg">` |
+| Audio | `![[lecture.mp3]]` | `<p>[sound:lecture.mp3]</p>` |
+| Video | `![[clip.mp4]]` | `<p>[sound:clip.mp4]</p>` |
+| PDF | `![[slides.pdf]]` or `![[slides.pdf\|Course slides]]` | `<p><a href="slides.pdf">…</a></p>` |
+
+Anki uses the `[sound:…]` tag for both audio and video ([Anki media docs](https://docs.ankiweb.net/media.html)). Video plays via mpv on desktop — not inline like Obsidian’s embed viewer. PDF renders as a download link; Obsidian’s inline PDF viewer is not replicated. SVG is referenced via `<img>` (not inline SVG DOM).
+
+Supported extensions: see [`vaultIndex.ts`](../src/obsidian/vaultIndex.ts) — `.svg`, `.pdf`, `.mp3`, `.mp4` in addition to raster images.
+
+Paragraph-only images (`![](path.png)` on its own line) are hoisted to root-level `image` nodes before compile so they render as `<img>` rather than empty `<p>` elements.
+
 Filenames with spaces are rewritten for Anki (`Cell Diagram final.png` → `Cell_Diagram_final.png` in both `src` and the uploaded collection media name). Vault files keep their original names.
 
 **Basename collisions:** When multiple vault files share the same sanitized basename in one sync run, the engine hashes file **content** (SHA-256, first 8 hex chars) and inserts it before the extension with the `_=_` separator — e.g. `koala_=_a3f9b2c1.webp` vs `koala_=_7e2d1044.webp`. Unique basenames stay plain (`path.png`). Identical bytes under colliding names share one Anki file. See [`mediaNaming.ts`](../src/anki/mediaNaming.ts). Dry-run / stderr emits `media_warning` events when disambiguation occurs.
 
-Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` (see [`vaultIndex.ts`](../src/obsidian/vaultIndex.ts)). SVG, PDF, audio, and video are out of scope for V2.
-
 Pipeline:
 
-1. [`transclusionGraft.ts`](../src/ast/transclusionGraft.ts) — wiki image embeds short-circuit to `image` nodes when the file exists (note transclusion unchanged for `![[Note]]` / block refs).
-2. [`mediaResolver.ts`](../src/ast/mediaResolver.ts) — rewrites any remaining wiki media to `image` nodes and queues upload plans.
-3. [`cardCompiler.ts`](../src/ast/cardCompiler.ts) — `image` → `<img>` with literal `src` (spaces preserved; no `%20` encoding).
-4. [`mediaQueue.ts`](../src/anki/mediaQueue.ts) — live sync uploads files before card notes are sent.
+1. [`transclusionGraft.ts`](../src/ast/transclusionGraft.ts) — wiki media embeds short-circuit when the file exists (note transclusion unchanged for `![[Note]]` / block refs).
+2. [`vaultMediaNodes.ts`](../src/ast/vaultMediaNodes.ts) — resolved files become `image`, `[sound:…]`, or PDF link nodes.
+3. [`mediaResolver.ts`](../src/ast/mediaResolver.ts) — rewrites remaining wiki embeds, applies collision names, queues upload plans.
+4. [`cardCompiler.ts`](../src/ast/cardCompiler.ts) — standard mdast → HTML (`image` → `<img>`, sound paragraphs, PDF links).
+5. [`mediaQueue.ts`](../src/anki/mediaQueue.ts) — live sync uploads before card notes: local `path` first, base64 fallback, `url` for `![](https://...)` images.
 
-Paragraph-only images (`![](path.png)` on its own line) are hoisted to root-level `image` nodes before compile so they render as `<img>` rather than empty `<p>` elements.
+**Upload transport:** Vault media uses AnkiConnect `path` (file copy on disk). If that fails, the engine retries with base64 `data`. Markdown images with `http://` or `https://` URLs use AnkiConnect `url` so Anki downloads the file into `collection.media` (requires internet; card `src` becomes the local basename, not a hotlink).
 
-Fixture assets for tests: `bun run setup:fixtures` (see [`scripts/download-fixture-assets.ts`](../scripts/download-fixture-assets.ts)). Committed images under `tests/fixtures/assets/` must be real files (not empty placeholders); tests refuse to upload media smaller than 1 KB. You can drop manual downloads in `assets/media/` or `assets/nested/` and re-run setup to copy them to canonical names (`sample.jpg`, `path.png`, etc.).
+Fixture assets for tests: `bun run setup:fixtures` (see [`scripts/download-fixture-assets.ts`](../scripts/download-fixture-assets.ts)). Committed media under `tests/fixtures/assets/` must be real files (not empty placeholders); tests refuse to upload media smaller than 1 KB. You can drop manual downloads in `assets/media/` and re-run setup to copy them to canonical names (`sample.jpg`, `sample.svg`, `sample.pdf`, `sample.mp3`, `sample.mp4`, etc.).
 
 ## Wikilinks in card bodies
 
@@ -242,6 +260,8 @@ After transclusion grafting, remaining `[[links]]` compile to `<a>` elements. Em
 |-------|---------|
 | `frontHtml` | Compiled HTML for front field |
 | `backHtml` | Compiled HTML for back field |
+| `wouldUploadMedia` | Basenames queued for upload |
+| `mediaUploadDetails` | Per-file `{ fileName, transport }` where transport is `path`, `base64`, or `url` |
 
 Replaces legacy `frontPreview` / `backPreview` plain-text flattening.
 

@@ -4,10 +4,17 @@
   "description": "A deterministic, headless Node.js synchronization pipeline bridging Obsidian and Anki.",
   "homepage": "https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./sync": "./dist/syncPipeline.js",
+    "./anki": "./dist/anki/client.js",
+    "./config": "./dist/config/configParser.js"
+  },
   "scripts": {
     "start": "bun run src/index.ts",
     "sync": "bun run src/index.ts",
     "build": "tsc",
+    "build:plugin": "cd plugin && bun run build",
     "dev": "bun run src/index.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",

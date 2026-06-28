@@ -46,6 +46,10 @@ export type SyncAction = {
   wouldInjectId?: string;
   ankiNoteId?: number;
   wouldUploadMedia?: string[];
+  mediaUploadDetails?: Array<{
+    fileName: string;
+    transport: "path" | "base64" | "url";
+  }>;
   unresolvedEmbeds?: string[];
   transclusionResolved?: boolean;
   syncError?: string;
@@ -214,6 +218,10 @@ export async function runSync(
         ankiId: card.ankiId,
         wouldInjectId: injectionPlan?.uuid,
         wouldUploadMedia: mediaResult.plans.map((plan) => plan.fileName),
+        mediaUploadDetails: mediaResult.plans.map((plan) => ({
+          fileName: plan.fileName,
+          transport: plan.transport,
+        })),
         unresolvedEmbeds:
           unresolvedEmbeds.length > 0 ? [...unresolvedEmbeds] : undefined,
         transclusionResolved: unresolvedEmbeds.length === 0,

@@ -63,11 +63,11 @@ const ASSETS: FixtureAsset[] = [
     path: join(FIXTURES_DIR, "assets/media/sample.pdf"),
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/4/45/En-us-hello.ogg",
+    url: "https://samplelib.com/lib/preview/mp3/sample-3s.mp3",
     path: join(FIXTURES_DIR, "assets/media/sample.mp3"),
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogg",
+    url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
     path: join(FIXTURES_DIR, "assets/media/sample.mp4"),
   },
 ];
@@ -124,10 +124,11 @@ async function downloadOrFallback(url: string, path: string): Promise<void> {
     }
 
     console.warn(
-      `Download failed for ${url}; writing minimal ${extname(path) || "PNG"} (${String(error)})`,
+      `Download failed for ${url}; skipping minimal fallback for ${path} (${String(error)})`,
     );
-    await writeFile(path, fallbackForPath(path));
-    console.log(`Saved minimal fallback ${path}`);
+    console.warn(
+      `Drop a real ${extname(path) || "media"} file in tests/fixtures/assets/media/ and re-run: bun run setup:fixtures`,
+    );
   }
 }
 
@@ -169,6 +170,30 @@ async function syncCanonicalNamesFromManualAssets(): Promise<void> {
       source: manualGif,
       target: join(FIXTURES_DIR, "assets/media/sample.gif"),
     });
+  }
+
+  const mediaDir = join(FIXTURES_DIR, "assets/media");
+  const canonicalMediaNames = ["sample.svg", "sample.pdf", "sample.mp3", "sample.mp4"] as const;
+  try {
+    const { readdir } = await import("node:fs/promises");
+    const entries = await readdir(mediaDir);
+    for (const canonicalName of canonicalMediaNames) {
+      const ext = extname(canonicalName);
+      const manualMatch = entries.find(
+        (entry) =>
+          entry !== canonicalName &&
+          entry.toLowerCase().endsWith(ext) &&
+          !entry.startsWith("sample."),
+      );
+      if (manualMatch) {
+        manualSources.push({
+          source: join(mediaDir, manualMatch),
+          target: join(mediaDir, canonicalName),
+        });
+      }
+    }
+  } catch {
+    // no media directory yet
   }
 
   for (const { source, target } of manualSources) {

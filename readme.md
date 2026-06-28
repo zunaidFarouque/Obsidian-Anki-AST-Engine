@@ -89,6 +89,10 @@ bun run sync -- --check
 
 See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID binding, and troubleshooting.
 
+## **🔌 Obsidian plugin**
+
+An in-vault plugin scaffold lives in [`plugin/`](plugin/). Build it with `bun run build:plugin` (requires `dist/` from the engine). See [plugin/README.md](plugin/README.md) for local install steps.
+
 ## **🧪 Test-Driven Development (TDD)**
 
 This project strictly adheres to TDD to handle the immense edge cases of personal knowledge management workflows. Before contributing new features, refer to the fixtures directory (`tests/fixtures/`).

@@ -14,11 +14,6 @@ import type { ObsidianCallout } from "./remarkObsidianCallout";
 import { remarkObsidianHighlight } from "./remarkObsidianHighlight";
 import { remarkPreviewHeading } from "./remarkPreviewHeading";
 import { remarkObsidianComment, stripObsidianCommentsFromNodes } from "./remarkObsidianComment";
-import {
-  isPdfLinkParagraph,
-  isSoundMediaParagraph,
-  soundFileNameFromParagraph,
-} from "./vaultMediaNodes";
 
 const compiler = unified()
   .use(remarkObsidianComment)
@@ -168,31 +163,6 @@ function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
     ) {
       result.push(node.children[0] as Content);
       continue;
-    }
-
-    if (isSoundMediaParagraph(node)) {
-      const fileName = soundFileNameFromParagraph(node);
-      if (fileName) {
-        result.push({
-          type: "html",
-          value: `[sound:${fileName}]`,
-        });
-        continue;
-      }
-    }
-
-    if (isPdfLinkParagraph(node)) {
-      const link = node.children[0];
-      if (link?.type === "link") {
-        const label = link.children
-          .map((child) => ("value" in child ? String(child.value) : ""))
-          .join("");
-        result.push({
-          type: "html",
-          value: `<a href="${link.url}">${label}</a>`,
-        });
-        continue;
-      }
     }
 
     result.push(node);

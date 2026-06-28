@@ -172,7 +172,12 @@ Implementation: [`src/anki/duplicateDetect.ts`](../src/anki/duplicateDetect.ts)
 
 For each file:
 
-1. Upload media (`storeMediaFile`, concurrency 3). If media upload fails, no cards in that file are synced or injected.
+1. Upload media (`storeMediaFile`, concurrency 3) using tiered transport:
+   - **Vault files** — AnkiConnect `path` (local file copy; fastest)
+   - **Path failure** — automatic fallback to `data` (base64)
+   - **External markdown images** `![](https://...)` — AnkiConnect `url` (Anki downloads into `collection.media`)
+   
+   Dry-run JSON includes `mediaUploadDetails` with `{ fileName, transport }` per file. If media upload fails, no cards in that file are synced or injected.
 2. Sync each card to Anki independently (per-card errors do not abort siblings).
 3. Batch-inject new IDs for **all successful cards** (reverse offset order).
 

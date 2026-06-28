@@ -108,7 +108,7 @@ The transformation of Markdown into a traversable Abstract Syntax Tree is the fo
 ### **Deep Media Resolution**
 
 During the traversal of the AST, the system must identify and process media assets to ensure they render correctly within the Anki client. The mediaResolver.ts module uses unist-util-visit to locate nodes of type image (standard Markdown images) and wikiLink nodes where the isType property indicates an embed (Obsidian image embeds)2.  
-When a media node is intercepted, the engine extracts the file name and resolves the local absolute path by cross-referencing the Obsidian vault root. Because AnkiConnect's storeMediaFile endpoint requires binary data to be transmitted as a Base64-encoded string, the engine reads the local file buffer, executes the conversion, and pushes the payload into a throttled p-limit queue22. Once the AnkiConnect API confirms the successful storage of the media file in Anki's SQLite database22, the AST node's URL property is rewritten. It is modified from the local Obsidian path to the newly stored filename, ensuring that when the card is eventually compiled into HTML, the src attribute correctly points to the internal Anki media directory.
+When a media node is intercepted, the engine extracts the file name and resolves the local absolute path by cross-referencing the Obsidian vault root. Upload uses AnkiConnect's tiered `storeMediaFile` API: **path** (local file copy) for vault files, **data** (base64) as fallback when path fails, and **url** for external markdown images `![](https://...)` so Anki downloads into `collection.media`. Plans are pushed through a throttled p-limit queue. Once stored, the AST node's URL property is rewritten to the Anki media basename.
 
 ### **Asynchronous Transclusion Grafting**
 
@@ -261,7 +261,7 @@ This concurrency pattern guarantees that if File A initiates an ID injection int
 **Failure Mode:** The AnkiConnect plugin operates as a synchronous, single-threaded HTTP server hosted within the Python environment of the Anki Desktop application. When a user syncs a vault containing hundreds of high-resolution images, the storeMediaFile action necessitates the transmission of massive Base64 payloads over localhost22. Because Node.js is heavily asynchronous, it will easily dispatch hundreds of concurrent fetch requests simultaneously, rapidly overflowing AnkiConnect's request backlog. This leads to ECONNRESET errors, socket timeouts, and silently dropped media files5.  
 **Code-Level Mitigation:** All network requests directed at AnkiConnect will be rigorously routed through an abstraction layer managed by p-limit4. Rather than using a priority queue, simple stateless concurrency caps are established:
 
-1. const mediaLimit \= pLimit(3); \- Base64 media uploads (storeMediaFile) are strictly throttled to a maximum concurrency of 3\. This drip-feeds the heavy payloads, ensuring the Python thread can process and write the binary data to SQLite without stalling.  
+1. const mediaLimit \= pLimit(3); \- Media uploads (storeMediaFile via path, url, or base64 fallback) are strictly throttled to a maximum concurrency of 3\. This drip-feeds payloads, ensuring the Python thread can process and write binary data to SQLite without stalling.  
 2. const syncLimit \= pLimit(10); \- Lightweight JSON requests (addNote, updateNoteFields, notesInfo) are throttled to a concurrency of 10, optimizing throughput without triggering API rejection logic22.
 
 ### **Bottleneck 3: Destructive Formatting Alterations via AST Serialization**

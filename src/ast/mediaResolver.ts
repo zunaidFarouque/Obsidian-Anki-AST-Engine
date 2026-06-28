@@ -11,6 +11,11 @@ import {
 } from "../obsidian/vaultIndex";
 import { enqueueMediaDryRun } from "../anki/mediaQueue";
 import { toAnkiMediaFileName } from "../anki/mediaFileName";
+import {
+  disambiguateRemoteFileName,
+  fileNameFromRemoteUrl,
+  isRemoteMediaUrl,
+} from "../anki/mediaTransport";
 import type { MediaPathEntry } from "../anki/mediaNaming";
 import {
   createResolvedMediaNode,
@@ -19,10 +24,14 @@ import {
   soundFileNameFromParagraph,
 } from "./vaultMediaNodes";
 
+export type MediaUploadTransport = "path" | "base64" | "url";
+
 export type MediaUploadPlan = {
   fileName: string;
-  absolutePath: string;
-  vaultRelativePath: string;
+  transport: MediaUploadTransport;
+  absolutePath?: string;
+  vaultRelativePath?: string;
+  sourceUrl?: string;
 };
 
 export type MediaResolveResult = {
@@ -112,6 +121,9 @@ export function collectResolvedMediaPaths(
   const walk = (nodes: Content[]) => {
     for (const node of nodes) {
       if (node.type === "image") {
+        if (isRemoteMediaUrl(node.url)) {
+          continue;
+        }
         tryAddPath(node.url);
         continue;
       }
@@ -185,13 +197,29 @@ export async function resolveMedia(
   rewriteRemainingMediaEmbeds(ast.children, context);
 
   const plans: MediaUploadPlan[] = [];
-  const seen = new Set<string>();
+  const seenPaths = new Set<string>();
+  const seenRemoteNames = new Map<string, string>();
 
-  visitResolvableMedia(ast, context, (vaultRelativePath, applyAnkiFileName) => {
-    const absolutePath = resolvePath(context.vaultIndex.vaultPath, vaultRelativePath);
-    const fileName = ankiFileNameForVaultPath(vaultRelativePath, context);
-    applyAnkiFileName(fileName);
-    addPlan(plans, seen, fileName, absolutePath, vaultRelativePath, context.dryRun);
+  visitResolvableMedia(ast, context, {
+    onVaultPath: (vaultRelativePath, applyAnkiFileName) => {
+      const absolutePath = resolvePath(context.vaultIndex.vaultPath, vaultRelativePath);
+      const fileName = ankiFileNameForVaultPath(vaultRelativePath, context);
+      applyAnkiFileName(fileName);
+      addPathPlan(
+        plans,
+        seenPaths,
+        fileName,
+        absolutePath,
+        vaultRelativePath,
+        context.dryRun,
+      );
+    },
+    onRemoteUrl: (sourceUrl, applyAnkiFileName) => {
+      const baseName = fileNameFromRemoteUrl(sourceUrl);
+      const fileName = disambiguateRemoteFileName(baseName, sourceUrl, seenRemoteNames);
+      applyAnkiFileName(fileName);
+      addUrlPlan(plans, fileName, sourceUrl, context.dryRun);
+    },
   });
 
   return { plans };
@@ -203,16 +231,29 @@ function visitResolvableMedia(
     MediaResolveContext,
     "sourcePath" | "vaultIndex" | "attachmentFolder" | "linkFormat"
   >,
-  onResolved: (
-    vaultRelativePath: string,
-    applyAnkiFileName: (fileName: string) => void,
-  ) => void,
+  handlers: {
+    onVaultPath: (
+      vaultRelativePath: string,
+      applyAnkiFileName: (fileName: string) => void,
+    ) => void;
+    onRemoteUrl: (
+      sourceUrl: string,
+      applyAnkiFileName: (fileName: string) => void,
+    ) => void;
+  },
 ): void {
   const walk = (nodes: Content[]) => {
     for (const node of nodes) {
       if (node.type === "image") {
+        if (isRemoteMediaUrl(node.url)) {
+          handlers.onRemoteUrl(node.url, (fileName) => {
+            node.url = fileName;
+          });
+          continue;
+        }
+
         visitMediaReference(node.url, (resolved) => {
-          onResolved(resolved, (fileName) => {
+          handlers.onVaultPath(resolved, (fileName) => {
             node.url = fileName;
           });
         });
@@ -226,7 +267,7 @@ function visitResolvableMedia(
           const soundFile = soundFileNameFromParagraph(paragraph);
           if (soundFile) {
             visitMediaReference(soundFile, (resolved) => {
-              onResolved(resolved, (fileName) => {
+              handlers.onVaultPath(resolved, (fileName) => {
                 const child = paragraph.children[0];
                 if (child?.type === "text") {
                   child.value = `[sound:${fileName}]`;
@@ -240,7 +281,7 @@ function visitResolvableMedia(
         if (isPdfLinkParagraph(paragraph)) {
           const link = paragraph.children[0] as Link;
           visitMediaReference(link.url, (resolved) => {
-            onResolved(resolved, (fileName) => {
+            handlers.onVaultPath(resolved, (fileName) => {
               link.url = fileName;
             });
           });
@@ -379,20 +420,47 @@ function createTextParagraph(text: string): Paragraph {
   };
 }
 
-function addPlan(
+function addPathPlan(
   plans: MediaUploadPlan[],
-  seen: Set<string>,
+  seenPaths: Set<string>,
   fileName: string,
   absolutePath: string,
   vaultRelativePath: string,
   dryRun: boolean,
 ): void {
-  if (seen.has(absolutePath)) {
+  if (seenPaths.has(absolutePath)) {
     return;
   }
 
-  seen.add(absolutePath);
-  const plan = { fileName, absolutePath, vaultRelativePath };
+  seenPaths.add(absolutePath);
+  const plan: MediaUploadPlan = {
+    fileName,
+    transport: "path",
+    absolutePath,
+    vaultRelativePath,
+  };
+  plans.push(plan);
+
+  if (dryRun) {
+    enqueueMediaDryRun(plan);
+  }
+}
+
+function addUrlPlan(
+  plans: MediaUploadPlan[],
+  fileName: string,
+  sourceUrl: string,
+  dryRun: boolean,
+): void {
+  if (plans.some((plan) => plan.sourceUrl === sourceUrl)) {
+    return;
+  }
+
+  const plan: MediaUploadPlan = {
+    fileName,
+    transport: "url",
+    sourceUrl,
+  };
   plans.push(plan);
 
   if (dryRun) {

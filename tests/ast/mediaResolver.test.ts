@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Content } from "mdast";
 import { parseMarkdown } from "../../src/ast/processor";
@@ -11,7 +11,7 @@ import {
 } from "../../src/ast/mediaResolver";
 import { graftTransclusions } from "../../src/ast/transclusionGraft";
 import { buildVaultFileIndex } from "../../src/obsidian/vaultIndex";
-import { assertFixtureMediaReady } from "../helpers/fixtureMedia";
+import { assertFixtureMediaReady, NON_IMAGE_MEDIA_FIXTURE_FILES } from "../helpers/fixtureMedia";
 
 function collectImageUrls(ast: { children: Content[] }): string[] {
   const urls: string[] = [];
@@ -86,5 +86,85 @@ describe("mediaResolver", () => {
     const planNames = result.plans.map((plan) => plan.fileName);
     expect(planNames).toContain("jpeg-home.jpg");
     expect(planNames).toContain("koala.webp");
+    expect(result.plans.every((plan) => plan.transport === "path")).toBe(true);
+  });
+
+  test("resolveMedia queues url transport for https markdown images", async () => {
+    const body = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Remote",
+      "",
+      "#### External image",
+      "",
+      "![](https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png)",
+      "",
+      ":::",
+      "",
+      "Answer.",
+    ].join("\n");
+
+    const vaultPath = FIXTURES_DIR;
+    const vaultIndex = await buildVaultFileIndex(vaultPath);
+    const ast = parseMarkdown(body, vaultPath);
+    await graftTransclusions(ast, {
+      vaultPath,
+      sourcePath: "remote-image.md",
+      vaultIndex,
+    });
+
+    const result = await resolveMedia(ast, {
+      vaultPath,
+      sourcePath: "remote-image.md",
+      vaultIndex,
+      dryRun: true,
+    });
+
+    expect(result.plans).toHaveLength(1);
+    expect(result.plans[0]?.transport).toBe("url");
+    expect(result.plans[0]?.sourceUrl).toContain("https://");
+    expect(result.plans[0]?.fileName).toBe("PNG_transparency_demonstration_1.png");
+
+    const imageUrls = collectImageUrls(ast);
+    expect(imageUrls).toContain("PNG_transparency_demonstration_1.png");
+  });
+
+  test("resolveMedia rewrites non-image wiki embeds", async () => {
+    const rawText = await readFile(
+      join(FIXTURES_DIR, "complex-media-non-image.md"),
+      "utf8",
+    );
+    const vaultPath = FIXTURES_DIR;
+    await assertFixtureMediaReady(vaultPath, NON_IMAGE_MEDIA_FIXTURE_FILES);
+
+    const vaultIndex = await buildVaultFileIndex(vaultPath);
+    const ast = parseMarkdown(stripFrontmatter(rawText), vaultPath);
+    await graftTransclusions(ast, {
+      vaultPath,
+      sourcePath: "complex-media-non-image.md",
+      vaultIndex,
+    });
+
+    const result = await resolveMedia(ast, {
+      vaultPath,
+      sourcePath: "complex-media-non-image.md",
+      vaultIndex,
+      dryRun: true,
+    });
+
+    expect(result.plans.length).toBeGreaterThanOrEqual(4);
+
+    const imageUrls = collectImageUrls(ast);
+    expect(imageUrls).toContain("sample.svg");
+
+    const planNames = result.plans.map((plan) => plan.fileName);
+    expect(planNames).toContain("sample.svg");
+    expect(planNames).toContain("sample.mp3");
+    expect(planNames).toContain("sample.mp4");
+    expect(planNames).toContain("sample.pdf");
+    expect(result.plans.every((plan) => plan.transport === "path")).toBe(true);
   });
 });
