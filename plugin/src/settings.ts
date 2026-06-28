@@ -43,7 +43,12 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl('p', {
-			text: 'Vault path is taken from the open Obsidian vault. Full sync wiring is in progress.',
+			text: 'Vault path is taken from the open Obsidian vault. Media uploads use base64 transport (required for browser-based AnkiConnect).',
+		});
+
+		containerEl.createEl('p', {
+			cls: 'setting-item-description',
+			text: 'AnkiConnect CORS: add your Obsidian origin (e.g. app://obsidian.md) to webCorsOriginList in AnkiConnect add-on config. See Docs/Anki-Integration.md in the engine repo.',
 		});
 
 		new Setting(containerEl)
@@ -72,8 +77,20 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName('Default engine tag')
+			.setDesc('Tag applied to every synced note from this plugin.')
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.defaultEngineTag)
+					.onChange(async (value) => {
+						this.plugin.settings.defaultEngineTag = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName('AnkiConnect URL')
-			.setDesc('Local AnkiConnect endpoint. Add Obsidian to webCorsOriginList in AnkiConnect config.')
+			.setDesc('Local AnkiConnect endpoint.')
 			.addText((text) =>
 				text
 					.setValue(this.plugin.settings.ankiConnectUrl)
@@ -103,6 +120,34 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.delimiter)
 					.onChange(async (value) => {
 						this.plugin.settings.delimiter = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Link format')
+			.setDesc('How wikilinks are resolved when grafting transclusions.')
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('shortest', 'shortest')
+					.addOption('relative', 'relative')
+					.addOption('absolute', 'absolute')
+					.setValue(this.plugin.settings.linkFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.linkFormat = value as AnkiAstSyncSettings['linkFormat'];
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Attachment folder')
+			.setDesc('Default attachment folder name for media resolution (optional).')
+			.addText((text) =>
+				text
+					.setPlaceholder('attachments')
+					.setValue(this.plugin.settings.attachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentFolder = value;
 						await this.plugin.saveSettings();
 					}),
 			);

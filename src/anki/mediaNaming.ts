@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
 import pLimit from "p-limit";
-import { createHash } from "node:crypto";
 import { toAnkiMediaFileName } from "./mediaFileName";
+import type { VaultAdapter } from "../io/vaultAdapter";
+import { basename as pathBasename } from "../utils/pathUtils";
 
 export const MEDIA_HASH_SEPARATOR = "_=_";
 export const MEDIA_HASH_LENGTH = 8;
@@ -43,18 +43,35 @@ export function insertHashBeforeExtension(baseName: string, hash: string): strin
   return `${stem}${MEDIA_HASH_SEPARATOR}${hash}${ext}`;
 }
 
-export function hashFileContent(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex").slice(0, MEDIA_HASH_LENGTH);
+export async function hashFileContent(buffer: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, MEDIA_HASH_LENGTH);
+}
+
+async function readEntryBytes(
+  entry: MediaPathEntry,
+  vault?: VaultAdapter,
+): Promise<Uint8Array> {
+  if (vault) {
+    return vault.readBytes(entry.vaultRelativePath);
+  }
+
+  const buffer = await readFile(entry.absolutePath);
+  return new Uint8Array(buffer);
 }
 
 export async function buildAnkiMediaNameMap(
   entries: MediaPathEntry[],
+  vault?: VaultAdapter,
 ): Promise<MediaNameMapResult> {
   const uniqueEntries = dedupeEntries(entries);
   const groups = new Map<string, MediaPathEntry[]>();
 
   for (const entry of uniqueEntries) {
-    const vaultBaseName = basename(entry.vaultRelativePath);
+    const vaultBaseName = pathBasename(entry.vaultRelativePath);
     const sanitizedBasename = toAnkiMediaFileName(vaultBaseName);
     const group = groups.get(sanitizedBasename) ?? [];
     group.push(entry);
@@ -82,8 +99,8 @@ export async function buildAnkiMediaNameMap(
     const hashedEntries = await Promise.all(
       group.map((entry) =>
         limit(async () => {
-          const buffer = await readFile(entry.absolutePath);
-          const hash = hashFileContent(buffer);
+          const buffer = await readEntryBytes(entry, vault);
+          const hash = await hashFileContent(buffer);
           const ankiFileName = insertHashBeforeExtension(sanitizedBasename, hash);
           return { entry, ankiFileName };
         }),

@@ -46,6 +46,7 @@ export type MediaResolveContext = {
   linkFormat?: "shortest" | "relative" | "absolute";
   ankiNameByVaultPath?: Map<string, string>;
   dryRun: boolean;
+  forceBase64Media?: boolean;
 };
 
 const WIKI_EMBED_IN_TEXT = /!\[\[([^\]]+)\]\]/g;
@@ -212,6 +213,7 @@ export async function resolveMedia(
         absolutePath,
         vaultRelativePath,
         context.dryRun,
+        context.forceBase64Media,
       );
     },
     onRemoteUrl: (sourceUrl, applyAnkiFileName) => {
@@ -427,6 +429,7 @@ function addPathPlan(
   absolutePath: string,
   vaultRelativePath: string,
   dryRun: boolean,
+  forceBase64Media?: boolean,
 ): void {
   if (seenPaths.has(absolutePath)) {
     return;
@@ -435,7 +438,7 @@ function addPathPlan(
   seenPaths.add(absolutePath);
   const plan: MediaUploadPlan = {
     fileName,
-    transport: "path",
+    transport: forceBase64Media ? "base64" : "path",
     absolutePath,
     vaultRelativePath,
   };

@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { Content, Root } from "mdast";
 import type { Parent } from "unist";
 import { visit } from "unist-util-visit";
@@ -18,11 +16,15 @@ import {
 } from "../obsidian/vaultIndex";
 import { createResolvedMediaNode } from "./vaultMediaNodes";
 import { stripFrontmatter } from "../io/frontmatterFilter";
+import type { VaultAdapter } from "../io/vaultAdapter";
+import { readFile } from "node:fs/promises";
+import { resolve as nodeResolve } from "node:path";
 
 export type GraftContext = {
   vaultPath: string;
   sourcePath: string;
   vaultIndex: VaultFileIndex;
+  vault?: VaultAdapter;
   attachmentFolder?: string;
   linkFormat?: "shortest" | "relative" | "absolute";
   visiting?: Set<string>;
@@ -262,16 +264,17 @@ function resolveVaultMediaEmbed(
 
 async function loadFileNodes(
   destPath: string,
-  context: { vaultPath: string; vaultIndex: VaultFileIndex },
+  context: { vaultPath: string; vaultIndex: VaultFileIndex; vault?: VaultAdapter },
 ): Promise<Content[]> {
   const cache = context.vaultIndex.fileCaches.get(destPath);
   if (cache) {
     return structuredClone(cache.ast.children) as Content[];
   }
 
-  const absolutePath = resolve(context.vaultPath, destPath);
   try {
-    const rawText = await readFile(absolutePath, "utf8");
+    const rawText = context.vault
+      ? await context.vault.readText(destPath)
+      : await readFile(nodeResolve(context.vaultPath, destPath), "utf8");
     const ast = parseMarkdown(stripFrontmatter(rawText), context.vaultPath);
     return [...ast.children];
   } catch {

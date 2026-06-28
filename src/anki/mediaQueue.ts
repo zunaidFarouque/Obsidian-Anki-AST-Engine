@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import pLimit from "p-limit";
 import type { MediaUploadPlan } from "../ast/mediaResolver";
 import type { AnkiConnectClient } from "./client";
+import type { VaultAdapter } from "../io/vaultAdapter";
 
 const MIN_UPLOAD_BYTES = 1000;
 
@@ -34,6 +35,8 @@ export function clearMediaDryRunQueue(): void {
 
 export type UploadMediaOptions = {
   concurrency?: number;
+  vault?: VaultAdapter;
+  forceBase64Media?: boolean;
 };
 
 export async function uploadMediaPlans(
@@ -51,15 +54,63 @@ export async function uploadMediaPlans(
   await Promise.all(
     uniquePlans.map((plan) =>
       limit(async () => {
-        await uploadSinglePlan(plan, client);
+        await uploadSinglePlan(plan, client, options);
       }),
     ),
   );
 }
 
+async function readPlanBytes(
+  plan: MediaUploadPlan,
+  vault?: VaultAdapter,
+): Promise<Uint8Array> {
+  if (vault && plan.vaultRelativePath) {
+    return vault.readBytes(plan.vaultRelativePath);
+  }
+
+  if (!plan.absolutePath) {
+    throw new Error(`Media plan missing path for ${plan.fileName}`);
+  }
+
+  const buffer = await readFile(plan.absolutePath);
+  return new Uint8Array(buffer);
+}
+
+async function statPlanFile(
+  plan: MediaUploadPlan,
+  vault?: VaultAdapter,
+): Promise<{ size: number; isFile: boolean }> {
+  if (vault && plan.vaultRelativePath) {
+    return vault.stat(plan.vaultRelativePath);
+  }
+
+  if (!plan.absolutePath) {
+    throw new Error(`Media plan missing path for ${plan.fileName}`);
+  }
+
+  const fileStat = await stat(plan.absolutePath);
+  return {
+    size: fileStat.size,
+    isFile: fileStat.isFile(),
+  };
+}
+
+function bytesToBase64(buffer: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(buffer).toString("base64");
+  }
+
+  let binary = "";
+  for (const byte of buffer) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
 async function uploadSinglePlan(
   plan: MediaUploadPlan,
   client: AnkiConnectClient,
+  options: UploadMediaOptions,
 ): Promise<void> {
   if (plan.transport === "url") {
     if (!plan.sourceUrl) {
@@ -73,16 +124,13 @@ async function uploadSinglePlan(
     return;
   }
 
-  if (plan.transport === "base64") {
-    if (!plan.absolutePath) {
-      throw new Error(`Base64 media plan missing absolutePath for ${plan.fileName}`);
-    }
+  const buffer = await readPlanBytes(plan, options.vault);
+  await assertValidMediaBuffer(plan, buffer);
 
-    const buffer = await readFile(plan.absolutePath);
-    await assertValidMediaBuffer(plan, buffer);
+  if (plan.transport === "base64" || options.forceBase64Media) {
     await client.storeMediaFile({
       filename: plan.fileName,
-      data: buffer.toString("base64"),
+      data: bytesToBase64(buffer),
     });
     return;
   }
@@ -91,8 +139,8 @@ async function uploadSinglePlan(
     throw new Error(`Path media plan missing absolutePath for ${plan.fileName}`);
   }
 
-  const fileStat = await stat(plan.absolutePath);
-  if (!fileStat.isFile()) {
+  const fileStat = await statPlanFile(plan, options.vault);
+  if (!fileStat.isFile) {
     throw new Error(`Media file not found: ${plan.absolutePath}`);
   }
 
@@ -108,12 +156,10 @@ async function uploadSinglePlan(
       path: plan.absolutePath,
     });
   } catch (pathError) {
-    const buffer = await readFile(plan.absolutePath);
-    await assertValidMediaBuffer(plan, buffer);
     try {
       await client.storeMediaFile({
         filename: plan.fileName,
-        data: buffer.toString("base64"),
+        data: bytesToBase64(buffer),
       });
     } catch (base64Error) {
       const pathMessage =
@@ -129,7 +175,7 @@ async function uploadSinglePlan(
 
 async function assertValidMediaBuffer(
   plan: MediaUploadPlan,
-  buffer: Buffer,
+  buffer: Uint8Array,
 ): Promise<void> {
   if (buffer.length < MIN_UPLOAD_BYTES) {
     throw new Error(

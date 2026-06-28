@@ -1,6 +1,14 @@
 import { Notice, Plugin } from 'obsidian';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import {
+	runSync,
+	summarizeSyncActions,
+	type DuplicateWarning,
+	type MediaBasenameWarning,
+} from 'obsidian-anki-ast-engine/sync';
+import { buildPluginConfig } from './configBuilder';
+import { createObsidianVaultAdapter } from './obsidianVaultAdapter';
+import {
 	AnkiAstSyncSettingTab,
 	DEFAULT_SETTINGS,
 	type AnkiAstSyncSettings,
@@ -13,7 +21,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.addRibbonIcon('layers', 'Anki AST Sync', () => {
-			void this.checkAnkiConnect();
+			void this.syncVaultToAnki();
 		});
 
 		this.addCommand({
@@ -28,9 +36,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			id: 'sync-to-anki',
 			name: 'Sync vault to Anki',
 			callback: () => {
-				new Notice(
-					'Full vault sync from the plugin is not wired yet. Use the CLI engine for now.',
-				);
+				void this.syncVaultToAnki();
 			},
 		});
 
@@ -69,6 +75,54 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			new Notice(`AnkiConnect error: ${message}`);
+		}
+	}
+
+	private async syncVaultToAnki(): Promise<void> {
+		const notice = new Notice('Syncing vault to Anki…', 0);
+
+		try {
+			const vault = createObsidianVaultAdapter(this.app);
+			const config = buildPluginConfig(this.app, this.settings);
+			const { actions, duplicateWarnings, mediaWarnings } = await runSync(
+				config,
+				{
+					dryRun: false,
+					vault,
+					forceBase64Media: true,
+				},
+			);
+
+			const summary = summarizeSyncActions(actions);
+			notice.setMessage(
+				`Sync complete: added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}`,
+			);
+			window.setTimeout(() => notice.hide(), 8000);
+
+			this.showDuplicateWarnings(duplicateWarnings);
+			this.showMediaWarnings(mediaWarnings);
+		} catch (error) {
+			notice.hide();
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`Sync failed: ${message}`, 10000);
+		}
+	}
+
+	private showDuplicateWarnings(warnings: DuplicateWarning[]): void {
+		for (const warning of warnings) {
+			const label =
+				warning.kind === 'back_mismatch'
+					? 'Duplicate front with different backs'
+					: warning.kind === 'vault_front_collision'
+						? 'Duplicate front collision'
+						: 'Anki duplicate recovered';
+			new Notice(`${label}: ${warning.message}`, 12000);
+		}
+	}
+
+	private showMediaWarnings(warnings: MediaBasenameWarning[]): void {
+		for (const warning of warnings) {
+			new Notice(`Media: ${warning.message}`, 10000);
 		}
 	}
 }

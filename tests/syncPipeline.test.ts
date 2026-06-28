@@ -54,8 +54,8 @@ describe("syncPipeline", () => {
       action: "add",
       deck: "Science::Physics",
       tag: "Science::Newton",
-      file: notePath,
     });
+    expect(actions[0]?.file.replace(/\\/g, "/")).toContain("Notes/physics.md");
     expect(actions[0]?.frontHtml).toContain("<p>What is g</p>");
     expect(actions[0]?.backHtml).toContain("9.8");
     expect(actions[0]?.wouldInjectId).toBeDefined();

@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
+import { resolve as nodeResolve } from "node:path";
 import { runExclusive } from "../utils/mutexMap";
 import type { ExtractedCard } from "../parser/stateMachine";
+import type { VaultAdapter } from "./vaultAdapter";
 
 export type InjectionPlan = {
   offset: number;
@@ -72,29 +73,33 @@ export function buildInjectionPlan(card: ExtractedCard): InjectionPlan | undefin
 
   return {
     offset: card.injectionOffset,
-    uuid: randomUUID(),
+    uuid: crypto.randomUUID(),
   };
 }
 
 export async function injectIdIntoFile(
-  absolutePath: string,
+  filePath: string,
   rawText: string,
   offset: number,
   uuid: string,
+  vault?: VaultAdapter,
 ): Promise<string> {
-  return batchInjectIdsIntoFile(absolutePath, rawText, [{ offset, uuid }]);
+  return batchInjectIdsIntoFile(filePath, rawText, [{ offset, uuid }], vault);
 }
 
 export async function batchInjectIdsIntoFile(
-  absolutePath: string,
+  filePath: string,
   rawText: string,
   injections: Array<{ offset: number; uuid: string }>,
+  vault?: VaultAdapter,
 ): Promise<string> {
   if (injections.length === 0) {
     return rawText;
   }
 
-  return runExclusive(absolutePath, async () => {
+  const lockKey = vault ? `${vault.vaultRoot}:${filePath}` : filePath;
+
+  return runExclusive(lockKey, async () => {
     let updated = rawText;
     const sorted = [...injections].sort((a, b) => b.offset - a.offset);
 
@@ -107,7 +112,12 @@ export async function batchInjectIdsIntoFile(
       updated = spliceIdAtOffset(updated, injection.offset, injection.uuid);
     }
 
-    await writeFile(absolutePath, updated, "utf8");
+    if (vault) {
+      await vault.writeText(filePath, updated);
+    } else {
+      await writeFile(nodeResolve(filePath), updated, "utf8");
+    }
+
     return updated;
   });
 }

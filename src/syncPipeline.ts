@@ -1,7 +1,5 @@
-import { relative, resolve } from "node:path";
+import { joinPath } from "./utils/pathUtils";
 import type { Config } from "./config/configParser";
-import { scanVault } from "./io/scanner";
-import { readMarkdownFile } from "./io/reader";
 import {
   shouldSyncFile,
   getBodyStartOffset,
@@ -20,7 +18,7 @@ import { compileCardFields } from "./ast/cardCompiler";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
-import { AnkiConnectError, createAnkiClient } from "./anki/client";
+import { AnkiConnectError, createAnkiClient, type AnkiConnectClient } from "./anki/client";
 import { syncFileCards, createSyncRunContext, type CardSyncPayload } from "./anki/syncEngine";
 import {
   detectVaultFrontCollisions,
@@ -31,9 +29,13 @@ import {
   buildAnkiMediaNameMap,
   type MediaBasenameWarning,
 } from "./anki/mediaNaming";
+import type { VaultAdapter } from "./io/vaultAdapter";
+import { toActionFilePath } from "./io/vaultAdapter";
+import { createNodeVaultAdapter } from "./io/nodeVaultAdapter";
 
 export type { DuplicateWarning } from "./anki/duplicateDetect";
 export type { MediaBasenameWarning } from "./anki/mediaNaming";
+export type { VaultAdapter } from "./io/vaultAdapter";
 
 export type SyncAction = {
   action: "add" | "update" | "skip";
@@ -57,6 +59,9 @@ export type SyncAction = {
 
 export type SyncOptions = {
   dryRun: boolean;
+  vault?: VaultAdapter;
+  forceBase64Media?: boolean;
+  ankiClient?: AnkiConnectClient;
 };
 
 export type SyncRunResult = {
@@ -98,19 +103,33 @@ export function summarizeSyncActions(actions: SyncAction[]): SyncSummary {
   return summary;
 }
 
+function resolveVaultAdapter(config: Config, options: SyncOptions): VaultAdapter {
+  return options.vault ?? createNodeVaultAdapter(config.vaultPath);
+}
+
+function entryAbsolutePath(
+  vault: VaultAdapter,
+  vaultRelativePath: string,
+): string {
+  return joinPath(vault.vaultRoot, vaultRelativePath);
+}
+
 export async function runSync(
   config: Config,
   options: SyncOptions,
 ): Promise<SyncRunResult> {
   clearMediaDryRunQueue();
-  const vaultPath = resolve(config.vaultPath);
-  const vaultIndex = await buildVaultFileIndex(vaultPath);
-  const filePaths = await scanVault(vaultPath, config.scanFolders);
+  const vault = resolveVaultAdapter(config, options);
+  const vaultPath = vault.vaultRoot;
+  const vaultIndex = await buildVaultFileIndex(vault);
+  const filePaths = await vault.listMarkdownFiles(config.scanFolders);
   const actions: SyncAction[] = [];
   const collisionSources: DuplicateCardSource[] = [];
   const ankiDuplicateWarnings: DuplicateWarning[] = [];
 
-  let client = options.dryRun ? undefined : createAnkiClient(config);
+  let client = options.dryRun
+    ? undefined
+    : options.ankiClient ?? createAnkiClient(config);
   let syncContext: ReturnType<typeof createSyncRunContext> | undefined;
 
   if (!options.dryRun && client) {
@@ -125,26 +144,22 @@ export async function runSync(
 
   const phase1MediaEntries = await collectVaultMediaPaths(
     config,
-    vaultPath,
+    vault,
     vaultIndex,
     filePaths,
   );
   const { nameByVaultPath, warnings: mediaWarnings } =
-    await buildAnkiMediaNameMap(phase1MediaEntries);
+    await buildAnkiMediaNameMap(phase1MediaEntries, vault);
 
-  for (const filePath of filePaths) {
-    const { rawText, absolutePath } = await readMarkdownFile(filePath);
+  for (const sourcePath of filePaths) {
+    const rawText = await vault.readText(sourcePath);
     if (!shouldSyncFile(rawText)) {
       continue;
     }
 
     const deck = getTargetAnkiDeck(rawText, config.defaultAnkiDeck);
     const fileAnkiTags = getFileAnkiTags(rawText);
-
-    const sourcePath = relative(vaultPath, absolutePath).replace(
-      /\\/g,
-      "/",
-    );
+    const actionFile = toActionFilePath(vault, sourcePath);
     const ast = parseMarkdown(rawText, vaultPath);
     const unresolvedEmbeds: string[] = [];
 
@@ -168,6 +183,7 @@ export async function runSync(
       vaultPath,
       sourcePath,
       vaultIndex,
+      vault,
       attachmentFolder: config.attachmentFolder,
       linkFormat: config.linkFormat,
       unresolvedEmbeds,
@@ -181,6 +197,7 @@ export async function runSync(
       linkFormat: config.linkFormat,
       ankiNameByVaultPath: nameByVaultPath,
       dryRun: options.dryRun,
+      forceBase64Media: options.forceBase64Media,
     });
 
     const cards = mergeInjectionMetadata(
@@ -212,7 +229,7 @@ export async function runSync(
 
       fileActions.push({
         action: plannedAction,
-        file: absolutePath,
+        file: actionFile,
         deck,
         tag: card.tag,
         frontHtml,
@@ -230,7 +247,7 @@ export async function runSync(
       });
 
       collisionSources.push({
-        file: absolutePath,
+        file: actionFile,
         deck,
         tag: card.tag,
         frontHtml,
@@ -247,7 +264,7 @@ export async function runSync(
           ankiId: card.ankiId,
           wouldInjectId: injectionPlan?.uuid,
           fileAnkiTags,
-          sourceFile: absolutePath,
+          sourceFile: actionFile,
         },
         injectionOffset: injectionPlan?.offset,
       });
@@ -259,7 +276,11 @@ export async function runSync(
     }
 
     try {
-      await uploadMediaPlans(mediaResult.plans, client!, { concurrency: 3 });
+      await uploadMediaPlans(mediaResult.plans, client!, {
+        concurrency: 3,
+        vault,
+        forceBase64Media: options.forceBase64Media,
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
@@ -289,9 +310,10 @@ export async function runSync(
 
     if (fileSync.injections.length > 0) {
       await batchInjectIdsIntoFile(
-        absolutePath,
+        sourcePath,
         rawText,
         fileSync.injections,
+        vault,
       );
     }
 
@@ -310,26 +332,26 @@ export async function runSync(
 
 async function collectVaultMediaPaths(
   config: Config,
-  vaultPath: string,
+  vault: VaultAdapter,
   vaultIndex: Awaited<ReturnType<typeof buildVaultFileIndex>>,
   filePaths: string[],
 ) {
   const entries = [];
 
-  for (const filePath of filePaths) {
-    const { rawText, absolutePath } = await readMarkdownFile(filePath);
+  for (const sourcePath of filePaths) {
+    const rawText = await vault.readText(sourcePath);
     if (!shouldSyncFile(rawText)) {
       continue;
     }
 
-    const sourcePath = relative(vaultPath, absolutePath).replace(/\\/g, "/");
-    const ast = parseMarkdown(rawText, vaultPath);
+    const ast = parseMarkdown(rawText, vault.vaultRoot);
     const unresolvedEmbeds: string[] = [];
 
     await graftTransclusions(ast, {
-      vaultPath,
+      vaultPath: vault.vaultRoot,
       sourcePath,
       vaultIndex,
+      vault,
       attachmentFolder: config.attachmentFolder,
       linkFormat: config.linkFormat,
       unresolvedEmbeds,
@@ -337,15 +359,17 @@ async function collectVaultMediaPaths(
 
     entries.push(
       ...collectResolvedMediaPaths(ast, {
-        vaultPath,
+        vaultPath: vault.vaultRoot,
         sourcePath,
         vaultIndex,
         attachmentFolder: config.attachmentFolder,
         linkFormat: config.linkFormat,
-      }),
+      }).map((entry) => ({
+        ...entry,
+        absolutePath: entryAbsolutePath(vault, entry.vaultRelativePath),
+      })),
     );
   }
 
   return entries;
 }
-

@@ -1,11 +1,11 @@
-import fg from "fast-glob";
-import { resolve, relative, basename, normalize, join } from "node:path";
-import { readFile } from "node:fs/promises";
 import type { Root, Heading } from "mdast";
 import type { Content } from "mdast";
 import { parseMarkdown } from "../ast/processor";
 import { buildBlockIndex, type BlockCacheEntry } from "../ast/blockIdTagging";
 import { stripFrontmatter } from "../io/frontmatterFilter";
+import type { VaultAdapter } from "../io/vaultAdapter";
+import { createNodeVaultAdapter } from "../io/nodeVaultAdapter";
+import { basename as pathBasename, joinPath, relativePath } from "../utils/pathUtils";
 
 export type FileCache = {
   path: string;
@@ -118,15 +118,13 @@ export function isImageMediaPath(path: string): boolean {
 }
 
 export async function buildVaultFileIndex(
-  vaultPath: string,
+  vaultOrPath: VaultAdapter | string,
 ): Promise<VaultFileIndex> {
-  const absoluteVault = resolve(vaultPath);
-  const matches = await fg("**/*", {
-    cwd: absoluteVault,
-    onlyFiles: true,
-    dot: false,
-    ignore: ["**/.obsidian/**", "**/.trash/**"],
-  });
+  const vault =
+    typeof vaultOrPath === "string"
+      ? createNodeVaultAdapter(vaultOrPath)
+      : vaultOrPath;
+  const matches = await vault.listAllFiles();
 
   const files = new Set<string>();
   const byBasename = new Map<string, string[]>();
@@ -136,7 +134,7 @@ export async function buildVaultFileIndex(
     const normalized = match.replace(/\\/g, "/");
     files.add(normalized);
 
-    const base = basename(normalized);
+    const base = pathBasename(normalized);
     const baseNoExt = base.replace(/\.md$/i, "");
     const basenameKeys =
       baseNoExt === base ? [base] : [base, baseNoExt];
@@ -153,9 +151,9 @@ export async function buildVaultFileIndex(
       continue;
     }
 
-    const rawText = await readFile(resolve(absoluteVault, normalized), "utf8");
+    const rawText = await vault.readText(normalized);
     const body = stripFrontmatter(rawText);
-    const ast = parseMarkdown(body, absoluteVault);
+    const ast = parseMarkdown(body, vault.vaultRoot);
     const headings = indexHeadings(ast);
     const blocks = buildBlockIndex(ast);
 
@@ -168,7 +166,7 @@ export async function buildVaultFileIndex(
   }
 
   return {
-    vaultPath: absoluteVault,
+    vaultPath: vault.vaultRoot,
     files,
     byBasename,
     fileCaches,
@@ -215,7 +213,7 @@ export function findMediaBasenameMatches(
   fileName: string,
   vaultIndex: VaultFileIndex,
 ): string[] {
-  const basenameKey = basename(fileName);
+  const basenameKey = pathBasename(fileName);
   return (vaultIndex.byBasename.get(basenameKey) ?? []).filter(
     (path) => vaultIndex.files.has(path) && isMediaPath(path),
   );
@@ -290,9 +288,9 @@ export function resolveAttachmentPath(
   }
 
   if (target.startsWith("./")) {
-    target = normalize(join(sourceDir, target.slice(2))).replace(/\\/g, "/");
+    target = joinPath(sourceDir, target.slice(2));
   } else if (target.startsWith("../")) {
-    target = normalize(join(sourceDir, target)).replace(/\\/g, "/");
+    target = joinPath(sourceDir, target);
   }
 
   const explicitCandidates = [
@@ -325,7 +323,7 @@ export function vaultRelativePath(
   vaultPath: string,
   absolutePath: string,
 ): string {
-  return relative(vaultPath, absolutePath).replace(/\\/g, "/");
+  return relativePath(vaultPath, absolutePath);
 }
 
 export type { Content };

@@ -4,13 +4,11 @@ Obsidian plugin for the [Obsidian-Anki AST Engine](../readme.md). Lives in `plug
 
 ## Development
 
-1. Build the engine (required — plugin bundles from `../dist`):
+1. Build the engine dist (required before plugin build):
 
    ```bash
    bun run build
    ```
-
-   If `tsc` fails, ensure `dist/` is present from a prior successful build.
 
 2. Install plugin dependencies and build:
 
@@ -20,7 +18,17 @@ Obsidian plugin for the [Obsidian-Anki AST Engine](../readme.md). Lives in `plug
    bun run build
    ```
 
-3. Symlink or copy this folder into your vault’s plugins directory:
+   Or from repo root: `bun run build:plugin`
+
+3. Deploy into your vault (build + copy):
+
+   ```bash
+   bun run deploy:plugin
+   ```
+
+   Configure the destination once by copying `plugin/deploy.path.example` to `plugin/deploy.path`, or set `OBSIDIAN_PLUGIN_DIR`, or pass a path: `bun run copy:plugin -- "D:/vault/.obsidian/plugins/obsidian-anki-ast-sync"`.
+
+4. Symlink or copy this folder into your vault’s plugins directory (manual alternative):
 
    ```
    <vault>/.obsidian/plugins/obsidian-anki-ast-sync/
@@ -37,7 +45,7 @@ The plugin calls AnkiConnect from the browser. Add your Obsidian origin to `webC
 ## Commands
 
 - **Check AnkiConnect connection** — verifies Anki is reachable.
-- **Sync vault to Anki** — placeholder; full vault adapter wiring is next.
+- **Sync vault to Anki** — live sync via the AST engine (base64 media, ID injection).
 
 ## Watch mode
 

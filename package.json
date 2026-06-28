@@ -8,13 +8,16 @@
     ".": "./dist/index.js",
     "./sync": "./dist/syncPipeline.js",
     "./anki": "./dist/anki/client.js",
-    "./config": "./dist/config/configParser.js"
+    "./config": "./dist/config/configParser.js",
+    "./vault": "./dist/io/vaultAdapter.js"
   },
   "scripts": {
     "start": "bun run src/index.ts",
     "sync": "bun run src/index.ts",
-    "build": "tsc",
-    "build:plugin": "cd plugin && bun run build",
+    "build": "bun run scripts/build-dist.ts",
+    "build:plugin": "bun run build && cd plugin && bun run build",
+    "copy:plugin": "bun run scripts/deploy-plugin.ts",
+    "deploy:plugin": "bun run build:plugin && bun run copy:plugin",
     "dev": "bun run src/index.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",

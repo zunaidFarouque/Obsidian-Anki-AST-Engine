@@ -36,6 +36,18 @@ const context = await esbuild.context({
 			repoRoot,
 			'dist/syncPipeline.js',
 		),
+		'obsidian-anki-ast-engine/vault': path.join(
+			repoRoot,
+			'dist/io/vaultAdapter.js',
+		),
+		'node:fs/promises': path.join(
+			fileURLToPath(new URL('.', import.meta.url)),
+			'shims/fs-promises.js',
+		),
+		'fast-glob': path.join(
+			fileURLToPath(new URL('.', import.meta.url)),
+			'shims/fast-glob.js',
+		),
 	},
 	external: [
 		'obsidian',

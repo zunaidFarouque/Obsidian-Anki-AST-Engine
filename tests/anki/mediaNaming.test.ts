@@ -19,11 +19,11 @@ describe("mediaNaming", () => {
     );
   });
 
-  test("hashFileContent returns first 8 hex chars of sha256", () => {
-    const hash = hashFileContent(Buffer.from("hello"));
+  test("hashFileContent returns first 8 hex chars of sha256", async () => {
+    const hash = await hashFileContent(new Uint8Array(Buffer.from("hello")));
     expect(hash).toHaveLength(8);
-    expect(hash).toBe(hashFileContent(Buffer.from("hello")));
-    expect(hash).not.toBe(hashFileContent(Buffer.from("world")));
+    expect(hash).toBe(await hashFileContent(new Uint8Array(Buffer.from("hello"))));
+    expect(hash).not.toBe(await hashFileContent(new Uint8Array(Buffer.from("world"))));
   });
 
   test("buildAnkiMediaNameMap keeps plain basename when unique", async () => {
