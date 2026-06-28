@@ -117,16 +117,37 @@ Compiles to:
 
 Plugin: [`remarkObsidianCallout.ts`](../src/ast/remarkObsidianCallout.ts). Collapsible `+`/`-` modifiers are not supported in V2.
 
-## Footnotes (card-scoped embed)
+## Footnotes (hierarchical scoped embed)
 
-GFM footnotes (`[^id]` / `[^id]: text`) use [`compileCardFields`](../src/ast/cardCompiler.ts) + [`remarkFootnoteEmbed.ts`](../src/ast/remarkFootnoteEmbed.ts):
+GFM footnotes (`[^id]` / `[^id]: text`) use [`compileCardFields`](../src/ast/cardCompiler.ts), [`remarkFootnoteEmbed.ts`](../src/ast/remarkFootnoteEmbed.ts), and [`footnoteScopeIndex.ts`](../src/ast/footnoteScopeIndex.ts).
 
-1. Collect definitions from front and back subtrees.
-2. Number references by first appearance across **both** sides.
-3. Front: `<sup>n</sup>` only (no footer).
-4. Back: body content, then `<hr>`, then ordered list of footnote definitions at the bottom.
+### Resolution order (inner wins on same id)
 
-Definitions are stripped from mid-body flow; they appear only in the back footer.
+1. Definitions in the card’s own front/back
+2. Non-card definitions in the innermost enclosing heading region (e.g. `### Week 2`)
+3. Walk outward through ancestor heading regions (`##`, `#`, …)
+4. Loose definitions before the first heading (file preamble)
+
+Shared footnote blocks live in **non-card** regions: any heading depth other than `cardDeclarationHeadingLevel`, or loose `[^id]:` lines between cards. A `#### Footnotes` section cannot be used when cards are also declared at `####`.
+
+### Numbering and footers
+
+1. Merge inherited + card-local definitions (card overrides section/file on collision).
+2. Number references by first appearance across **both** sides of the card.
+3. **Per-side footers:** each field gets `<hr>` + `<ol>` only for ids cited on that side. If both sides cite the same note, both fields include its definition.
+
+Definitions are stripped from mid-body flow; they appear only in footers.
+
+```mermaid
+flowchart BT
+  cardLocal[CardLocalDefs]
+  week2[Section_Week2]
+  chapter[Section_Chapter]
+  fileRoot[FilePreamble]
+  cardLocal -->|"wins on same id"| week2
+  week2 --> chapter
+  chapter --> fileRoot
+```
 
 ## Wikilinks in card bodies
 
@@ -169,7 +190,8 @@ flowchart LR
 | [`card-rich-formatting.md`](../tests/fixtures/card-rich-formatting.md) | Paragraphs, soft break, emphasis, table, HR, highlight, preview heading, code |
 | [`card-math.md`](../tests/fixtures/card-math.md) | Inline/display MathJax; `:::` inside math |
 | [`card-callouts.md`](../tests/fixtures/card-callouts.md) | Obsidian callout blockquotes |
-| [`card-footnotes.md`](../tests/fixtures/card-footnotes.md) | Shared numbering; back footer embed |
+| [`card-footnotes.md`](../tests/fixtures/card-footnotes.md) | Card-local footnotes; per-side footers |
+| [`card-footnotes-scoped.md`](../tests/fixtures/card-footnotes-scoped.md) | Section/chapter scoped shared footnotes |
 | [`multi-line-card-layout.md`](../tests/fixtures/multi-line-card-layout.md) | Multi-paragraph front/back with `:::` |
 | [`card-feature-stress-test.md`](../tests/fixtures/card-feature-stress-test.md) | Full permutation matrix (14 cards); CI via `syncPipeline.stressTest.test.ts` |
 | [`embed_me.md`](../tests/fixtures/embed_me.md) | Transclusion target for heading-section embed (`![[embed_me#This section is for embedding]]`) |

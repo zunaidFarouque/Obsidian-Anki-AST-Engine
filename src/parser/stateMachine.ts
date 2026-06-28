@@ -10,6 +10,8 @@ export type ExtractedCard = {
   tag: string;
   frontNodes: Content[];
   backNodes: Content[];
+  sectionDepths: Map<number, string>;
+  ordinal: number;
   ankiId?: string;
   injectionOffset?: number;
 };
@@ -93,7 +95,9 @@ function extractCardsWithDeclarationLevel(
       return;
     }
 
-    cards.push(buildCard(currentTag, frontNodes, backNodes));
+    cards.push(
+      buildCard(currentTag, frontNodes, backNodes, contextByDepth, cards.length),
+    );
     frontNodes = [];
     backNodes = [];
     phase = "none";
@@ -147,6 +151,9 @@ function extractCardsWithDeclarationLevel(
       const heading = child as Heading;
 
       if (heading.depth < declarationLevel) {
+        if (phase !== "none") {
+          finalizeCard();
+        }
         updateContext(heading.depth, getHeadingText(heading));
         continue;
       }
@@ -193,7 +200,15 @@ function extractCardsLegacy(
       return;
     }
 
-    cards.push(buildCard(currentTag, frontNodes, backNodes));
+    cards.push(
+      buildCard(
+        currentTag,
+        frontNodes,
+        backNodes,
+        new Map<number, string>(),
+        cards.length,
+      ),
+    );
     frontNodes = [];
     backNodes = [];
     phase = "none";
@@ -271,6 +286,8 @@ function buildCard(
   tag: string,
   frontNodes: Content[],
   backNodes: Content[],
+  sectionDepths: Map<number, string>,
+  ordinal: number,
 ): ExtractedCard {
   const ankiId = extractAnkiId(backNodes);
   const injectionOffset = ankiId ? undefined : getInjectionOffset(backNodes);
@@ -279,6 +296,8 @@ function buildCard(
     tag,
     frontNodes,
     backNodes,
+    sectionDepths: new Map(sectionDepths),
+    ordinal,
     ankiId,
     injectionOffset,
   };

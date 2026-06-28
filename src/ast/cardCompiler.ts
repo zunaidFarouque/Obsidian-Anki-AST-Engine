@@ -1,7 +1,6 @@
-import type { InlineMath, Math } from "mdast";
+import type { Content, FootnoteDefinition, Parents, Root } from "mdast";
 import rehypeStringify from "rehype-stringify";
 import type { State } from "mdast-util-to-hast";
-import type { Content, Parents, Root } from "mdast";
 import type { Element } from "hast";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
@@ -68,7 +67,7 @@ const compiler = unified()
         return state.applyData(node, result);
       },
       inlineMath(state: State, node): Element {
-        const mathNode = node as InlineMath;
+        const mathNode = node as { value: string };
         const result: Element = {
           type: "element",
           tagName: "span",
@@ -79,7 +78,7 @@ const compiler = unified()
         return result;
       },
       math(state: State, node): Element {
-        const mathNode = node as Math;
+        const mathNode = node as { value: string };
         const result: Element = {
           type: "element",
           tagName: "div",
@@ -106,18 +105,25 @@ export function compileCardField(nodes: Content[]): string {
   return compileRoot({ type: "root", children: nodes });
 }
 
+export type CompileCardFieldsOptions = {
+  inheritedFootnoteDefs?: Map<string, FootnoteDefinition>;
+};
+
 export function compileCardFields(
   frontNodes: Content[],
   backNodes: Content[],
+  options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
-  const context = buildFootnoteEmbedContext(frontNodes, backNodes);
+  const context = buildFootnoteEmbedContext(frontNodes, backNodes, {
+    inheritedDefs: options.inheritedFootnoteDefs,
+  });
 
   return {
     frontHtml: compileRoot(
-      prepareFootnoteRoot(frontNodes, context, { appendFooter: false }),
+      prepareFootnoteRoot(frontNodes, context, { appendFooterFor: "front" }),
     ),
     backHtml: compileRoot(
-      prepareFootnoteRoot(backNodes, context, { appendFooter: true }),
+      prepareFootnoteRoot(backNodes, context, { appendFooterFor: "back" }),
     ),
   };
 }

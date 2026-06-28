@@ -9,6 +9,7 @@ import { graftTransclusions } from "./ast/transclusionGraft";
 import { resolveMedia } from "./ast/mediaResolver";
 import { extractCards } from "./parser/stateMachine";
 import { compileCardFields } from "./ast/cardCompiler";
+import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue } from "./anki/mediaQueue";
 
@@ -73,23 +74,32 @@ export async function runSync(
     });
 
     const delimiter = getDelimiter(rawText, config.delimiter);
+    const declarationLevel = getCardDeclarationHeadingLevel(
+      rawText,
+      config.defaultCardDeclarationHeadingLevel,
+    );
+    const bodyStartOffset = getBodyStartOffset(rawText);
     const cards = extractCards(ast, delimiter, {
-      bodyStartOffset: getBodyStartOffset(rawText),
-      cardDeclarationHeadingLevel: getCardDeclarationHeadingLevel(
-        rawText,
-        config.defaultCardDeclarationHeadingLevel,
-      ),
+      bodyStartOffset,
+      cardDeclarationHeadingLevel: declarationLevel,
       includeParentHeadersAsTags: getIncludeParentHeadersAsTags(
         rawText,
         config.includeParentHeadersAsTags,
       ),
     });
 
+    const footnoteScopeIndex =
+      declarationLevel !== undefined
+        ? buildFootnoteScopeIndex(ast, declarationLevel, bodyStartOffset)
+        : undefined;
+
     for (const card of cards) {
       const injectionPlan = buildInjectionPlan(card);
+      const inheritedFootnoteDefs = footnoteScopeIndex?.resolveForCard(card);
       const { frontHtml, backHtml } = compileCardFields(
         card.frontNodes,
         card.backNodes,
+        { inheritedFootnoteDefs },
       );
       const action: SyncAction = {
         action: card.ankiId ? "update" : "add",

@@ -69,11 +69,14 @@ describe("syncPipeline stress fixture", () => {
     const footnotesA = findByTag(actions, "Footnotes Set A");
     expect(footnotesA.frontHtml).toContain("<sup>1</sup>");
     expect(footnotesA.frontHtml).toContain("<sup>2</sup>");
+    expect(footnotesA.frontHtml).toContain("<hr>");
+    expect(footnotesA.frontHtml).toContain("First footnote definition for set A");
     expect(footnotesA.backHtml).toContain("<hr>");
     expect(footnotesA.backHtml).toContain("First footnote definition for set A");
     expect(footnotesA.backHtml).not.toContain("[^note-a]:");
 
     const footnotesB = findByTag(actions, "Footnotes Set B");
+    expect(footnotesB.frontHtml).toContain("<hr>");
     expect(footnotesB.backHtml).toContain("<hr>");
     expect(footnotesB.backHtml).toContain("Footnote definition for set B");
 
@@ -95,7 +98,9 @@ describe("syncPipeline stress fixture", () => {
     const embedMath = findByTag(actions, "Embed Plus Math");
     expect(embedMath.frontHtml).toContain("should be visible");
     expect(embedMath.frontHtml).toContain("\\(E=mc^2\\)");
-    expect(embedMath.backHtml).toContain("<hr>");
+    expect(embedMath.frontHtml).toContain("<hr>");
+    expect(embedMath.frontHtml).toContain("Footnote on embed-plus-math card back");
+    expect(embedMath.backHtml).not.toContain("<hr>");
     expect(embedMath.backHtml).toMatch(/\\\[|\\sum/);
 
     const kitchenSink = findByTag(actions, "Kitchen Sink");

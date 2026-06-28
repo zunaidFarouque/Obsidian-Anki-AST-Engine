@@ -124,14 +124,54 @@ describe("cardCompiler", () => {
 
     expect(frontHtml).toContain("<sup>1</sup>");
     expect(frontHtml).toContain("<sup>2</sup>");
-    expect(frontHtml).not.toContain("<hr>");
-    expect(frontHtml).not.toContain("Source citation");
+    expect(frontHtml).toContain("<hr>");
+    expect(frontHtml).toContain("Source citation at bottom");
+    expect(frontHtml).toContain("Additional note for numbering");
 
     expect(backHtml).toContain("Answer body cites");
     expect(backHtml).toContain("<sup>1</sup>");
     expect(backHtml).toContain("<hr>");
     expect(backHtml).toContain("Source citation at bottom");
-    expect(backHtml).toContain("Additional note for numbering");
+    expect(backHtml).not.toContain("Additional note for numbering");
     expect(backHtml).not.toContain("[^src]:");
+  });
+
+  test("compileCardFields resolves inherited section footnotes with per-side footers", async () => {
+    const rawText = await readFile(
+      join(FIXTURES_DIR, "card-footnotes-scoped.md"),
+      "utf8",
+    );
+    const ast = parseMarkdown(stripFrontmatter(rawText), "/vault");
+    const level = getCardDeclarationHeadingLevel(rawText, 4);
+    const cards = extractCards(ast, DEFAULT_DELIMITER, {
+      cardDeclarationHeadingLevel: level,
+    });
+    const index = (
+      await import("../../src/ast/footnoteScopeIndex")
+    ).buildFootnoteScopeIndex(ast, level, 0);
+
+    const cardA = cards.find((c) => c.tag.endsWith("Card A"));
+    expect(cardA).toBeDefined();
+
+    const { frontHtml, backHtml } = compileCardFields(
+      cardA!.frontNodes,
+      cardA!.backNodes,
+      { inheritedFootnoteDefs: index.resolveForCard(cardA!) },
+    );
+
+    expect(frontHtml).toContain("<sup>1</sup>");
+    expect(frontHtml).toContain("<hr>");
+    expect(frontHtml).toContain("Applies to all Week 2 cards");
+    expect(backHtml).not.toContain("<hr>");
+
+    const cardB = cards.find((c) => c.tag.endsWith("Card B"));
+    const inheritedB = index.resolveForCard(cardB!);
+    const cardBHtml = compileCardFields(cardB!.frontNodes, cardB!.backNodes, {
+      inheritedFootnoteDefs: inheritedB,
+    });
+
+    expect(cardBHtml.frontHtml).toContain("Applies to all Week 2 cards");
+    expect(cardBHtml.frontHtml).toContain("Card-local override example");
+    expect(cardBHtml.backHtml).not.toContain("<hr>");
   });
 });

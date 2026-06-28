@@ -16,18 +16,23 @@ export type FootnoteEmbedRef = {
 export type FootnoteEmbedContext = {
   definitions: Map<string, FootnoteDefinition>;
   order: string[];
+  frontOrder: string[];
+  backOrder: string[];
+};
+
+export type BuildFootnoteEmbedContextOptions = {
+  inheritedDefs?: Map<string, FootnoteDefinition>;
 };
 
 function normalizeId(identifier: string): string {
   return identifier.toUpperCase();
 }
 
-export function buildFootnoteEmbedContext(
+function collectCardLocalDefs(
   frontNodes: Content[],
   backNodes: Content[],
-): FootnoteEmbedContext {
+): Map<string, FootnoteDefinition> {
   const definitions = new Map<string, FootnoteDefinition>();
-  const order: string[] = [];
 
   for (const node of [...frontNodes, ...backNodes]) {
     if (node.type === "footnoteDefinition") {
@@ -39,7 +44,32 @@ export function buildFootnoteEmbedContext(
     }
   }
 
-  const markReference = (nodes: Content[]) => {
+  return definitions;
+}
+
+export function buildFootnoteEmbedContext(
+  frontNodes: Content[],
+  backNodes: Content[],
+  options: BuildFootnoteEmbedContextOptions = {},
+): FootnoteEmbedContext {
+  const definitions = new Map<string, FootnoteDefinition>();
+
+  if (options.inheritedDefs) {
+    for (const [id, definition] of options.inheritedDefs) {
+      definitions.set(id, definition);
+    }
+  }
+
+  const cardLocalDefs = collectCardLocalDefs(frontNodes, backNodes);
+  for (const [id, definition] of cardLocalDefs) {
+    definitions.set(id, definition);
+  }
+
+  const order: string[] = [];
+  const frontOrder: string[] = [];
+  const backOrder: string[] = [];
+
+  const markReference = (nodes: Content[], sideOrder: string[]) => {
     visit({ type: "root", children: nodes }, (visited) => {
       if (visited.type !== "footnoteReference") {
         return;
@@ -47,17 +77,24 @@ export function buildFootnoteEmbedContext(
 
       const reference = visited as FootnoteReference;
       const id = normalizeId(reference.identifier);
-      if (!definitions.has(id) || order.includes(id)) {
+      if (!definitions.has(id)) {
         return;
       }
-      order.push(id);
+
+      if (!sideOrder.includes(id)) {
+        sideOrder.push(id);
+      }
+
+      if (!order.includes(id)) {
+        order.push(id);
+      }
     });
   };
 
-  markReference(frontNodes);
-  markReference(backNodes);
+  markReference(frontNodes, frontOrder);
+  markReference(backNodes, backOrder);
 
-  return { definitions, order };
+  return { definitions, order, frontOrder, backOrder };
 }
 
 function replaceFootnoteReferences(
@@ -92,12 +129,15 @@ function replaceFootnoteReferences(
   return root.children;
 }
 
-function buildFootnoteFooter(context: FootnoteEmbedContext): Content[] {
-  if (context.order.length === 0) {
+function buildFootnoteFooter(
+  context: FootnoteEmbedContext,
+  sideOrder: string[],
+): Content[] {
+  if (sideOrder.length === 0) {
     return [];
   }
 
-  const listItems: ListItem[] = context.order.map((id) => {
+  const listItems: ListItem[] = sideOrder.map((id) => {
     const definition = context.definitions.get(id);
     return {
       type: "listItem",
@@ -119,19 +159,27 @@ function buildFootnoteFooter(context: FootnoteEmbedContext): Content[] {
 export function prepareFootnoteNodes(
   nodes: Content[],
   context: FootnoteEmbedContext,
-  options: { appendFooter: boolean },
+  options: { appendFooterFor?: "front" | "back" },
 ): Content[] {
   const prepared = replaceFootnoteReferences(nodes, context);
-  if (!options.appendFooter) {
+  const sideOrder =
+    options.appendFooterFor === "front"
+      ? context.frontOrder
+      : options.appendFooterFor === "back"
+        ? context.backOrder
+        : [];
+
+  if (!options.appendFooterFor) {
     return prepared;
   }
-  return [...prepared, ...buildFootnoteFooter(context)];
+
+  return [...prepared, ...buildFootnoteFooter(context, sideOrder)];
 }
 
 export function prepareFootnoteRoot(
   nodes: Content[],
   context: FootnoteEmbedContext,
-  options: { appendFooter: boolean },
+  options: { appendFooterFor?: "front" | "back" },
 ): Root {
   return {
     type: "root",

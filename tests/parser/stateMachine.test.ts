@@ -318,7 +318,7 @@ describe("stateMachine", () => {
     expect(cards).toHaveLength(0);
   });
 
-  test("does not finalize card when encountering H3 during an open card", () => {
+  test("finalizes card when encountering parent heading during an open card", () => {
     const rawText = [
       "# CS101",
       "",
@@ -328,7 +328,7 @@ describe("stateMachine", () => {
       "",
       "### Week 2",
       "",
-      "Still part of the front.",
+      "This prose belongs to Week 2, not Card One.",
       "",
       ":::",
       "",
@@ -345,7 +345,8 @@ describe("stateMachine", () => {
 
     expect(cards).toHaveLength(2);
     expect(cards[0]?.tag).toBe("CS101::Card One");
-    expect(nodesToPreview(cards[0]!.frontNodes)).toContain("Still part of the front");
+    expect(nodesToPreview(cards[0]!.frontNodes)).toBe("Front line one.");
+    expect(nodesToPreview(cards[0]!.backNodes)).toBe("");
     expect(cards[1]?.tag).toBe("CS101::Week 2::Card Two");
   });
 });
