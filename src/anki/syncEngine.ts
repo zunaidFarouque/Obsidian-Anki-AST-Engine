@@ -7,6 +7,7 @@ import {
   findNoteByFrontInDeck,
   normalizeSyncFieldHtml,
 } from "./frontSearch";
+import { resolveExistingNoteForRelink } from "./noteRelink";
 import { normalizeAnkiTagList, normalizeAnkiTagPath } from "./tagNormalize";
 import {
   buildAnkiDuplicateRecoveredWarning,
@@ -86,7 +87,7 @@ export function buildAnkiTags(input: BuildAnkiTagsInput): string[] {
 
 export function isDuplicateNoteError(error: unknown): boolean {
   return (
-    error instanceof AnkiConnectError &&
+    error instanceof Error &&
     error.message.toLowerCase().includes("duplicate")
   );
 }
@@ -250,15 +251,18 @@ async function recoverDuplicateNote(
   tags: string[],
   context?: SyncRunContext,
 ): Promise<CardSyncResult> {
-  const duplicate = await findNoteByFrontInDeck(
+  const duplicate = await resolveExistingNoteForRelink(
     client,
-    payload.deck,
-    payload.frontHtml,
+    {
+      deck: payload.deck,
+      tag: payload.tag,
+      frontHtml: payload.frontHtml,
+    },
     context?.frontMatchCache,
   );
   if (!duplicate) {
     throw new AnkiConnectError(
-      `cannot create note because it is a duplicate, but no matching Anki note was found by Front in deck "${payload.deck}"`,
+      `cannot create note because it is a duplicate, but no matching Anki note was found in deck "${payload.deck}" (tried front, heading tag, and keyword search)`,
     );
   }
 
@@ -304,18 +308,21 @@ export async function syncCard(
   );
 
   if (existingNoteId === undefined) {
-    const existingByFront = await findNoteByFrontInDeck(
+    const existingForRelink = await resolveExistingNoteForRelink(
       client,
-      payload.deck,
-      payload.frontHtml,
+      {
+        deck: payload.deck,
+        tag: payload.tag,
+        frontHtml: payload.frontHtml,
+      },
       context?.frontMatchCache,
     );
-    if (existingByFront) {
+    if (existingForRelink) {
       return linkExistingNoteByFront(
         client,
         payload,
         config,
-        existingByFront,
+        existingForRelink,
         fields,
       );
     }
@@ -448,18 +455,21 @@ async function addPreparedCard(
   config: SyncEngineConfig,
   context?: SyncRunContext,
 ): Promise<CardSyncResult> {
-  const existingByFront = await findNoteByFrontInDeck(
+  const existingForRelink = await resolveExistingNoteForRelink(
     client,
-    prepared.item.payload.deck,
-    prepared.item.payload.frontHtml,
+    {
+      deck: prepared.item.payload.deck,
+      tag: prepared.item.payload.tag,
+      frontHtml: prepared.item.payload.frontHtml,
+    },
     context?.frontMatchCache,
   );
-  if (existingByFront) {
+  if (existingForRelink) {
     return linkExistingNoteByFront(
       client,
       prepared.item.payload,
       config,
-      existingByFront,
+      existingForRelink,
       prepared.fields,
     );
   }
@@ -678,19 +688,22 @@ async function syncFileCardsBatched(
   const remainingAdds: PreparedCardItem[] = [];
 
   for (const entry of preparedAdds) {
-    const existingByFront = await findNoteByFrontInDeck(
+    const existingForRelink = await resolveExistingNoteForRelink(
       client,
-      entry.item.payload.deck,
-      entry.item.payload.frontHtml,
+      {
+        deck: entry.item.payload.deck,
+        tag: entry.item.payload.tag,
+        frontHtml: entry.item.payload.frontHtml,
+      },
       context.frontMatchCache,
     );
-    if (existingByFront) {
+    if (existingForRelink) {
       try {
         const result = await linkExistingNoteByFront(
           client,
           entry.item.payload,
           config,
-          existingByFront,
+          existingForRelink,
           entry.fields,
         );
         frontLinkedResults.push({ prepared: entry, result });

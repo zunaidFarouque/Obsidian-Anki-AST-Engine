@@ -2,6 +2,57 @@ import type { AnkiConnectClient, NoteInfo } from "./client";
 import { normalizeCodeBlockLineEndings } from "./htmlNormalize";
 
 const MAX_FRONT_SEARCH_CHARS = 80;
+const SEARCH_STOPWORDS = new Set([
+  "about",
+  "after",
+  "also",
+  "and",
+  "any",
+  "are",
+  "because",
+  "been",
+  "but",
+  "can",
+  "could",
+  "did",
+  "does",
+  "for",
+  "from",
+  "had",
+  "has",
+  "have",
+  "here",
+  "how",
+  "into",
+  "its",
+  "just",
+  "not",
+  "off",
+  "our",
+  "out",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "there",
+  "they",
+  "this",
+  "today",
+  "was",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "who",
+  "why",
+  "will",
+  "with",
+  "you",
+  "your",
+]);
 
 export function stripHtmlForSearch(html: string): string {
   return html
@@ -14,12 +65,33 @@ function escapeAnkiQuotedText(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+function decodeHtmlEntities(html: string): string {
+  return html
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+}
+
+function normalizeComparableFrontHtml(html: string): string {
+  return decodeHtmlEntities(html)
+    .replace(/<\s*(\/?)\s*i\b/gi, "<$1em")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function normalizeSyncFieldHtml(html: string): string {
   return normalizeCodeBlockLineEndings(html);
 }
 
 export function buildFrontSearchPlainText(html: string): string {
-  return stripHtmlForSearch(normalizeSyncFieldHtml(html)).trim();
+  return stripHtmlForSearch(
+    normalizeComparableFrontHtml(normalizeSyncFieldHtml(html)),
+  ).trim();
 }
 
 function plainTextsMatchForRecovery(left: string, right: string): boolean {
@@ -54,8 +126,12 @@ export function frontsMatchForRecovery(
   ankiFront: string,
   compiledFront: string,
 ): boolean {
-  const normAnki = normalizeSyncFieldHtml(ankiFront);
-  const normCompiled = normalizeSyncFieldHtml(compiledFront);
+  const normAnki = normalizeComparableFrontHtml(
+    normalizeSyncFieldHtml(ankiFront),
+  );
+  const normCompiled = normalizeComparableFrontHtml(
+    normalizeSyncFieldHtml(compiledFront),
+  );
   if (normAnki === normCompiled) {
     return true;
   }
@@ -79,25 +155,51 @@ export function frontsMatchForRecovery(
   return false;
 }
 
-export function buildFrontOnlySearchQuery(frontHtml: string): string | undefined {
-  return buildFrontSearchQueries(undefined, frontHtml)[0];
+function buildFrontSearchPlainVariants(frontHtml: string): string[] {
+  const plain = buildFrontSearchPlainText(frontHtml);
+  if (plain.length === 0) {
+    const mediaToken = buildMediaFrontSearchToken(frontHtml);
+    return mediaToken ? [mediaToken] : [];
+  }
+
+  const variants = new Set<string>();
+  variants.add(plain.slice(0, MAX_FRONT_SEARCH_CHARS));
+  variants.add(plain.toLocaleLowerCase().slice(0, MAX_FRONT_SEARCH_CHARS));
+
+  if (plain.length > MAX_FRONT_SEARCH_CHARS) {
+    const midpoint = Math.max(0, Math.floor(plain.length / 2) - 40);
+    variants.add(plain.slice(midpoint, midpoint + MAX_FRONT_SEARCH_CHARS));
+  }
+
+  return [...variants].filter((value) => value.length > 0);
 }
 
 function buildDeckFrontSearchQuery(deck: string, frontPlain: string): string {
   return `deck:"${escapeAnkiQuotedText(deck)}" front:"${escapeAnkiQuotedText(frontPlain)}"`;
 }
 
-function buildFrontSearchPlainVariants(frontHtml: string): string[] {
-  const plain = buildFrontSearchPlainText(frontHtml).slice(
-    0,
-    MAX_FRONT_SEARCH_CHARS,
-  );
-  if (plain.length === 0) {
-    const mediaToken = buildMediaFrontSearchToken(frontHtml);
-    return mediaToken ? [mediaToken] : [];
+export function buildKeywordSearchQueries(
+  deck: string,
+  frontHtml: string,
+): string[] {
+  const plain = buildFrontSearchPlainText(frontHtml).toLocaleLowerCase();
+  const words = plain
+    .split(/[^a-z0-9]+/i)
+    .filter(
+      (word) =>
+        word.length >= 4 &&
+        !SEARCH_STOPWORDS.has(word) &&
+        !/^\d+$/.test(word),
+    );
+  const unique = [...new Set(words)].sort((left, right) => right.length - left.length);
+  if (unique.length < 2) {
+    return [];
   }
 
-  return [...new Set([plain, plain.toLocaleLowerCase()])];
+  const keywords = unique
+    .slice(0, 4)
+    .map((word) => `"${escapeAnkiQuotedText(word)}"`);
+  return [`deck:"${escapeAnkiQuotedText(deck)}" ${keywords.join(" ")}`];
 }
 
 export function buildFrontSearchQueries(
@@ -120,11 +222,19 @@ export function buildFrontSearchQueries(
       queries.push(buildDeckFrontSearchQuery(deck, mediaToken));
     }
     queries.push(`front:"${escapeAnkiQuotedText(mediaToken)}"`);
-  } else if (deck && plainVariants.length === 0) {
+  } else if (deck) {
+    queries.push(...buildKeywordSearchQueries(deck, frontHtml));
+  }
+
+  if (deck && plainVariants.length === 0 && !mediaToken) {
     queries.push(`deck:"${escapeAnkiQuotedText(deck)}"`);
   }
 
   return [...new Set(queries)];
+}
+
+export function buildFrontOnlySearchQuery(frontHtml: string): string | undefined {
+  return buildFrontSearchQueries(undefined, frontHtml)[0];
 }
 
 export function buildFrontDuplicateSearchQuery(
@@ -198,6 +308,5 @@ export async function findNoteByFrontInDeck(
     }
   }
 
-  cache?.set(cacheKey, undefined);
   return undefined;
 }

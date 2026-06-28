@@ -244,6 +244,100 @@ describe("syncEngine", () => {
     expect(result.duplicateWarning?.message).toContain("duplicate Front");
   });
 
+  test("syncCard recovers duplicate when error is not AnkiConnectError instance", async () => {
+    let searchPass = 0;
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query.includes('front:"Q"')) {
+          searchPass += 1;
+          return searchPass >= 2 ? [55] : [];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 55,
+          tags: ["obsidian-id::existing-uuid"],
+          fields: {
+            Front: { value: "<p>Q</p>", order: 0 },
+            Back: { value: "<p>A</p>", order: 1 },
+          },
+        },
+      ],
+      addNote: async () => {
+        throw new Error("cannot create note because it is a duplicate");
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "CS101::Entropy",
+        frontHtml: "<p>Q</p>",
+        backHtml: "<p>A</p>",
+        wouldInjectId: "new-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(result.injectedId).toBe("existing-uuid");
+    expect(result.ankiNoteId).toBe(55);
+  });
+
+  test("syncCard links Why Expedite card by heading tag when front search misses", async () => {
+    let addNoteCalled = false;
+    const expediteFront =
+      '<p>VO: <em>"Why are you here today instead of your original July appointment? Why couldn\'t you wait?"</em></p>';
+
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query.includes("Why_Expedite")) {
+          return [42];
+        }
+        if (query.startsWith('deck:"Test::Deck" front:"')) {
+          return [];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 42,
+          tags: [
+            "Obsidian-Anki-AST",
+            "VISAF1",
+            "General_Questions::Why_Expedite?",
+            "obsidian-id::8acaff39-f843-4b76-99de-088a24039dac",
+          ],
+          fields: {
+            Front: { value: expediteFront, order: 0 },
+            Back: { value: "<p>Answer</p>", order: 1 },
+          },
+        },
+      ],
+      addNote: async () => {
+        addNoteCalled = true;
+        return 999;
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "General Questions::Why Expedite?",
+        frontHtml: expediteFront,
+        backHtml: "<p>Answer</p>",
+        wouldInjectId: "new-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(addNoteCalled).toBe(false);
+    expect(result.injectedId).toBe("8acaff39-f843-4b76-99de-088a24039dac");
+    expect(result.ankiNoteId).toBe(42);
+  });
+
   test("syncCard links existing note when Anki front differs only by letter casing", async () => {
     let addNoteCalled = false;
     const client = createMockClient({
