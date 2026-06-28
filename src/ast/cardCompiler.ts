@@ -13,8 +13,10 @@ import { remarkObsidianCallout } from "./remarkObsidianCallout";
 import type { ObsidianCallout } from "./remarkObsidianCallout";
 import { remarkObsidianHighlight } from "./remarkObsidianHighlight";
 import { remarkPreviewHeading } from "./remarkPreviewHeading";
+import { remarkObsidianComment, stripObsidianCommentsFromNodes } from "./remarkObsidianComment";
 
 const compiler = unified()
+  .use(remarkObsidianComment)
   .use(remarkPreviewHeading)
   .use(remarkObsidianHighlight)
   .use(remarkObsidianCallout)
@@ -102,7 +104,10 @@ function compileRoot(root: Root): string {
 }
 
 export function compileCardField(nodes: Content[]): string {
-  return compileRoot({ type: "root", children: nodes });
+  return compileRoot({
+    type: "root",
+    children: stripObsidianCommentsFromNodes(nodes),
+  });
 }
 
 export type CompileCardFieldsOptions = {
@@ -114,16 +119,18 @@ export function compileCardFields(
   backNodes: Content[],
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
-  const context = buildFootnoteEmbedContext(frontNodes, backNodes, {
+  const strippedFront = stripObsidianCommentsFromNodes(frontNodes);
+  const strippedBack = stripObsidianCommentsFromNodes(backNodes);
+  const context = buildFootnoteEmbedContext(strippedFront, strippedBack, {
     inheritedDefs: options.inheritedFootnoteDefs,
   });
 
   return {
     frontHtml: compileRoot(
-      prepareFootnoteRoot(frontNodes, context, { appendFooterFor: "front" }),
+      prepareFootnoteRoot(strippedFront, context, { appendFooterFor: "front" }),
     ),
     backHtml: compileRoot(
-      prepareFootnoteRoot(backNodes, context, { appendFooterFor: "back" }),
+      prepareFootnoteRoot(strippedBack, context, { appendFooterFor: "back" }),
     ),
   };
 }

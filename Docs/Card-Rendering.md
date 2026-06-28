@@ -71,6 +71,36 @@ Answer paragraph.
 | `link` | `<a href="…">` |
 | `html` | passed through (e.g. `<!--anki-id-->` stripped before compile) |
 
+## Obsidian comments (`%% … %%`)
+
+Obsidian inline and block comments are **authoring-only** — they stay in the vault but are removed before Anki HTML is compiled.
+
+| Syntax | Vault | Anki field |
+|--------|-------|------------|
+| `%% inline note %%` | Visible in Obsidian (hidden in preview) | Stripped |
+| `%%` … `%%` block (single or multiple paragraphs) | Visible in Obsidian | Stripped |
+| `%%` inside fenced code | Literal text | Preserved |
+
+Implementation: [`remarkObsidianComment.ts`](../src/ast/remarkObsidianComment.ts) in the card compile pipeline only. Card extraction and `<!--anki-id-->` injection use the original markdown; comments do not affect byte offsets.
+
+```markdown
+#### Question %% draft: tighten wording %%
+
+Visible question text
+
+:::
+
+Answer paragraph
+
+%%
+TODO: add citation before sync
+%%
+
+Published answer only.
+```
+
+Compiles to Anki as if the `%%` regions were never written.
+
 ## Paragraph and line-break rules
 
 **Blank line(s) between blocks** → separate mdast block nodes → separate HTML blocks. Multiple blank lines in source collapse to one paragraph boundary (mdast normalization); one `<p>` gap is sufficient.
