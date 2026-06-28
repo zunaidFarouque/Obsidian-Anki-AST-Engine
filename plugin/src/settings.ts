@@ -13,6 +13,8 @@ export interface AnkiAstSyncSettings {
 	defaultCardDeclarationHeadingLevel: number;
 	includeParentHeadersAsTags: boolean;
 	autoCreateDecks: boolean;
+	noteModelName: string;
+	syncTagPrefix: string;
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -27,6 +29,8 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	defaultCardDeclarationHeadingLevel: 4,
 	includeParentHeadersAsTags: true,
 	autoCreateDecks: true,
+	noteModelName: 'Basic',
+	syncTagPrefix: 'obsidian-id',
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {
@@ -186,6 +190,32 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.autoCreateDecks)
 					.onChange(async (value) => {
 						this.plugin.settings.autoCreateDecks = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		containerEl.createEl('h3', { text: 'Advanced' });
+
+		new Setting(containerEl)
+			.setName('Note model name')
+			.setDesc('Anki note type for new cards. Only Basic is supported by the engine today.')
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.noteModelName)
+					.onChange(async (value) => {
+						this.plugin.settings.noteModelName = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Obsidian ID tag prefix')
+			.setDesc('Prefix for obsidian-id::uuid tags that bind vault cards to Anki notes.')
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.syncTagPrefix)
+					.onChange(async (value) => {
+						this.plugin.settings.syncTagPrefix = value;
 						await this.plugin.saveSettings();
 					}),
 			);

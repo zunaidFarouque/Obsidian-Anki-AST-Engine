@@ -2,24 +2,13 @@ import { App, Modal } from 'obsidian';
 import type { DuplicateWarning } from 'obsidian-anki-ast-engine/sync';
 import { stripHtmlForSearch } from 'obsidian-anki-ast-engine/sync';
 import { openVaultCard } from '../navigation/openVaultCard';
+import { basename, truncate } from './syncDisplayUtils';
 
 type ConflictEntry = {
 	file: string;
 	tag: string;
 	frontPreview: string;
 };
-
-function basename(filePath: string): string {
-	const normalized = filePath.replace(/\\/g, '/');
-	return normalized.split('/').pop() ?? filePath;
-}
-
-function truncate(text: string, maxLength: number): string {
-	if (text.length <= maxLength) {
-		return text;
-	}
-	return `${text.slice(0, maxLength - 1)}…`;
-}
 
 function collectConflictEntries(warnings: DuplicateWarning[]): ConflictEntry[] {
 	const entries: ConflictEntry[] = [];

@@ -289,4 +289,5 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 - Reversible / Cloze card types
 - Custom note types with configurable field maps
 - Suspend/delete orphaned Anki notes when cards are removed from vault
-- Obsidian plugin (browser CORS client) — consume `duplicate_warning` stderr events for in-editor notifications
+- Exact in-note scroll to card byte offset (plugin uses heading anchors today)
+- Full plugin orchestrator tests with mocked Obsidian `requestUrl`

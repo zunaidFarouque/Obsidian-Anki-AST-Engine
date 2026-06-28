@@ -21,10 +21,10 @@ export function buildPluginConfig(
 		defaultEngineTag: settings.defaultEngineTag,
 		ankiConnectUrl: settings.ankiConnectUrl,
 		ankiConnectApiKey: settings.ankiConnectApiKey || undefined,
-		noteModelName: 'Basic',
+		noteModelName: settings.noteModelName,
 		noteModelType: 'basic',
 		autoCreateDecks: settings.autoCreateDecks,
-		syncTagPrefix: 'obsidian-id',
+		syncTagPrefix: settings.syncTagPrefix,
 		linkFormat: settings.linkFormat,
 		attachmentFolder: settings.attachmentFolder || undefined,
 		defaultCardDeclarationHeadingLevel:

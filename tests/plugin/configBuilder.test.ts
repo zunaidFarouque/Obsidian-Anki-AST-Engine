@@ -15,6 +15,8 @@ const baseSettings: AnkiAstSyncSettings = {
 	defaultCardDeclarationHeadingLevel: 4,
 	includeParentHeadersAsTags: true,
 	autoCreateDecks: true,
+	noteModelName: 'Basic',
+	syncTagPrefix: 'obsidian-id',
 };
 
 describe('configBuilder', () => {
@@ -35,6 +37,8 @@ describe('configBuilder', () => {
 			...baseSettings,
 			scanFolders: 'Notes',
 			ankiConnectApiKey: 'secret',
+			noteModelName: 'Basic (and reversed card)',
+			syncTagPrefix: 'vault-card-id',
 		};
 
 		const config = ConfigSchema.parse({
@@ -45,10 +49,10 @@ describe('configBuilder', () => {
 			defaultEngineTag: settings.defaultEngineTag,
 			ankiConnectUrl: settings.ankiConnectUrl,
 			ankiConnectApiKey: settings.ankiConnectApiKey || undefined,
-			noteModelName: 'Basic',
+			noteModelName: settings.noteModelName,
 			noteModelType: 'basic',
 			autoCreateDecks: settings.autoCreateDecks,
-			syncTagPrefix: 'obsidian-id',
+			syncTagPrefix: settings.syncTagPrefix,
 			linkFormat: settings.linkFormat,
 			attachmentFolder: settings.attachmentFolder || undefined,
 			defaultCardDeclarationHeadingLevel:
@@ -59,7 +63,7 @@ describe('configBuilder', () => {
 		expect(config.vaultPath).toBe('C:/Vault');
 		expect(config.scanFolders).toEqual(['Notes']);
 		expect(config.ankiConnectApiKey).toBe('secret');
-		expect(config.noteModelName).toBe('Basic');
-		expect(config.syncTagPrefix).toBe('obsidian-id');
+		expect(config.noteModelName).toBe('Basic (and reversed card)');
+		expect(config.syncTagPrefix).toBe('vault-card-id');
 	});
 });

@@ -415,4 +415,96 @@ describe("syncPipeline", () => {
 
     await rm(root, { recursive: true, force: true });
   });
+
+  test("dry-run limits actions to files option when set", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-sync-files-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const noteTemplate = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Card",
+      "",
+      "Question text",
+      "",
+      ":::",
+      "",
+    ].join("\n");
+
+    await writeFile(
+      join(notesDir, "note-a.md"),
+      `${noteTemplate}Answer A.\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(notesDir, "note-b.md"),
+      `${noteTemplate}Answer B.\n`,
+      "utf8",
+    );
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, {
+      dryRun: true,
+      files: ["Notes/note-a.md"],
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.file.replace(/\\/g, "/")).toContain("Notes/note-a.md");
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("returns no actions when files option does not match any vault file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-sync-files-miss-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "#### Card",
+      "",
+      "Question",
+      "",
+      ":::",
+      "",
+      "Answer",
+    ].join("\n");
+    await writeFile(join(notesDir, "only.md"), noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, {
+      dryRun: true,
+      files: ["Notes/missing.md"],
+    });
+
+    expect(actions).toEqual([]);
+
+    await rm(root, { recursive: true, force: true });
+  });
 });

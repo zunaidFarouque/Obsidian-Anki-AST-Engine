@@ -40,6 +40,7 @@ export {
   cardExclusionKey,
 } from "./anki/duplicateDetect";
 export { stripHtmlForSearch } from "./anki/frontSearch";
+export { shouldSyncFile } from "./io/frontmatterFilter";
 export type { MediaBasenameWarning } from "./anki/mediaNaming";
 export type { VaultAdapter } from "./io/vaultAdapter";
 
@@ -72,6 +73,8 @@ export type SyncOptions = {
   /** Obsidian plugin should pass createObsidianFetch() to avoid browser CORS. */
   fetchImpl?: typeof fetch;
   excludeCardKeys?: ReadonlySet<string>;
+  /** Vault-relative markdown paths to limit sync scope. */
+  files?: string[];
 };
 
 export type SyncRunResult = {
@@ -124,6 +127,24 @@ function entryAbsolutePath(
   return joinPath(vault.vaultRoot, vaultRelativePath);
 }
 
+function normalizeVaultRelativePath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+function filterFilePaths(
+  filePaths: string[],
+  files: string[] | undefined,
+): string[] {
+  if (!files || files.length === 0) {
+    return filePaths;
+  }
+
+  const allowed = new Set(files.map(normalizeVaultRelativePath));
+  return filePaths.filter((path) =>
+    allowed.has(normalizeVaultRelativePath(path)),
+  );
+}
+
 export async function runSync(
   config: Config,
   options: SyncOptions,
@@ -132,7 +153,19 @@ export async function runSync(
   const vault = resolveVaultAdapter(config, options);
   const vaultPath = vault.vaultRoot;
   const vaultIndex = await buildVaultFileIndex(vault);
-  const filePaths = await vault.listMarkdownFiles(config.scanFolders);
+  const filePaths = filterFilePaths(
+    await vault.listMarkdownFiles(config.scanFolders),
+    options.files,
+  );
+
+  if (filePaths.length === 0) {
+    return {
+      actions: [],
+      duplicateWarnings: [],
+      mediaWarnings: [],
+    };
+  }
+
   const actions: SyncAction[] = [];
   const collisionSources: DuplicateCardSource[] = [];
   const ankiDuplicateWarnings: DuplicateWarning[] = [];

@@ -62,3 +62,36 @@
 	padding: 0.45em 0.9em;
 	line-height: 1.3;
 }
+
+.anki-ast-sync-results-modal {
+	width: min(42rem, 92vw);
+	max-width: 92vw;
+}
+
+.anki-ast-sync-results-modal .modal-content {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	max-height: min(80vh, 36rem);
+}
+
+.anki-ast-sync-results-scroll {
+	overflow-y: auto;
+	flex: 1 1 auto;
+	margin-bottom: 0.75em;
+}
+
+.anki-ast-sync-results-summary {
+	margin-bottom: 1em;
+	font-weight: 600;
+}
+
+.anki-ast-sync-results-heading {
+	margin: 0.75em 0 0.5em;
+	font-size: 1em;
+}
+
+.anki-ast-sync-results-note {
+	margin: 0 0 0.75em;
+	opacity: 0.9;
+}

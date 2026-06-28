@@ -10,14 +10,20 @@ Living reference for post–Step 1 plugin work. Step 1 (vault adapter + live syn
 - Live vault sync from Obsidian (Anki updates + surgical `<!--anki-id-->` injection)
 - AnkiConnect via Obsidian `requestUrl` (not browser `fetch`)
 - Deploy script: `bun run deploy:plugin`
-- Basic Notices for sync summary, duplicate warnings, and media warnings
+- Pre-sync duplicate-front modal with **Cancel** / **Sync anyway** (conflicts skipped on proceed)
+- Re-link notices (30s) with **Open in vault** / **Open in Anki** links
+- `openVaultCard` navigation helper (heading anchor from tag)
+- Dry-run commands (vault + current note) and sync-current-note command
+- `SyncOptions.files` for scoped sync; shared `syncOrchestrator` for vault vs single-file flows
+- Unified sync results modal with clickable failures, duplicates, and media warnings
+- Settings for `noteModelName` and `syncTagPrefix`
+- Fixture id-free integrity test guarding parser regression fixtures
 
 **Still thin**
 
-- Full-vault live sync only (no dry-run, no per-file sync)
-- No rich results UI (Notices only)
-- Some config hardcoded in `plugin/src/configBuilder.ts` (`noteModelName`, `syncTagPrefix`)
-- Docs `Anki-Integration.md` deferred section partially outdated
+- Full orchestrator integration tests with mocked `requestUrl` (engine vault tests cover sync path)
+- Heading-only scroll (no exact card offset navigation)
+- Phase 4 items: auto-sync, progress UI, orphan handling, community release
 
 ---
 
@@ -27,27 +33,13 @@ Living reference for post–Step 1 plugin work. Step 1 (vault adapter + live syn
 
 #### 1. Dry-run command
 
-Add **“Dry-run sync to Anki”** calling:
-
-```typescript
-runSync(config, { dryRun: true, vault, ankiClient })
-```
-
-**Why first:** Same pipeline as live sync without Anki writes or ID injection. Matches CLI `bun run sync -- --dry-run`.
-
-**Touches:** `plugin/src/main.ts`, optional command in ribbon palette.
+**Done.** Commands: **Dry-run sync vault to Anki**, **Dry-run sync current note to Anki** (`plugin/src/syncOrchestrator.ts`).
 
 ---
 
 #### 2. Sync current file only
 
-Add **“Sync current note to Anki”** for the active `TFile`.
-
-**Why:** Full-vault sync is slow on large vaults. This is the everyday workflow while editing.
-
-**Implementation sketch:** Filter to one vault-relative path, or extend `SyncOptions` with e.g. `files?: string[]`.
-
-**Touches:** `src/syncPipeline.ts` (optional `files` filter), `plugin/src/main.ts`.
+**Done.** Command: **Sync current note to Anki** — full-vault duplicate preflight, live sync scoped to active file via `SyncOptions.files`.
 
 ---
 
@@ -55,27 +47,13 @@ Add **“Sync current note to Anki”** for the active `TFile`.
 
 #### 3. Sync results modal
 
-Replace stacked Notices with a modal or panel showing:
-
-- Summary: added / updated / skipped / failed
-- Failed cards with `syncError`
-- `back_mismatch` and `vault_front_collision` with clickable file paths
-- `media_warning` entries (including disambiguated basenames)
-
-**Touches:** new `plugin/src/syncResultsModal.ts` (or similar), `plugin/src/main.ts`.
+**Done.** [`plugin/src/ui/syncResultsModal.ts`](../plugin/src/ui/syncResultsModal.ts) — summary, failures, duplicate/media warnings, skipped conflicts; wired from [`syncOrchestrator.ts`](../plugin/src/syncOrchestrator.ts). Re-link recovery still uses 30s notices.
 
 ---
 
 #### 4. In-editor navigation for warnings
 
-For `back_mismatch` and failed syncs:
-
-- Open the source note
-- Optionally scroll to the card (tag or heading path)
-
-Engine already returns `file`, `tag`, `frontHtml` on each `SyncAction`.
-
-**Touches:** plugin UI layer; may use Obsidian `Workspace` / `MarkdownView` APIs.
+**Done (heading anchor).** Clickable rows in results and duplicate modals call [`openVaultCard`](../plugin/src/navigation/openVaultCard.ts) (last `::` tag segment as heading). Exact card offset scroll deferred.
 
 ---
 
@@ -83,12 +61,12 @@ Engine already returns `file`, `tag`, `frontHtml` on each `SyncAction`.
 
 Do in parallel with Phase 1–2 or immediately after.
 
-| Item | Why |
-|------|-----|
-| Fix 4 failing fixture tests | `injection-required-no-ids.md` has `anki-id` comments but tests expect cards without IDs — fixture/test drift |
-| Plugin tests | Mock `requestUrl` / vault adapter for dry-run and live paths |
-| Settings parity | Expose `syncTagPrefix`, `noteModelName` in settings (currently hardcoded in `configBuilder`) |
-| Update docs | Refresh `Anki-Integration.md` deferred section; link here from `readme.md` |
+| Item | Status |
+|------|--------|
+| Fix fixture test drift | **Done** — restored id-free fixtures + `fixtureIdFreeIntegrity.test.ts` |
+| Plugin tests | **Partial** — `syncDisplayUtils`, `scanFolders`, `configBuilder`; full `requestUrl` mock deferred |
+| Settings parity | **Done** — `noteModelName`, `syncTagPrefix` in plugin settings |
+| Update docs | **Done** — this roadmap + `Anki-Integration.md` deferred section |
 
 ---
 
@@ -110,7 +88,7 @@ Do in parallel with Phase 1–2 or immediately after.
 | Day 3–4 | Results modal with warnings and failures |
 | Day 5 | Fix fixture test drift + harden deploy/build |
 
-**Single best next task:** dry-run + sync current file — small scope, immediately useful, low risk after live sync is proven.
+**Single best next task:** Phase 4 — auto-sync on save or progress UI for large vaults.
 
 ---
 

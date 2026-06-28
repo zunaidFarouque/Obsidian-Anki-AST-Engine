@@ -6,3 +6,18 @@ export function parseScanFolders(scanFolders: string): string[] {
 
 	return folders.length > 0 ? folders : ['.'];
 }
+
+export function isOutsideScanFolders(
+	filePath: string,
+	scanFoldersSetting: string,
+): boolean {
+	const folders = parseScanFolders(scanFoldersSetting);
+	if (folders.includes('.')) {
+		return false;
+	}
+
+	const normalized = filePath.replace(/\\/g, '/');
+	return !folders.some(
+		(folder) => normalized === folder || normalized.startsWith(`${folder}/`),
+	);
+}
