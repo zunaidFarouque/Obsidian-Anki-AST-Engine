@@ -64,4 +64,6 @@ It decouples senders from receivers and can smooth traffic spikes.
 
 
 Common examples include RabbitMQ and Kafka.
+<!--anki-id: f79f0b18-1c3c-4ff9-b425-7ec8e7909261-->
+
 

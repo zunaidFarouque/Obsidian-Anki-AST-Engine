@@ -27,7 +27,8 @@ Implemented in [`src/syncPipeline.ts`](../src/syncPipeline.ts):
 5. **Media** — resolve attachment paths; queue dry-run uploads
 6. **Extract** — state machine splits front/back at structural delimiter
 7. **Compile** — `compileCardFields` → `frontHtml` / `backHtml` (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
-8. **Inject** — plan `<!--anki-id: uuid-->` at byte offsets (dry-run today; live write deferred)
+8. **Inject** — plan or write `<!--anki-id: uuid-->` at byte offsets (live sync after successful `addNote`)
+9. **Anki sync** — `addNote` / `updateNoteFields` / `updateNoteTags` via AnkiConnect (see [Anki-Integration.md](Anki-Integration.md))
 
 ## Read-only AST and vault safety
 
@@ -259,9 +260,9 @@ src/
 │   ├── linkResolver.ts
 │   └── vaultIndex.ts
 ├── anki/
-│   ├── client.ts            # AnkiConnect HTTP (stub)
-│   ├── syncEngine.ts        # Live sync (stub)
-│   └── mediaQueue.ts
+│   ├── client.ts            # AnkiConnect HTTP client
+│   ├── syncEngine.ts        # add/update/skip card sync
+│   └── mediaQueue.ts        # Media upload queue
 └── utils/
     ├── hash.ts
     ├── mutexMap.ts

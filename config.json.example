@@ -8,6 +8,9 @@
     }
   ],
   "ankiConnectUrl": "http://127.0.0.1:8765",
+  "noteModelName": "Basic",
+  "autoCreateDecks": true,
+  "syncTagPrefix": "obsidian-id",
   "linkFormat": "shortest",
   "attachmentFolder": "attachments",
   "defaultCardDeclarationHeadingLevel": 4,

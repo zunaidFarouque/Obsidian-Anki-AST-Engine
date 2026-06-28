@@ -12,6 +12,11 @@ export const ConfigSchema = z.object({
   delimiter: z.string().min(1).default(":::"),
   deckMappings: z.array(DeckMappingSchema).min(1),
   ankiConnectUrl: z.string().url().default("http://127.0.0.1:8765"),
+  ankiConnectApiKey: z.string().min(1).optional(),
+  noteModelName: z.string().min(1).default("Basic"),
+  noteModelType: z.enum(["basic"]).default("basic"),
+  autoCreateDecks: z.boolean().default(true),
+  syncTagPrefix: z.string().min(1).default("obsidian-id"),
   linkFormat: z.enum(["shortest", "relative", "absolute"]).default("shortest"),
   attachmentFolder: z.string().optional(),
   defaultCardDeclarationHeadingLevel: z

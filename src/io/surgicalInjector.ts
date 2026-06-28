@@ -34,8 +34,26 @@ export async function injectIdIntoFile(
   offset: number,
   uuid: string,
 ): Promise<string> {
+  return batchInjectIdsIntoFile(absolutePath, rawText, [{ offset, uuid }]);
+}
+
+export async function batchInjectIdsIntoFile(
+  absolutePath: string,
+  rawText: string,
+  injections: Array<{ offset: number; uuid: string }>,
+): Promise<string> {
+  if (injections.length === 0) {
+    return rawText;
+  }
+
   return runExclusive(absolutePath, async () => {
-    const updated = spliceIdAtOffset(rawText, offset, uuid);
+    let updated = rawText;
+    const sorted = [...injections].sort((a, b) => b.offset - a.offset);
+
+    for (const injection of sorted) {
+      updated = spliceIdAtOffset(updated, injection.offset, injection.uuid);
+    }
+
     await writeFile(absolutePath, updated, "utf8");
     return updated;
   });

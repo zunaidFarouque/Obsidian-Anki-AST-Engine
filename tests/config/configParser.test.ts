@@ -27,6 +27,32 @@ describe("configParser", () => {
     expect(config.ankiConnectUrl).toBe("http://127.0.0.1:8765");
     expect(config.defaultCardDeclarationHeadingLevel).toBe(4);
     expect(config.includeParentHeadersAsTags).toBe(true);
+    expect(config.noteModelName).toBe("Basic");
+    expect(config.autoCreateDecks).toBe(true);
+    expect(config.syncTagPrefix).toBe("obsidian-id");
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("parses optional anki integration fields", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "anki-config-"));
+    const configPath = join(dir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        vaultPath: "/vault",
+        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        ankiConnectApiKey: "secret",
+        noteModelName: "Basic",
+        autoCreateDecks: false,
+        syncTagPrefix: "oid",
+      }),
+    );
+
+    const config = await loadConfig(configPath);
+    expect(config.ankiConnectApiKey).toBe("secret");
+    expect(config.autoCreateDecks).toBe(false);
+    expect(config.syncTagPrefix).toBe("oid");
 
     await rm(dir, { recursive: true, force: true });
   });

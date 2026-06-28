@@ -3,7 +3,7 @@ import type { Config, DeckMapping } from "./config/configParser";
 import { scanVault } from "./io/scanner";
 import { readMarkdownFile } from "./io/reader";
 import { shouldSyncFile, getBodyStartOffset, getCardDeclarationHeadingLevel, getDelimiter, getIncludeParentHeadersAsTags } from "./io/frontmatterFilter";
-import { buildInjectionPlan } from "./io/surgicalInjector";
+import { batchInjectIdsIntoFile, buildInjectionPlan } from "./io/surgicalInjector";
 import { parseMarkdown } from "./ast/processor";
 import { graftTransclusions } from "./ast/transclusionGraft";
 import { resolveMedia } from "./ast/mediaResolver";
@@ -11,10 +11,12 @@ import { extractCards } from "./parser/stateMachine";
 import { compileCardFields } from "./ast/cardCompiler";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
-import { clearMediaDryRunQueue } from "./anki/mediaQueue";
+import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
+import { AnkiConnectError, createAnkiClient } from "./anki/client";
+import { syncFileCards, type CardSyncPayload } from "./anki/syncEngine";
 
 export type SyncAction = {
-  action: "add" | "update";
+  action: "add" | "update" | "skip";
   file: string;
   deck: string;
   tag: string;
@@ -22,14 +24,49 @@ export type SyncAction = {
   backHtml: string;
   ankiId?: string;
   wouldInjectId?: string;
+  ankiNoteId?: number;
   wouldUploadMedia?: string[];
   unresolvedEmbeds?: string[];
   transclusionResolved?: boolean;
+  syncError?: string;
 };
 
 export type SyncOptions = {
   dryRun: boolean;
 };
+
+export type SyncSummary = {
+  added: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+};
+
+export function summarizeSyncActions(actions: SyncAction[]): SyncSummary {
+  const summary: SyncSummary = {
+    added: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+  };
+
+  for (const action of actions) {
+    if (action.syncError) {
+      summary.failed += 1;
+      continue;
+    }
+
+    if (action.action === "add") {
+      summary.added += 1;
+    } else if (action.action === "update") {
+      summary.updated += 1;
+    } else {
+      summary.skipped += 1;
+    }
+  }
+
+  return summary;
+}
 
 export async function runSync(
   config: Config,
@@ -39,6 +76,17 @@ export async function runSync(
   const vaultIndex = await buildVaultFileIndex(config.vaultPath);
   const filePaths = await scanVault(config.vaultPath, config.deckMappings);
   const actions: SyncAction[] = [];
+
+  let client = options.dryRun ? undefined : createAnkiClient(config);
+
+  if (!options.dryRun && client) {
+    const connected = await client.canConnect();
+    if (!connected) {
+      throw new AnkiConnectError(
+        "Cannot connect to AnkiConnect. Is Anki running with the AnkiConnect add-on enabled?",
+      );
+    }
+  }
 
   for (const filePath of filePaths) {
     const deck = resolveDeck(filePath, config.vaultPath, config.deckMappings);
@@ -93,6 +141,12 @@ export async function runSync(
         ? buildFootnoteScopeIndex(ast, declarationLevel, bodyStartOffset)
         : undefined;
 
+    const fileActions: SyncAction[] = [];
+    const syncItems: Array<{
+      payload: CardSyncPayload;
+      injectionOffset?: number;
+    }> = [];
+
     for (const card of cards) {
       const injectionPlan = buildInjectionPlan(card);
       const inheritedFootnoteDefs = footnoteScopeIndex?.resolveForCard(card);
@@ -101,8 +155,11 @@ export async function runSync(
         card.backNodes,
         { inheritedFootnoteDefs },
       );
-      const action: SyncAction = {
-        action: card.ankiId ? "update" : "add",
+
+      const plannedAction: SyncAction["action"] = card.ankiId ? "update" : "add";
+
+      fileActions.push({
+        action: plannedAction,
         file: absolutePath,
         deck,
         tag: card.tag,
@@ -114,13 +171,55 @@ export async function runSync(
         unresolvedEmbeds:
           unresolvedEmbeds.length > 0 ? [...unresolvedEmbeds] : undefined,
         transclusionResolved: unresolvedEmbeds.length === 0,
-      };
+      });
 
-      if (!options.dryRun && injectionPlan) {
-        // MVP: file write and AnkiConnect dispatch will run here.
+      syncItems.push({
+        payload: {
+          deck,
+          tag: card.tag,
+          frontHtml,
+          backHtml,
+          ankiId: card.ankiId,
+          wouldInjectId: injectionPlan?.uuid,
+        },
+        injectionOffset: injectionPlan?.offset,
+      });
+    }
+
+    if (options.dryRun || fileActions.length === 0) {
+      actions.push(...fileActions);
+      continue;
+    }
+
+    try {
+      await uploadMediaPlans(mediaResult.plans, client!, { concurrency: 3 });
+      const fileSync = await syncFileCards(client!, syncItems, config);
+
+      for (let index = 0; index < fileActions.length; index += 1) {
+        const result = fileSync.results[index];
+        const action = fileActions[index]!;
+        if (result) {
+          action.action = result.action;
+          action.ankiNoteId = result.ankiNoteId;
+        }
       }
 
-      actions.push(action);
+      if (fileSync.injections.length > 0) {
+        await batchInjectIdsIntoFile(
+          absolutePath,
+          rawText,
+          fileSync.injections,
+        );
+      }
+
+      actions.push(...fileActions);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      for (const action of fileActions) {
+        action.syncError = message;
+        actions.push(action);
+      }
     }
   }
 

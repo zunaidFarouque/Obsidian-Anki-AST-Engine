@@ -76,11 +76,19 @@ bun run sync -- --dry-run
 
 Each line of output is a JSON `SyncAction` with compiled `frontHtml` and `backHtml` fields (see [Docs/Card-Rendering.md](Docs/Card-Rendering.md)).
 
-To execute a full synchronization (AnkiConnect integration coming in MVP):
+To execute a full synchronization (requires Anki Desktop + AnkiConnect):
 
 ```bash
 bun run sync
 ```
+
+Check AnkiConnect connectivity:
+
+```bash
+bun run sync -- --check
+```
+
+See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID binding, and troubleshooting.
 
 ## **🧪 Test-Driven Development (TDD)**
 
