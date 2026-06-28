@@ -4,17 +4,33 @@ import type { AnkiConnectClient } from "../../src/anki/client";
 import {
   buildAnkiTags,
   buildObsidianIdTag,
+  createSyncRunContext,
   syncCard,
   syncFileCards,
   type CardSyncPayload,
 } from "../../src/anki/syncEngine";
 
 function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConnectClient {
+  const findNotesImpl =
+    overrides.findNotes ?? (async () => [] as number[]);
+
   return {
     deckNames: async () => ["Test::Deck"],
-    findNotes: async () => [],
+    findNotes: findNotesImpl,
+    invokeMulti:
+      overrides.invokeMulti ??
+      (async (actions) =>
+        Promise.all(
+          actions.map(async (action) => {
+            if (action.action === "findNotes") {
+              return findNotesImpl(action.params?.query as string);
+            }
+            throw new Error(`unsupported multi action ${action.action}`);
+          }),
+        )),
     notesInfo: async () => [],
     addNote: async () => 1001,
+    addNotes: async (notes) => notes.map(() => 1001),
     updateNoteFields: async () => undefined,
     updateNoteTags: async () => undefined,
     ...overrides,
@@ -398,5 +414,164 @@ describe("syncEngine", () => {
     expect(fileSync.results[0]?.injectedId).toBe("uuid-1");
     expect(fileSync.results[1]?.error).toContain("boom");
     expect(fileSync.injections).toEqual([{ offset: 100, uuid: "uuid-1" }]);
+  });
+
+  test("syncFileCards preserves result order under batched adds", async () => {
+    const client = createMockClient({
+      findNotes: async () => [],
+      addNotes: async (notes) => notes.map((_, index) => 1001 + index),
+    });
+
+    const context = createSyncRunContext(client, baseConfig);
+    const fileSync = await syncFileCards(
+      client,
+      [
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::One",
+            frontHtml: "<p>First</p>",
+            backHtml: "<p>A</p>",
+            wouldInjectId: "uuid-1",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Two",
+            frontHtml: "<p>Second</p>",
+            backHtml: "<p>B</p>",
+            wouldInjectId: "uuid-2",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Three",
+            frontHtml: "<p>Third</p>",
+            backHtml: "<p>C</p>",
+            wouldInjectId: "uuid-3",
+          },
+        },
+      ],
+      baseConfig,
+      context,
+    );
+
+    expect(fileSync.results.map((r) => r.ankiNoteId)).toEqual([1001, 1002, 1003]);
+  });
+
+  test("syncFileCards with context calls deckNames once for multiple cards", async () => {
+    let deckNamesCalls = 0;
+    const client = createMockClient({
+      deckNames: async () => {
+        deckNamesCalls += 1;
+        return ["Test::Deck"];
+      },
+      addNote: async () => 101,
+    });
+
+    const context = createSyncRunContext(client, baseConfig);
+    await syncFileCards(
+      client,
+      [
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::One",
+            frontHtml: "<p>One</p>",
+            backHtml: "<p>A</p>",
+            wouldInjectId: "uuid-1",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Two",
+            frontHtml: "<p>Two</p>",
+            backHtml: "<p>B</p>",
+            wouldInjectId: "uuid-2",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Three",
+            frontHtml: "<p>Three</p>",
+            backHtml: "<p>C</p>",
+            wouldInjectId: "uuid-3",
+          },
+        },
+      ],
+      baseConfig,
+      context,
+    );
+
+    expect(deckNamesCalls).toBe(1);
+  });
+
+  test("syncFileCards updates existing cards concurrently", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const client = createMockClient({
+      invokeMulti: async () => [[99], [100], [101]],
+      notesInfo: async (ids) =>
+        ids.map((noteId) => ({
+          noteId,
+          tags: [
+            "Obsidian-Anki-AST",
+            "CS101::Entropy",
+            `obsidian-id::uuid-${noteId}`,
+          ],
+          fields: {
+            Front: { value: "<p>Old</p>", order: 0 },
+            Back: { value: "<p>Old back</p>", order: 1 },
+          },
+        })),
+      updateNoteFields: async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlight -= 1;
+      },
+    });
+
+    const context = createSyncRunContext(client, baseConfig, { concurrency: 3 });
+    await syncFileCards(
+      client,
+      [
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::One",
+            frontHtml: "<p>New 1</p>",
+            backHtml: "<p>A</p>",
+            ankiId: "uuid-99",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Two",
+            frontHtml: "<p>New 2</p>",
+            backHtml: "<p>B</p>",
+            ankiId: "uuid-100",
+          },
+        },
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Three",
+            frontHtml: "<p>New 3</p>",
+            backHtml: "<p>C</p>",
+            ankiId: "uuid-101",
+          },
+        },
+      ],
+      baseConfig,
+      context,
+    );
+
+    expect(maxInFlight).toBeGreaterThanOrEqual(2);
   });
 });

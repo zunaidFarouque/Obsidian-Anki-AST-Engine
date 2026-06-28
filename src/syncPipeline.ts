@@ -21,7 +21,7 @@ import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
 import { AnkiConnectError, createAnkiClient } from "./anki/client";
-import { syncFileCards, type CardSyncPayload } from "./anki/syncEngine";
+import { syncFileCards, createSyncRunContext, type CardSyncPayload } from "./anki/syncEngine";
 import {
   detectVaultFrontCollisions,
   type DuplicateCardSource,
@@ -111,6 +111,7 @@ export async function runSync(
   const ankiDuplicateWarnings: DuplicateWarning[] = [];
 
   let client = options.dryRun ? undefined : createAnkiClient(config);
+  let syncContext: ReturnType<typeof createSyncRunContext> | undefined;
 
   if (!options.dryRun && client) {
     const connected = await client.canConnect();
@@ -119,6 +120,7 @@ export async function runSync(
         "Cannot connect to AnkiConnect. Is Anki running with the AnkiConnect add-on enabled?",
       );
     }
+    syncContext = createSyncRunContext(client, config);
   }
 
   const phase1MediaEntries = await collectVaultMediaPaths(
@@ -268,7 +270,7 @@ export async function runSync(
       continue;
     }
 
-    const fileSync = await syncFileCards(client!, syncItems, config);
+    const fileSync = await syncFileCards(client!, syncItems, config, syncContext);
 
     for (let index = 0; index < fileActions.length; index += 1) {
       const result = fileSync.results[index];

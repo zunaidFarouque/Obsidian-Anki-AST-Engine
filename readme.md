@@ -14,7 +14,7 @@ This engine solves that by transforming your Obsidian vault into a traversable *
 * **Surgical Two-Way Binding:** Generates and tracks unique UUIDs via HTML comments (\<\!--anki-id: uuid--\>). IDs are injected by splicing the raw file at AST-derived byte offsets—never by round-tripping Markdown through a serializer. Pre-graft offsets are preserved when transclusions expand card content for HTML compile. See [Docs/Engine-Architecture.md](Docs/Engine-Architecture.md#read-only-ast-and-vault-safety).
 * **Duplicate detection:** Flags vault cards that compile to the same Front HTML (and `back_mismatch` when answers differ). Warnings are emitted on stderr as JSON for future in-editor notifications. See [Docs/Anki-Integration.md](Docs/Anki-Integration.md#duplicate-detection).
 * **Stable Anki updates:** Normalizes line endings inside compiled code blocks before comparing to Anki, so Windows CRLF does not cause false `update` actions.
-* **Stateless Concurrency Control:** Safely handles large media vaults using throttled async queues (p-limit) to prevent overwhelming the AnkiConnect Python server.
+* **Stateless Concurrency Control:** Throttles AnkiConnect HTTP (media uploads, batched card sync) with `p-limit` and automatic retry so large vault syncs do not overwhelm the local Anki server. See [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md).
 
 ## **🚀 Architecture Overview**
 
@@ -25,7 +25,7 @@ The system operates strictly headlessly, reading from an absolute vault path and
 3. **Transclusion & Media:** Resolves local file paths and fetches linked block nodes.  
 4. **Layout Extractor:** Uses state-machine logic to chunk nodes into Front and Back card buffers based on heading depth and user-defined delimiters (default `:::`; `?` and other strings are supported).
 5. **Injector:** Calculates exact byte-offsets on the **pre-graft** AST to safely inject tracking IDs back into the source Obsidian file via async-mutex locking; merges grafted compile buffers without shifting offsets.  
-6. **Anki Sync:** Compiles AST buffers to raw HTML, detects duplicate fronts vault-wide, normalizes code-block line endings for field compare, and dispatches throttled addNote / updateNoteFields payloads to Anki.
+6. **Anki Sync:** Compiles AST buffers to raw HTML, detects duplicate fronts vault-wide, normalizes code-block line endings for field compare, and syncs to Anki via batched `addNotes` / parallel updates (see [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)).
 
 ## **📦 Prerequisites**
 
@@ -87,7 +87,7 @@ Check AnkiConnect connectivity:
 bun run sync -- --check
 ```
 
-See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID binding, and troubleshooting.
+See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID binding, and troubleshooting. Live sync performance (batched adds, HTTP throttling): [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md).
 
 ## **🔌 Obsidian plugin**
 
@@ -105,5 +105,5 @@ bun test
 
 ## **🤝 Contributing**
 
-Contributions are welcome\! Please ensure you have read the architectural docs in the `docs/` folder ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md)) before opening a PR. All parsing modifications must include an accompanying edge-case fixture test.
+Contributions are welcome\! Please ensure you have read the architectural docs in the `docs/` folder ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md), [Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)) before opening a PR. All parsing modifications must include an accompanying edge-case fixture test.
 

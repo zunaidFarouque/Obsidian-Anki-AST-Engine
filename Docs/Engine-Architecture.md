@@ -38,7 +38,7 @@ Implemented in [`src/syncPipeline.ts`](../src/syncPipeline.ts):
 8. **Merge** — `mergeInjectionMetadata` copies `ankiId` and `injectionOffset` from source cards onto grafted cards by index
 9. **Compile** — `compileCardFields` → `frontHtml` / `backHtml` (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
 10. **Duplicate scan** — after all files are compiled, group by `deck + frontHtml`; emit `duplicate_warning` for collisions (see [Anki-Integration.md](Anki-Integration.md#duplicate-detection))
-11. **Anki sync** — `addNote` / `updateNoteFields` / `updateNoteTags` with code-block line-ending normalization (see [Anki-Integration.md](Anki-Integration.md#field-comparison-and-code-blocks))
+11. **Anki sync** — batched live path: `invokeMulti` prefetch, `addNotes` chunks, parallel updates; see [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md#live-sync-flow-per-file) and [Anki-Integration.md](Anki-Integration.md#card-sync-performance)
 12. **Inject** — plan or write `<!--anki-id: uuid-->` at pre-graft byte offsets (live sync after successful card sync)
 
 ## Read-only AST and vault safety
@@ -131,7 +131,7 @@ Further detail on failure modes and mutex locking: [Starter Arch DR.md](Starter%
 For each sync-eligible file ([`syncPipeline.ts`](../src/syncPipeline.ts)):
 
 1. **Media upload** — `storeMediaFile` with concurrency 3: local `path` first, base64 `data` fallback, `url` for external `![](https://...)` images. If upload fails, no cards in that file are synced or injected.
-2. **Per-card Anki sync** — each card is synced independently; one card’s failure does not abort siblings.
+2. **Per-card Anki sync** — batched when live: one `multi` `findNotes` prefetch per file, one `notesInfo` for all existing IDs, `addNotes` chunks for new cards, parallel updates (`pLimit(10)`). Duplicate recovery uses targeted `deck + front` search ([`frontSearch.ts`](../src/anki/frontSearch.ts)). One card’s failure does not abort siblings. See [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md).
 3. **Batch ID injection** — successful cards without an `anki-id` receive `<!--anki-id-->` in **reverse offset order** so earlier splices do not shift later offsets.
 
 Partial success is intentional: a file with three new cards where one hits a non-recoverable error still injects IDs for the two that succeeded.
@@ -140,7 +140,7 @@ Partial success is intentional: a file with three new cards where one hits a non
 
 After compiling all cards in the run, the pipeline groups by **target deck + `frontHtml`**. Groups with more than one source card produce a `duplicate_warning` on stderr (dry-run and live). If backs differ within a group, the kind is `back_mismatch` — treated as an authoring error, not auto-merged.
 
-Anki-level duplicate recovery (when `addNote` is rejected) is separate; it emits `anki_duplicate_recovered`. See [Anki-Integration.md](Anki-Integration.md#duplicate-detection).
+Anki-level duplicate recovery (when `addNote` / `addNotes` is rejected) is separate; it emits `anki_duplicate_recovered`. See [Anki-Integration.md](Anki-Integration.md#duplicate-detection).
 
 ## HTML sync normalization
 
@@ -306,12 +306,15 @@ src/
 │   ├── linkResolver.ts
 │   └── vaultIndex.ts
 ├── anki/
-│   ├── client.ts            # AnkiConnect HTTP client
-│   ├── syncEngine.ts        # add/update/skip card sync
-│   ├── duplicateDetect.ts   # vault front collisions + warning payloads
-│   ├── htmlNormalize.ts     # code-block line ending normalization for Anki
+│   ├── client.ts            # AnkiConnect HTTP (invoke limit, retry, addNotes, multi)
+│   ├── syncEngine.ts        # Batched add/update/skip card sync
+│   ├── deckEnsurer.ts       # Per-run deck name cache
+│   ├── frontSearch.ts       # Targeted duplicate Front lookup queries
+│   ├── duplicateDetect.ts   # Vault front collisions + warning payloads
+│   ├── htmlNormalize.ts     # Code-block line ending normalization for Anki
 │   ├── tagNormalize.ts      # Anki tag path normalization
-│   └── mediaQueue.ts        # Media upload queue
+│   ├── mediaQueue.ts        # Tiered media upload queue
+│   └── mediaTransport.ts    # Remote URL / path transport helpers
 └── utils/
     ├── hash.ts
     ├── mutexMap.ts

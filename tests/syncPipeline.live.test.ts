@@ -54,6 +54,23 @@ describe("syncPipeline live mode", () => {
           return new Response(JSON.stringify({ result: [], error: null }));
         case "findNotes":
           return new Response(JSON.stringify({ result: [], error: null }));
+        case "multi":
+          return new Response(
+            JSON.stringify({
+              result: body.params.actions.map(() => []),
+              error: null,
+            }),
+          );
+        case "addNotes":
+          addedNotes.push(...body.params.notes);
+          return new Response(
+            JSON.stringify({
+              result: body.params.notes.map(
+                (_note: unknown, index: number) => 1001 + index,
+              ),
+              error: null,
+            }),
+          );
         case "addNote":
           addedNotes.push(body.params.note);
           return new Response(JSON.stringify({ result: 1000 + addedNotes.length, error: null }));
@@ -141,7 +158,23 @@ describe("syncPipeline live mode", () => {
         if (query.includes('tag:"obsidian-id::')) {
           return new Response(JSON.stringify({ result: [], error: null }));
         }
-        return new Response(JSON.stringify({ result: [88], error: null }));
+        if (query.includes('front:"Question"')) {
+          return new Response(JSON.stringify({ result: [88], error: null }));
+        }
+        return new Response(JSON.stringify({ result: [], error: null }));
+      }
+      if (body.action === "multi") {
+        return new Response(
+          JSON.stringify({
+            result: body.params.actions.map(() => []),
+            error: null,
+          }),
+        );
+      }
+      if (body.action === "addNotes") {
+        return new Response(
+          JSON.stringify({ result: [null], error: null }),
+        );
       }
       if (body.action === "notesInfo") {
         return new Response(
@@ -245,6 +278,19 @@ describe("syncPipeline live mode", () => {
       if (body.action === "findNotes") {
         return new Response(JSON.stringify({ result: [], error: null }));
       }
+      if (body.action === "multi") {
+        return new Response(
+          JSON.stringify({
+            result: body.params.actions.map(() => []),
+            error: null,
+          }),
+        );
+      }
+      if (body.action === "addNotes") {
+        return new Response(
+          JSON.stringify({ result: null, error: "collection unavailable" }),
+        );
+      }
       if (body.action === "addNote") {
         return new Response(
           JSON.stringify({ result: null, error: "collection unavailable" }),
@@ -330,6 +376,19 @@ describe("syncPipeline live mode", () => {
       }
       if (body.action === "findNotes") {
         return new Response(JSON.stringify({ result: [], error: null }));
+      }
+      if (body.action === "multi") {
+        return new Response(
+          JSON.stringify({
+            result: body.params.actions.map(() => []),
+            error: null,
+          }),
+        );
+      }
+      if (body.action === "addNotes") {
+        return new Response(
+          JSON.stringify({ result: null, error: "batch rejected" }),
+        );
       }
       if (body.action === "addNote") {
         const front = body.params.note.fields.Front as string;

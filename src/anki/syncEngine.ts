@@ -1,6 +1,9 @@
+import pLimit from "p-limit";
 import type { AnkiConnectClient, NoteInfo } from "./client";
 import { AnkiConnectError } from "./client";
 import type { Config } from "../config/configParser";
+import { createDeckEnsurer, type DeckEnsurer } from "./deckEnsurer";
+import { buildFrontDuplicateSearchQuery } from "./frontSearch";
 import { normalizeAnkiTagList, normalizeAnkiTagPath } from "./tagNormalize";
 import {
   buildAnkiDuplicateRecoveredWarning,
@@ -33,6 +36,27 @@ export type SyncEngineConfig = Pick<
   Config,
   "noteModelName" | "syncTagPrefix" | "autoCreateDecks" | "defaultEngineTag"
 >;
+
+export const DEFAULT_SYNC_CONCURRENCY = 10;
+export const DEFAULT_ADD_NOTES_CHUNK = 50;
+
+export type SyncRunContext = {
+  deckEnsurer: DeckEnsurer;
+  syncLimit: ReturnType<typeof pLimit>;
+  frontMatchCache: Map<string, NoteInfo | undefined>;
+};
+
+export function createSyncRunContext(
+  client: AnkiConnectClient,
+  config: SyncEngineConfig,
+  options?: { concurrency?: number },
+): SyncRunContext {
+  return {
+    deckEnsurer: createDeckEnsurer(client, config.autoCreateDecks),
+    syncLimit: pLimit(options?.concurrency ?? DEFAULT_SYNC_CONCURRENCY),
+    frontMatchCache: new Map(),
+  };
+}
 
 export type BuildAnkiTagsInput = {
   engineTag: string;
@@ -97,10 +121,18 @@ export async function findNoteByFrontInDeck(
   client: AnkiConnectClient,
   deck: string,
   frontHtml: string,
+  cache?: Map<string, NoteInfo | undefined>,
 ): Promise<NoteInfo | undefined> {
-  const escapedDeck = deck.replace(/"/g, '\\"');
-  const noteIds = await client.findNotes(`deck:"${escapedDeck}"`);
+  const cacheKey = `${deck}\0${frontHtml}`;
+  if (cache?.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  const noteIds = await client.findNotes(
+    buildFrontDuplicateSearchQuery(deck, frontHtml),
+  );
   if (noteIds.length === 0) {
+    cache?.set(cacheKey, undefined);
     return undefined;
   }
 
@@ -115,7 +147,9 @@ export async function findNoteByFrontInDeck(
     );
   }
 
-  return matches[0];
+  const match = matches[0];
+  cache?.set(cacheKey, match);
+  return match;
 }
 
 export async function ensureDeck(
@@ -202,11 +236,13 @@ async function recoverDuplicateNote(
   config: SyncEngineConfig,
   fields: Record<string, string>,
   tags: string[],
+  context?: SyncRunContext,
 ): Promise<CardSyncResult> {
   const duplicate = await findNoteByFrontInDeck(
     client,
     payload.deck,
     payload.frontHtml,
+    context?.frontMatchCache,
   );
   if (!duplicate) {
     throw new AnkiConnectError("cannot create note because it is a duplicate");
@@ -257,13 +293,18 @@ export async function syncCard(
   client: AnkiConnectClient,
   payload: CardSyncPayload,
   config: SyncEngineConfig,
+  context?: SyncRunContext,
 ): Promise<CardSyncResult> {
   const uuid = payload.ankiId ?? payload.wouldInjectId;
   if (!uuid) {
     throw new Error("Card sync payload missing obsidian uuid");
   }
 
-  await ensureDeck(client, payload.deck, config.autoCreateDecks);
+  if (context) {
+    await context.deckEnsurer.ensureDeck(payload.deck);
+  } else {
+    await ensureDeck(client, payload.deck, config.autoCreateDecks);
+  }
 
   const tags = buildAnkiTags({
     engineTag: config.defaultEngineTag,
@@ -298,7 +339,7 @@ export async function syncCard(
       if (!isDuplicateNoteError(error)) {
         throw error;
       }
-      return recoverDuplicateNote(client, payload, config, fields, tags);
+      return recoverDuplicateNote(client, payload, config, fields, tags, context);
     }
   }
 
@@ -328,32 +369,383 @@ export type FileSyncResult = {
   injections: Array<{ offset: number; uuid: string }>;
 };
 
-export async function syncFileCards(
+type PreparedCardItem = {
+  index: number;
+  item: FileCardSyncItem;
+  uuid: string;
+  tags: string[];
+  fields: Record<string, string>;
+};
+
+function prepareCardItemsWithConfig(
+  items: FileCardSyncItem[],
+  config: SyncEngineConfig,
+): PreparedCardItem[] {
+  return items.map((item, index) => {
+    const uuid = item.payload.ankiId ?? item.payload.wouldInjectId;
+    if (!uuid) {
+      throw new Error("Card sync payload missing obsidian uuid");
+    }
+
+    return {
+      index,
+      item,
+      uuid,
+      tags: buildAnkiTags({
+        engineTag: config.defaultEngineTag,
+        fileTags: item.payload.fileAnkiTags ?? [],
+        headingTag: item.payload.tag,
+        syncTagPrefix: config.syncTagPrefix,
+        uuid,
+      }),
+      fields: buildSyncFields(item.payload.frontHtml, item.payload.backHtml),
+    };
+  });
+}
+
+async function ensureDecksForItems(
+  context: SyncRunContext,
+  items: FileCardSyncItem[],
+): Promise<void> {
+  const decks = new Set(items.map((item) => item.payload.deck));
+  await Promise.all(
+    [...decks].map((deck) => context.deckEnsurer.ensureDeck(deck)),
+  );
+}
+
+async function batchResolveExistingNoteIds(
+  client: AnkiConnectClient,
+  prepared: PreparedCardItem[],
+  config: SyncEngineConfig,
+): Promise<Map<number, number | undefined>> {
+  if (prepared.length === 0) {
+    return new Map();
+  }
+
+  const results = await client.invokeMulti<number[][]>(
+    prepared.map((entry) => ({
+      action: "findNotes",
+      params: {
+        query: `tag:"${buildObsidianIdTag(config.syncTagPrefix, entry.uuid)}"`,
+      },
+    })),
+  );
+
+  const existingByIndex = new Map<number, number | undefined>();
+  for (let i = 0; i < prepared.length; i += 1) {
+    const entry = prepared[i]!;
+    const noteIds = results[i] ?? [];
+    if (noteIds.length > 1) {
+      throw new Error(`Duplicate Anki notes for obsidian id ${entry.uuid}`);
+    }
+    existingByIndex.set(entry.index, noteIds[0]);
+  }
+
+  return existingByIndex;
+}
+
+async function addPreparedCard(
+  client: AnkiConnectClient,
+  prepared: PreparedCardItem,
+  config: SyncEngineConfig,
+  context?: SyncRunContext,
+): Promise<CardSyncResult> {
+  try {
+    const noteId = await client.addNote({
+      deckName: prepared.item.payload.deck,
+      modelName: config.noteModelName,
+      fields: prepared.fields,
+      tags: prepared.tags,
+    });
+
+    return {
+      action: "add",
+      ankiNoteId: noteId,
+      injectedId: prepared.item.payload.wouldInjectId,
+    };
+  } catch (error) {
+    if (!isDuplicateNoteError(error)) {
+      throw error;
+    }
+    return recoverDuplicateNote(
+      client,
+      prepared.item.payload,
+      config,
+      prepared.fields,
+      prepared.tags,
+      context,
+    );
+  }
+}
+
+async function syncPreparedUpdates(
+  client: AnkiConnectClient,
+  updates: Array<{ prepared: PreparedCardItem; noteId: number }>,
+  noteInfoById: Map<number, NoteInfo>,
+  context: SyncRunContext,
+  results: CardSyncResult[],
+): Promise<void> {
+  await Promise.all(
+    updates.map(({ prepared, noteId }) =>
+      context.syncLimit(async () => {
+        try {
+          const noteInfo = noteInfoById.get(noteId);
+          if (!noteInfo) {
+            throw new Error(`Anki note ${noteId} not found`);
+          }
+
+          const action = await updateExistingNote(
+            client,
+            noteId,
+            noteInfo,
+            prepared.fields,
+            prepared.tags,
+          );
+          results[prepared.index] = { action, ankiNoteId: noteId };
+        } catch (error) {
+          results[prepared.index] = {
+            action: "skip",
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    ),
+  );
+}
+
+async function syncPreparedAdds(
+  client: AnkiConnectClient,
+  preparedAdds: PreparedCardItem[],
+  config: SyncEngineConfig,
+  context: SyncRunContext,
+  results: CardSyncResult[],
+): Promise<void> {
+  for (
+    let chunkStart = 0;
+    chunkStart < preparedAdds.length;
+    chunkStart += DEFAULT_ADD_NOTES_CHUNK
+  ) {
+    const chunk = preparedAdds.slice(
+      chunkStart,
+      chunkStart + DEFAULT_ADD_NOTES_CHUNK,
+    );
+
+    try {
+      const noteIds = await client.addNotes(
+        chunk.map((entry) => ({
+          deckName: entry.item.payload.deck,
+          modelName: config.noteModelName,
+          fields: entry.fields,
+          tags: entry.tags,
+        })),
+      );
+
+      for (let i = 0; i < chunk.length; i += 1) {
+        const entry = chunk[i]!;
+        const noteId = noteIds[i];
+        if (noteId !== null && noteId !== undefined) {
+          results[entry.index] = {
+            action: "add",
+            ankiNoteId: noteId,
+            injectedId: entry.item.payload.wouldInjectId,
+          };
+          continue;
+        }
+
+        try {
+          results[entry.index] = await recoverDuplicateNote(
+            client,
+            entry.item.payload,
+            config,
+            entry.fields,
+            entry.tags,
+            context,
+          );
+        } catch (error) {
+          results[entry.index] = {
+            action: "skip",
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+    } catch {
+      for (const entry of chunk) {
+        if (results[entry.index] !== undefined) {
+          continue;
+        }
+
+        try {
+          results[entry.index] = await addPreparedCard(
+            client,
+            entry,
+            config,
+            context,
+          );
+        } catch (error) {
+          results[entry.index] = {
+            action: "skip",
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+    }
+  }
+}
+
+function collectFileSyncInjections(
+  items: FileCardSyncItem[],
+  results: CardSyncResult[],
+): Array<{ offset: number; uuid: string }> {
+  const injections: Array<{ offset: number; uuid: string }> = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    const result = results[index];
+    const item = items[index];
+    if (
+      result?.injectedId &&
+      item?.injectionOffset !== undefined
+    ) {
+      injections.push({
+        offset: item.injectionOffset,
+        uuid: result.injectedId,
+      });
+    }
+  }
+
+  return injections;
+}
+
+async function syncFileCardsBatched(
   client: AnkiConnectClient,
   items: FileCardSyncItem[],
   config: SyncEngineConfig,
+  context: SyncRunContext,
 ): Promise<FileSyncResult> {
+  if (items.length === 0) {
+    return { results: [], injections: [] };
+  }
+
+  const prepared = prepareCardItemsWithConfig(items, config);
+  await ensureDecksForItems(context, items);
+
+  const results: CardSyncResult[] = new Array(items.length);
+  let existingByIndex: Map<number, number | undefined>;
+
+  try {
+    existingByIndex = await batchResolveExistingNoteIds(
+      client,
+      prepared,
+      config,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    for (let index = 0; index < items.length; index += 1) {
+      results[index] = { action: "skip", error: message };
+    }
+    return { results, injections: [] };
+  }
+
+  const updates: Array<{ prepared: PreparedCardItem; noteId: number }> = [];
+  const preparedAdds: PreparedCardItem[] = [];
+
+  for (const entry of prepared) {
+    const existingNoteId = existingByIndex.get(entry.index);
+    if (existingNoteId === undefined) {
+      preparedAdds.push(entry);
+    } else {
+      updates.push({ prepared: entry, noteId: existingNoteId });
+    }
+  }
+
+  const noteIds = [
+    ...new Set(updates.map((entry) => entry.noteId)),
+  ];
+  const noteInfos = noteIds.length > 0 ? await client.notesInfo(noteIds) : [];
+  const noteInfoById = new Map(noteInfos.map((note) => [note.noteId, note]));
+
+  await syncPreparedUpdates(
+    client,
+    updates,
+    noteInfoById,
+    context,
+    results,
+  );
+  await syncPreparedAdds(client, preparedAdds, config, context, results);
+
+  for (let index = 0; index < results.length; index += 1) {
+    if (results[index] === undefined) {
+      results[index] = {
+        action: "skip",
+        error: "Card sync did not produce a result",
+      };
+    }
+  }
+
+  return {
+    results,
+    injections: collectFileSyncInjections(items, results),
+  };
+}
+
+async function syncFileCardsParallel(
+  client: AnkiConnectClient,
+  items: FileCardSyncItem[],
+  config: SyncEngineConfig,
+  context?: SyncRunContext,
+): Promise<FileSyncResult> {
+  const limit = context?.syncLimit ?? pLimit(1);
+
+  const settled = await Promise.all(
+    items.map((item, index) =>
+      limit(async () => {
+        try {
+          const result = await syncCard(client, item.payload, config, context);
+          return { index, result, item };
+        } catch (error) {
+          return {
+            index,
+            result: {
+              action: "skip" as const,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            item,
+          };
+        }
+      }),
+    ),
+  );
+
+  settled.sort((a, b) => a.index - b.index);
+
   const results: CardSyncResult[] = [];
   const injections: Array<{ offset: number; uuid: string }> = [];
 
-  for (const item of items) {
-    try {
-      const result = await syncCard(client, item.payload, config);
-      results.push(result);
+  for (const entry of settled) {
+    results.push(entry.result);
 
-      if (result.injectedId && item.injectionOffset !== undefined) {
-        injections.push({
-          offset: item.injectionOffset,
-          uuid: result.injectedId,
-        });
-      }
-    } catch (error) {
-      results.push({
-        action: "skip",
-        error: error instanceof Error ? error.message : String(error),
+    if (
+      entry.result.injectedId &&
+      entry.item.injectionOffset !== undefined
+    ) {
+      injections.push({
+        offset: entry.item.injectionOffset,
+        uuid: entry.result.injectedId,
       });
     }
   }
 
   return { results, injections };
+}
+
+export async function syncFileCards(
+  client: AnkiConnectClient,
+  items: FileCardSyncItem[],
+  config: SyncEngineConfig,
+  context?: SyncRunContext,
+): Promise<FileSyncResult> {
+  if (context) {
+    return syncFileCardsBatched(client, items, config, context);
+  }
+
+  return syncFileCardsParallel(client, items, config, context);
 }

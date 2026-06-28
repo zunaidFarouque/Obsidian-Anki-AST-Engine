@@ -105,13 +105,13 @@ Sync complete (live): 37 card(s) — added 0, updated 4, skipped 33, failed 0, d
 ### New card flow
 
 1. Engine compiles HTML.
-2. `addNote` to target deck with `obsidian-id::<uuid>` tag.
+2. Live sync adds the card via batched `addNotes` (or per-card `addNote` on batch failure) with `obsidian-id::<uuid>` tag.
 3. On success, splices `<!--anki-id: uuid-->` into the markdown file at the AST-derived back offset.
 
 ### Update flow
 
 1. Read `<!--anki-id: uuid-->` from card back.
-2. `findNotes` with `tag:"obsidian-id::<uuid>"`.
+2. Live sync prefetches all obsidian-id lookups for the file in one `multi` request; re-sync uses `findNotes` with `tag:"obsidian-id::<uuid>"` when resolving a single card via `syncCard`.
 3. Compare `Front` / `Back` fields (with code-block line-ending normalization — see below); call `updateNoteFields` only when content truly changed.
 4. `updateNoteTags` when tag set differs (engine, file, heading, or binding tags).
 
@@ -119,7 +119,7 @@ Sync complete (live): 37 card(s) — added 0, updated 4, skipped 33, failed 0, d
 
 Compiled HTML is compared byte-for-byte against Anki’s stored fields. On Windows, fenced code blocks in source `.md` files often compile to **CRLF** (`\r\n`) inside `<pre><code>…</code></pre>`, while Anki typically stores **LF** (`\n`). Without normalization, every sync would report an `update` even though the card content is unchanged.
 
-Before compare and before `addNote` / `updateNoteFields`, the engine normalizes `\r\n` and lone `\r` to `\n` **inside `<pre><code>` blocks only**. Other HTML (paragraphs, `<br>`, tables) is left as compiled.
+Before compare and before `addNote` / `addNotes` / `updateNoteFields`, the engine normalizes `\r\n` and lone `\r` to `\n` **inside `<pre><code>` blocks only**. Other HTML (paragraphs, `<br>`, tables) is left as compiled.
 
 Implementation: [`src/anki/htmlNormalize.ts`](../src/anki/htmlNormalize.ts)
 
@@ -131,14 +131,48 @@ If markdown has a valid `anki-id` but Anki has no matching tag, the engine **re-
 
 ### Duplicate recovery
 
-If `addNote` is rejected because Anki already has a note with the same **Front** field in the target deck, the engine:
+If `addNote` / `addNotes` rejects a card because Anki already has a note with the same **Front** field in the target deck, the engine:
 
-1. Finds the existing note by exact `Front` HTML match in that deck.
+1. Finds candidate notes with a **targeted** Anki search: `deck:"…" front:"…"` (plain text stripped from compiled HTML), then confirms an exact `Front` field match — not a full-deck scan. See [`frontSearch.ts`](../src/anki/frontSearch.ts).
 2. Reuses its `obsidian-id::<uuid>` tag if present; otherwise adds the planned binding tag.
 3. Updates fields/tags if needed.
 4. Splices `<!--anki-id: uuid-->` into the markdown when the vault file lacks one.
 
+Lookups are cached per sync run (`SyncRunContext.frontMatchCache`) so multiple recoveries for the same front do not repeat API calls.
+
 This breaks the re-sync deadlock where duplicate rejection prevented ID injection on every run.
+
+## Card sync performance
+
+Live card sync is optimized to minimize AnkiConnect round trips. Full detail: [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md).
+
+### Per-file batched path
+
+For each file (after media upload):
+
+1. **`invokeMulti`** — all `findNotes` queries for `obsidian-id::<uuid>` tags in one HTTP request.
+2. **`notesInfo`** — one request for every existing note ID found.
+3. **Parallel updates** — up to 10 cards (`pLimit(10)`) call `updateNoteFields` / `updateNoteTags` when content or tags changed.
+4. **`addNotes`** — new cards added in chunks of up to **50** per HTTP request.
+5. **Fallbacks** — failed `addNotes` batch → per-card `addNote`; `null` slot in batch result → duplicate recovery (above).
+
+### HTTP transport layer
+
+All AnkiConnect actions share one client ([`client.ts`](../src/anki/client.ts)):
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `DEFAULT_INVOKE_CONCURRENCY` | 5 | Max simultaneous HTTP requests (media + cards) |
+| `DEFAULT_SYNC_CONCURRENCY` | 10 | Max parallel card **updates** per file |
+| `DEFAULT_ADD_NOTES_CHUNK` | 50 | Max notes per `addNotes` request |
+
+Transient errors (e.g. `Unable to connect. Is the computer able to access the url?` when Anki is overloaded) are retried automatically (3 attempts, exponential backoff).
+
+### Deck cache
+
+[`deckEnsurer.ts`](../src/anki/deckEnsurer.ts) loads `deckNames()` once per live sync run and deduplicates concurrent `createDeck` calls for the same new deck.
+
+Dry-run does not contact Anki; performance optimizations apply only to live sync.
 
 ## Duplicate detection
 
@@ -156,7 +190,7 @@ After each sync (dry-run or live), the engine emits structured warnings on **std
 |------|---------|-------------------|
 | `vault_front_collision` | Two or more vault cards in the **same deck** compile to identical `frontHtml` (same back too) | They map to one Anki note. Remove or differentiate one card, or accept shared binding. |
 | `back_mismatch` | Same `frontHtml` in the same deck but **different `backHtml`** | **SRS-breaking** — sync will keep overwriting the answer. Change the question text, heading, or back content so fronts differ, or delete the duplicate. |
-| `anki_duplicate_recovered` | `addNote` rejected as duplicate; engine linked to existing note by Front match | Review whether the link is intended; ensure `<!--anki-id-->` was injected. |
+| `anki_duplicate_recovered` | `addNote` / `addNotes` rejected as duplicate; engine linked to existing note by targeted Front match | Review whether the link is intended; ensure `<!--anki-id-->` was injected. |
 
 ### Common causes
 
@@ -178,7 +212,7 @@ For each file:
    - **External markdown images** `![](https://...)` — AnkiConnect `url` (Anki downloads into `collection.media`)
    
    Dry-run JSON includes `mediaUploadDetails` with `{ fileName, transport }` per file. If media upload fails, no cards in that file are synced or injected.
-2. Sync each card to Anki independently (per-card errors do not abort siblings).
+2. Sync each card to Anki with **concurrency 10** on updates; new cards in a file are added via batched **`addNotes`** (chunks of 50). Existing note IDs are prefetched with one **`multi`** `findNotes` call per file. Per-card errors do not abort siblings. Deck existence is checked once per sync run ([`deckEnsurer.ts`](../src/anki/deckEnsurer.ts)). See [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md).
 3. Batch-inject new IDs for **all successful cards** (reverse offset order).
 
 If one card fails for a non-recoverable reason, other successful cards in the same file still receive `<!--anki-id-->` comments.
@@ -214,6 +248,10 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 
 - HTTP client: [`src/anki/client.ts`](../src/anki/client.ts)
 - Sync logic: [`src/anki/syncEngine.ts`](../src/anki/syncEngine.ts)
+- AnkiConnect client: [`src/anki/client.ts`](../src/anki/client.ts)
+- Deck cache: [`src/anki/deckEnsurer.ts`](../src/anki/deckEnsurer.ts)
+- Duplicate front search: [`src/anki/frontSearch.ts`](../src/anki/frontSearch.ts)
+- Performance roadmap: [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md)
 - Duplicate detection: [`src/anki/duplicateDetect.ts`](../src/anki/duplicateDetect.ts)
 - HTML field normalization: [`src/anki/htmlNormalize.ts`](../src/anki/htmlNormalize.ts)
 - Media upload: [`src/anki/mediaQueue.ts`](../src/anki/mediaQueue.ts)

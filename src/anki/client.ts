@@ -1,7 +1,14 @@
 import { z } from "zod";
+import pLimit from "p-limit";
 import type { Config } from "../config/configParser";
 
 const ANKI_CONNECT_VERSION = 6;
+export const DEFAULT_INVOKE_CONCURRENCY = 5;
+const INVOKE_MAX_ATTEMPTS = 3;
+const INVOKE_RETRY_BASE_MS = 50;
+
+const TRANSIENT_ERROR_PATTERN =
+  /unable to connect|failed to fetch|network|econnreset|econnrefused|socket hang up/i;
 
 const AnkiResponseSchema = z.object({
   result: z.unknown(),
@@ -19,7 +26,25 @@ export type AnkiClientOptions = {
   url: string;
   apiKey?: string;
   fetchImpl?: typeof fetch;
+  requestConcurrency?: number;
+  retryBaseDelayMs?: number;
 };
+
+export function isRetryableAnkiConnectError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return true;
+  }
+
+  if (error instanceof AnkiConnectError) {
+    return TRANSIENT_ERROR_PATTERN.test(error.message);
+  }
+
+  return false;
+}
+
+function invokeRetryDelayMs(attempt: number, baseDelayMs: number): number {
+  return baseDelayMs * 2 ** (attempt - 1);
+}
 
 export type AddNoteParams = {
   deckName: string;
@@ -39,18 +64,73 @@ export type StoreMediaFileParams =
   | { filename: string; data: string }
   | { filename: string; url: string };
 
+export type MultiAction = {
+  action: string;
+  params?: Record<string, unknown>;
+};
+
+function buildAddNoteRequest(note: AddNoteParams): Record<string, unknown> {
+  return {
+    deckName: note.deckName,
+    modelName: note.modelName,
+    fields: note.fields,
+    tags: note.tags,
+    options: {
+      allowDuplicate: false,
+      duplicateScope: "deck",
+    },
+  };
+}
+
 export class AnkiConnectClient {
   private readonly url: string;
   private readonly apiKey?: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly requestLimit: ReturnType<typeof pLimit>;
+  private readonly retryBaseDelayMs: number;
 
   constructor(options: AnkiClientOptions) {
     this.url = options.url;
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.requestLimit = pLimit(
+      options.requestConcurrency ?? DEFAULT_INVOKE_CONCURRENCY,
+    );
+    this.retryBaseDelayMs = options.retryBaseDelayMs ?? INVOKE_RETRY_BASE_MS;
   }
 
   async invoke<T>(action: string, params?: Record<string, unknown>): Promise<T> {
+    return this.requestLimit(async () => {
+      let lastError: unknown;
+
+      for (let attempt = 1; attempt <= INVOKE_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          return await this.invokeOnce<T>(action, params);
+        } catch (error) {
+          lastError = error;
+          if (
+            attempt === INVOKE_MAX_ATTEMPTS ||
+            !isRetryableAnkiConnectError(error)
+          ) {
+            throw error;
+          }
+          await new Promise((resolve) =>
+            setTimeout(
+              resolve,
+              invokeRetryDelayMs(attempt, this.retryBaseDelayMs),
+            ),
+          );
+        }
+      }
+
+      throw lastError;
+    });
+  }
+
+  private async invokeOnce<T>(
+    action: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
     const body: Record<string, unknown> = {
       action,
       version: ANKI_CONNECT_VERSION,
@@ -109,6 +189,16 @@ export class AnkiConnectClient {
     return this.invoke<string[]>("modelNames");
   }
 
+  async invokeMulti<T extends unknown[]>(
+    actions: MultiAction[],
+  ): Promise<T> {
+    if (actions.length === 0) {
+      return [] as T;
+    }
+
+    return this.invoke<T>("multi", { actions });
+  }
+
   async findNotes(query: string): Promise<number[]> {
     return this.invoke<number[]>("findNotes", { query });
   }
@@ -123,16 +213,17 @@ export class AnkiConnectClient {
 
   async addNote(note: AddNoteParams): Promise<number> {
     return this.invoke<number>("addNote", {
-      note: {
-        deckName: note.deckName,
-        modelName: note.modelName,
-        fields: note.fields,
-        tags: note.tags,
-        options: {
-          allowDuplicate: false,
-          duplicateScope: "deck",
-        },
-      },
+      note: buildAddNoteRequest(note),
+    });
+  }
+
+  async addNotes(notes: AddNoteParams[]): Promise<Array<number | null>> {
+    if (notes.length === 0) {
+      return [];
+    }
+
+    return this.invoke<Array<number | null>>("addNotes", {
+      notes: notes.map((note) => buildAddNoteRequest(note)),
     });
   }
 

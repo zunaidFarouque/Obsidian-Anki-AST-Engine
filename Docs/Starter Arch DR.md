@@ -39,8 +39,10 @@ The system architecture adheres to Domain-Driven Design (DDD) principles, ensuri
 │   │   ├── linkResolver.ts
 │   │   └── vaultIndex.ts
 │   ├── anki/
-│   │   ├── client.ts          # AnkiConnect HTTP (stub)
-│   │   ├── syncEngine.ts      # Live sync dispatch (stub)
+│   │   ├── client.ts          # AnkiConnect HTTP (invoke limit, retry, batch APIs)
+│   │   ├── syncEngine.ts      # Batched live sync dispatch
+│   │   ├── deckEnsurer.ts     # Per-run deck cache
+│   │   ├── frontSearch.ts     # Targeted duplicate Front lookup
 │   │   └── mediaQueue.ts
 │   └── utils/
 │       ├── hash.ts
@@ -159,10 +161,15 @@ Before this new string is written to the disk, the thread must acquire an exclus
 
 ## **AnkiConnect Synchronization Engine**
 
-Once the flashcards are extracted and assigned unique identifiers, the AST buffers for the Front and Back are compiled into raw HTML strings using remark-rehype and rehype-stringify32. This HTML payload, alongside the derived tags and media references, is passed to the AnkiConnect synchronization engine.  
-The synchronization module relies heavily on the p-limit utility to throttle HTTP requests to http://localhost:8765, ensuring the single-threaded Python server underpinning AnkiConnect is not overwhelmed5. For each card, the engine constructs a notesInfo payload to query the Anki database22.  
-If the query returns null, indicating the UUID does not exist in the Anki database, the system constructs an addNote request, mapping the HTML strings to the configured Front and Back fields of the target deck22. If Anki rejects the note as a duplicate (identical Front in the same deck), the engine recovers by linking to the existing note, reusing or adding the `obsidian-id::<uuid>` tag, and injecting `<!--anki-id-->` into the vault when missing.  
-Conversely, if the query returns an existing note, the engine performs a local diff against the retrieved fields. **Code-block line endings** (`\r\n` vs `\n` inside `<pre><code>`) are normalized before compare and before write so unchanged cards report `skip` instead of false `update` actions. If the compiled HTML differs from the stored HTML, the system executes an updateNoteFields request22. Following a successful update, an updateNoteTags request is dispatched to ensure the Anki tags remain synchronized with the Obsidian heading hierarchy.
+Once the flashcards are extracted and assigned unique identifiers, the AST buffers for the Front and Back are compiled into raw HTML strings using remark-rehype and rehype-stringify32. This HTML payload, alongside the derived tags and media references, is passed to the AnkiConnect synchronization engine.
+
+The live sync path batches API calls per file: one `multi` request prefetches all `obsidian-id` tag lookups, one `notesInfo` for existing notes, `addNotes` chunks (up to 50) for new cards, and parallel updates (up to 10 concurrent). Deck names are cached for the whole run via `DeckEnsurer`. All HTTP traffic is capped at five concurrent requests with automatic retry on transient connection errors.
+
+If a UUID is not found in Anki, new cards are added via `addNotes` (or per-card `addNote` on batch failure). If Anki rejects a card as a duplicate (identical Front in the same deck), the engine recovers by linking to the existing note using a targeted `deck + front` search (not a full-deck scan), reusing or adding the `obsidian-id::<uuid>` tag, and injecting `<!--anki-id-->` into the vault when missing.
+
+If the query returns an existing note, the engine performs a local diff against the retrieved fields. **Code-block line endings** (`\r\n` vs `\n` inside `<pre><code>`) are normalized before compare and before write so unchanged cards report `skip` instead of false `update` actions. If the compiled HTML differs from the stored HTML, the system executes an `updateNoteFields` request22. Following a successful update, an `updateNoteTags` request is dispatched to ensure the Anki tags remain synchronized with the Obsidian heading hierarchy.
+
+Full performance detail: [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md).
 
 ### **Duplicate detection**
 
@@ -259,10 +266,13 @@ This concurrency pattern guarantees that if File A initiates an ID injection int
 ### **Bottleneck 2: AnkiConnect Thread Blocking and Socket Timeouts**
 
 **Failure Mode:** The AnkiConnect plugin operates as a synchronous, single-threaded HTTP server hosted within the Python environment of the Anki Desktop application. When a user syncs a vault containing hundreds of high-resolution images, the storeMediaFile action necessitates the transmission of massive Base64 payloads over localhost22. Because Node.js is heavily asynchronous, it will easily dispatch hundreds of concurrent fetch requests simultaneously, rapidly overflowing AnkiConnect's request backlog. This leads to ECONNRESET errors, socket timeouts, and silently dropped media files5.  
-**Code-Level Mitigation:** All network requests directed at AnkiConnect will be rigorously routed through an abstraction layer managed by p-limit4. Rather than using a priority queue, simple stateless concurrency caps are established:
+**Code-Level Mitigation:** All network requests directed at AnkiConnect are routed through [`AnkiConnectClient`](../src/anki/client.ts) with p-limit caps and automatic retry on transient errors:
 
-1. const mediaLimit \= pLimit(3); \- Media uploads (storeMediaFile via path, url, or base64 fallback) are strictly throttled to a maximum concurrency of 3\. This drip-feeds payloads, ensuring the Python thread can process and write binary data to SQLite without stalling.  
-2. const syncLimit \= pLimit(10); \- Lightweight JSON requests (addNote, updateNoteFields, notesInfo) are throttled to a concurrency of 10, optimizing throughput without triggering API rejection logic22.
+1. **Media** — `pLimit(3)` in [`mediaQueue.ts`](../src/anki/mediaQueue.ts): `storeMediaFile` via path, url, or base64 fallback (max 3 concurrent uploads).
+2. **HTTP transport** — `DEFAULT_INVOKE_CONCURRENCY` = 5: all `invoke` / `invokeMulti` / `addNotes` traffic shares one pool.
+3. **Card updates** — `DEFAULT_SYNC_CONCURRENCY` = 10: parallel `updateNoteFields` / `updateNoteTags` per file after batched prefetch.
+
+Card adds use `addNotes` (chunks of 50) rather than one HTTP request per card. See [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md).
 
 ### **Bottleneck 3: Destructive Formatting Alterations via AST Serialization**
 
