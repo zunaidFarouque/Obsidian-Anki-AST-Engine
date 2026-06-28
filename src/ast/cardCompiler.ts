@@ -14,6 +14,11 @@ import type { ObsidianCallout } from "./remarkObsidianCallout";
 import { remarkObsidianHighlight } from "./remarkObsidianHighlight";
 import { remarkPreviewHeading } from "./remarkPreviewHeading";
 import { remarkObsidianComment, stripObsidianCommentsFromNodes } from "./remarkObsidianComment";
+import {
+  isPdfLinkParagraph,
+  isSoundMediaParagraph,
+  soundFileNameFromParagraph,
+} from "./vaultMediaNodes";
 
 const compiler = unified()
   .use(remarkObsidianComment)
@@ -152,7 +157,7 @@ function stripMathHastAliases(nodes: Content[]): Content[] {
   return result;
 }
 
-function hoistParagraphImages(nodes: Content[]): Content[] {
+function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
   const result: Content[] = [];
 
   for (const node of nodes) {
@@ -165,6 +170,31 @@ function hoistParagraphImages(nodes: Content[]): Content[] {
       continue;
     }
 
+    if (isSoundMediaParagraph(node)) {
+      const fileName = soundFileNameFromParagraph(node);
+      if (fileName) {
+        result.push({
+          type: "html",
+          value: `[sound:${fileName}]`,
+        });
+        continue;
+      }
+    }
+
+    if (isPdfLinkParagraph(node)) {
+      const link = node.children[0];
+      if (link?.type === "link") {
+        const label = link.children
+          .map((child) => ("value" in child ? String(child.value) : ""))
+          .join("");
+        result.push({
+          type: "html",
+          value: `<a href="${link.url}">${label}</a>`,
+        });
+        continue;
+      }
+    }
+
     result.push(node);
   }
 
@@ -174,7 +204,7 @@ function hoistParagraphImages(nodes: Content[]): Content[] {
 export function compileCardField(nodes: Content[]): string {
   return compileRoot({
     type: "root",
-    children: hoistParagraphImages(
+    children: hoistSingleChildMediaParagraphs(
       stripMathHastAliases(stripObsidianCommentsFromNodes(nodes)),
     ),
   });
@@ -189,10 +219,10 @@ export function compileCardFields(
   backNodes: Content[],
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
-  const strippedFront = hoistParagraphImages(
+  const strippedFront = hoistSingleChildMediaParagraphs(
     stripMathHastAliases(stripObsidianCommentsFromNodes(frontNodes)),
   );
-  const strippedBack = hoistParagraphImages(
+  const strippedBack = hoistSingleChildMediaParagraphs(
     stripMathHastAliases(stripObsidianCommentsFromNodes(backNodes)),
   );
   const context = buildFootnoteEmbedContext(strippedFront, strippedBack, {

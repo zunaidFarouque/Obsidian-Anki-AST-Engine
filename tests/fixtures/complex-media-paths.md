@@ -11,13 +11,13 @@ cardDeclarationHeadingLevel: 4
 
 Identify the organelles shown below.
 
-![[assets/nested/another folderrrr/toppng.com-cartoon-1254x1254.png]]
+![[toppng.com-cartoon-1254x1254.png]]
 
-![](assets/nested/path.png)
+![[path.png]]
 
-![[assets/media/jpeg-home.jpg]]
+![[jpeg-home.jpg]]
 
-![[assets/media/koala.webp]]
+![[koala.webp]]
 
 Which structure is responsible for ATP synthesis?
 

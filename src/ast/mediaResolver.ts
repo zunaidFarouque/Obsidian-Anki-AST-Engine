@@ -1,15 +1,23 @@
 import { resolve as resolvePath } from "node:path";
-import type { Content, Image, Paragraph, Root } from "mdast";
+import type { Content, Image, Link, Paragraph, Root } from "mdast";
 import { isObsidianEmbed } from "./obsidianLinks";
 import { formatWikilink, parseLinktext, type ParsedLinktext } from "../obsidian/linkResolver";
 import {
-  isImageMediaPath,
+  getMediaKind,
+  isAttachableMediaPath,
   isMediaPath,
   resolveAttachmentPath,
   type VaultFileIndex,
 } from "../obsidian/vaultIndex";
 import { enqueueMediaDryRun } from "../anki/mediaQueue";
 import { toAnkiMediaFileName } from "../anki/mediaFileName";
+import type { MediaPathEntry } from "../anki/mediaNaming";
+import {
+  createResolvedMediaNode,
+  isPdfLinkParagraph,
+  isSoundMediaParagraph,
+  soundFileNameFromParagraph,
+} from "./vaultMediaNodes";
 
 export type MediaUploadPlan = {
   fileName: string;
@@ -26,10 +34,149 @@ export type MediaResolveContext = {
   sourcePath: string;
   vaultIndex: VaultFileIndex;
   attachmentFolder?: string;
+  linkFormat?: "shortest" | "relative" | "absolute";
+  ankiNameByVaultPath?: Map<string, string>;
   dryRun: boolean;
 };
 
 const WIKI_EMBED_IN_TEXT = /!\[\[([^\]]+)\]\]/g;
+
+function attachmentOptions(context: Pick<
+  MediaResolveContext,
+  "attachmentFolder" | "linkFormat"
+>) {
+  return {
+    attachmentFolder: context.attachmentFolder,
+    linkFormat: context.linkFormat,
+  };
+}
+
+function resolveVaultPath(
+  mediaPath: string,
+  context: Pick<
+    MediaResolveContext,
+    "sourcePath" | "vaultIndex" | "attachmentFolder" | "linkFormat"
+  >,
+): string | null {
+  return resolveAttachmentPath(
+    mediaPath,
+    context.sourcePath,
+    context.vaultIndex,
+    attachmentOptions(context),
+  );
+}
+
+function ankiFileNameForVaultPath(
+  vaultRelativePath: string,
+  context: MediaResolveContext,
+): string {
+  const fromMap = context.ankiNameByVaultPath?.get(vaultRelativePath);
+  if (fromMap) {
+    return fromMap;
+  }
+
+  const vaultBaseName = vaultRelativePath.split("/").pop() ?? vaultRelativePath;
+  return toAnkiMediaFileName(vaultBaseName);
+}
+
+function isAttachableWikiEmbed(parsed: ParsedLinktext): boolean {
+  return isAttachableMediaPath(parsed.path) && !parsed.subpath;
+}
+
+export function collectResolvedMediaPaths(
+  ast: Root,
+  context: Omit<MediaResolveContext, "dryRun" | "ankiNameByVaultPath">,
+): MediaPathEntry[] {
+  const entries: MediaPathEntry[] = [];
+  const seen = new Set<string>();
+
+  const addResolved = (vaultRelativePath: string) => {
+    if (seen.has(vaultRelativePath)) {
+      return;
+    }
+
+    seen.add(vaultRelativePath);
+    entries.push({
+      vaultRelativePath,
+      absolutePath: resolvePath(context.vaultIndex.vaultPath, vaultRelativePath),
+    });
+  };
+
+  const tryAddPath = (mediaPath: string) => {
+    const resolved = resolveVaultPath(mediaPath, context);
+    if (resolved) {
+      addResolved(resolved);
+    }
+  };
+
+  const walk = (nodes: Content[]) => {
+    for (const node of nodes) {
+      if (node.type === "image") {
+        tryAddPath(node.url);
+        continue;
+      }
+
+      if (isObsidianEmbed(node) && isAttachableWikiEmbed(node.data)) {
+        tryAddPath(node.data.path);
+        continue;
+      }
+
+      if (node.type === "paragraph") {
+        const paragraph = node as Paragraph;
+        collectWikiMediaFromParagraph(paragraph, tryAddPath);
+        collectResolvedMediaFromParagraph(paragraph, tryAddPath);
+      }
+
+      if ("children" in node && Array.isArray(node.children)) {
+        walk(node.children as Content[]);
+      }
+    }
+  };
+
+  walk(ast.children);
+  return entries;
+}
+
+function collectResolvedMediaFromParagraph(
+  paragraph: Paragraph,
+  tryAddPath: (mediaPath: string) => void,
+): void {
+  if (isSoundMediaParagraph(paragraph)) {
+    const fileName = soundFileNameFromParagraph(paragraph);
+    if (fileName) {
+      tryAddPath(fileName);
+    }
+    return;
+  }
+
+  if (!isPdfLinkParagraph(paragraph)) {
+    return;
+  }
+
+  const link = paragraph.children[0] as Link;
+  tryAddPath(link.url);
+}
+
+function collectWikiMediaFromParagraph(
+  paragraph: Paragraph,
+  tryAddPath: (mediaPath: string) => void,
+): void {
+  const fullText = paragraph.children
+    .map((child) => ("value" in child ? String(child.value) : ""))
+    .join("");
+
+  if (!fullText.includes("![[")) {
+    return;
+  }
+
+  for (const match of fullText.matchAll(WIKI_EMBED_IN_TEXT)) {
+    const parsed = parseLinktext(match[1] ?? "", true);
+    if (!isAttachableWikiEmbed(parsed)) {
+      continue;
+    }
+    tryAddPath(parsed.path);
+  }
+}
 
 export async function resolveMedia(
   ast: Root,
@@ -40,33 +187,65 @@ export async function resolveMedia(
   const plans: MediaUploadPlan[] = [];
   const seen = new Set<string>();
 
-  visitImages(ast, (node) => {
-    const resolved = resolveAttachmentPath(
-      node.url,
-      context.sourcePath,
-      context.vaultIndex,
-      context.attachmentFolder,
-    );
-
-    if (!resolved) {
-      return;
-    }
-
-    const absolutePath = resolvePath(context.vaultIndex.vaultPath, resolved);
-    const vaultBaseName = resolved.split("/").pop() ?? resolved;
-    const fileName = toAnkiMediaFileName(vaultBaseName);
-    node.url = fileName;
-    addPlan(plans, seen, fileName, absolutePath, resolved, context.dryRun);
+  visitResolvableMedia(ast, context, (vaultRelativePath, applyAnkiFileName) => {
+    const absolutePath = resolvePath(context.vaultIndex.vaultPath, vaultRelativePath);
+    const fileName = ankiFileNameForVaultPath(vaultRelativePath, context);
+    applyAnkiFileName(fileName);
+    addPlan(plans, seen, fileName, absolutePath, vaultRelativePath, context.dryRun);
   });
 
   return { plans };
 }
 
-function visitImages(ast: Root, onImage: (node: Image) => void): void {
+function visitResolvableMedia(
+  ast: Root,
+  context: Pick<
+    MediaResolveContext,
+    "sourcePath" | "vaultIndex" | "attachmentFolder" | "linkFormat"
+  >,
+  onResolved: (
+    vaultRelativePath: string,
+    applyAnkiFileName: (fileName: string) => void,
+  ) => void,
+): void {
   const walk = (nodes: Content[]) => {
     for (const node of nodes) {
       if (node.type === "image") {
-        onImage(node);
+        visitMediaReference(node.url, (resolved) => {
+          onResolved(resolved, (fileName) => {
+            node.url = fileName;
+          });
+        });
+        continue;
+      }
+
+      if (node.type === "paragraph") {
+        const paragraph = node as Paragraph;
+
+        if (isSoundMediaParagraph(paragraph)) {
+          const soundFile = soundFileNameFromParagraph(paragraph);
+          if (soundFile) {
+            visitMediaReference(soundFile, (resolved) => {
+              onResolved(resolved, (fileName) => {
+                const child = paragraph.children[0];
+                if (child?.type === "text") {
+                  child.value = `[sound:${fileName}]`;
+                }
+              });
+            });
+          }
+          continue;
+        }
+
+        if (isPdfLinkParagraph(paragraph)) {
+          const link = paragraph.children[0] as Link;
+          visitMediaReference(link.url, (resolved) => {
+            onResolved(resolved, (fileName) => {
+              link.url = fileName;
+            });
+          });
+          continue;
+        }
       }
 
       if ("children" in node && Array.isArray(node.children)) {
@@ -74,6 +253,16 @@ function visitImages(ast: Root, onImage: (node: Image) => void): void {
       }
     }
   };
+
+  function visitMediaReference(
+    mediaPath: string,
+    onResolvedVaultPath: (vaultRelativePath: string) => void,
+  ): void {
+    const resolved = resolveVaultPath(mediaPath, context);
+    if (resolved) {
+      onResolvedVaultPath(resolved);
+    }
+  }
 
   walk(ast.children);
 }
@@ -88,10 +277,10 @@ function rewriteRemainingMediaEmbeds(
       continue;
     }
 
-    if (isObsidianEmbed(child) && isImageMediaPath(child.data.path) && !child.data.subpath) {
-      const image = createImageNodeFromParsed(child.data, context);
-      if (image) {
-        children[index] = image;
+    if (isObsidianEmbed(child) && isAttachableWikiEmbed(child.data)) {
+      const mediaNode = createMediaNodeFromParsed(child.data, context);
+      if (mediaNode) {
+        children[index] = mediaNode;
       }
       continue;
     }
@@ -132,7 +321,7 @@ function rewriteParagraphMediaEmbeds(
     const end = start + match[0].length;
     const parsed = parseLinktext(match[1] ?? "", true);
 
-    if (!isImageMediaPath(parsed.path) || parsed.subpath) {
+    if (!isAttachableWikiEmbed(parsed)) {
       continue;
     }
 
@@ -142,9 +331,9 @@ function rewriteParagraphMediaEmbeds(
       nodes.push(createTextParagraph(before));
     }
 
-    const image = createImageNodeFromParsed(parsed, context);
-    if (image) {
-      nodes.push(image);
+    const mediaNode = createMediaNodeFromParsed(parsed, context);
+    if (mediaNode) {
+      nodes.push(mediaNode);
     } else {
       nodes.push(createTextParagraph(formatWikilink(parsed)));
     }
@@ -164,29 +353,23 @@ function rewriteParagraphMediaEmbeds(
   return nodes;
 }
 
-function createImageNodeFromParsed(
+function createMediaNodeFromParsed(
   parsed: ParsedLinktext,
   context: MediaResolveContext,
-): Image | undefined {
-  const resolved = resolveAttachmentPath(
-    parsed.path,
-    context.sourcePath,
-    context.vaultIndex,
-    context.attachmentFolder,
-  );
+): Content | undefined {
+  const mediaKind = getMediaKind(parsed.path);
+  if (!mediaKind) {
+    return undefined;
+  }
+
+  const resolved = resolveVaultPath(parsed.path, context);
 
   if (!resolved) {
     return undefined;
   }
 
-  const fileName = toAnkiMediaFileName(
-    resolved.split("/").pop() ?? resolved,
-  );
-  return {
-    type: "image",
-    url: fileName,
-    alt: parsed.displayText ?? "",
-  };
+  const fileName = ankiFileNameForVaultPath(resolved, context);
+  return createResolvedMediaNode(mediaKind, fileName, parsed.displayText);
 }
 
 function createTextParagraph(text: string): Paragraph {

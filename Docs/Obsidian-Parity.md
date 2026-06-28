@@ -49,6 +49,10 @@ Note transclusion with subpaths (`![[Note#^block]]`, `![[Note#Heading]]`) is unc
 
 Markdown images `![](path)` use the same media resolver and upload path as wiki image embeds.
 
+Basename-only wiki embeds (`![[photo.jpg]]`) are resolved vault-wide via [`resolveAttachmentPath`](../src/obsidian/vaultIndex.ts): same directory as the source note, paths under the note’s folder, configured `attachmentFolder` (default `attachments`), then shortest unique path when `linkFormat` is `shortest`. Ambiguous matches stay unresolved.
+
+Anki upload names may gain a content-hash suffix (`photo_=_a3f9b2c1.jpg`) when multiple vault files share the same basename in one sync — see [`mediaNaming.ts`](../src/anki/mediaNaming.ts).
+
 Test fixture: [`tests/fixtures/complex-media-paths.md`](../tests/fixtures/complex-media-paths.md). Run `bun run setup:fixtures` to download or generate minimal binary placeholders offline.
 
 ## File resolution (`getFirstLinkpathDest`)

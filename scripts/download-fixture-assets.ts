@@ -54,6 +54,22 @@ const ASSETS: FixtureAsset[] = [
     url: "https://upload.wikimedia.org/wikipedia/commons/2/2c/Rotating_earth_%28large%29.gif",
     path: join(FIXTURES_DIR, "assets/media/sample.gif"),
   },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/0/02/SVG_logo.svg",
+    path: join(FIXTURES_DIR, "assets/media/sample.svg"),
+  },
+  {
+    url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    path: join(FIXTURES_DIR, "assets/media/sample.pdf"),
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/4/45/En-us-hello.ogg",
+    path: join(FIXTURES_DIR, "assets/media/sample.mp3"),
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogg",
+    path: join(FIXTURES_DIR, "assets/media/sample.mp4"),
+  },
 ];
 
 function fallbackForPath(path: string): Buffer {

@@ -47,6 +47,56 @@ const IMAGE_MEDIA_EXTENSIONS = new Set([
   ".webp",
 ]);
 
+const SVG_MEDIA_EXTENSION = ".svg";
+const AUDIO_MEDIA_EXTENSIONS = new Set([".mp3"]);
+const VIDEO_MEDIA_EXTENSIONS = new Set([".mp4"]);
+const PDF_MEDIA_EXTENSION = ".pdf";
+
+export type MediaKind = "rasterImage" | "svg" | "audio" | "video" | "pdf";
+
+function extensionOf(path: string): string | null {
+  const lower = path.toLowerCase();
+  const dotIndex = lower.lastIndexOf(".");
+  if (dotIndex === -1) {
+    return null;
+  }
+
+  return lower.slice(dotIndex);
+}
+
+export function getMediaKind(path: string): MediaKind | null {
+  const ext = extensionOf(path);
+  if (!ext) {
+    return null;
+  }
+
+  if (IMAGE_MEDIA_EXTENSIONS.has(ext)) {
+    return "rasterImage";
+  }
+
+  if (ext === SVG_MEDIA_EXTENSION) {
+    return "svg";
+  }
+
+  if (AUDIO_MEDIA_EXTENSIONS.has(ext)) {
+    return "audio";
+  }
+
+  if (VIDEO_MEDIA_EXTENSIONS.has(ext)) {
+    return "video";
+  }
+
+  if (ext === PDF_MEDIA_EXTENSION) {
+    return "pdf";
+  }
+
+  return null;
+}
+
+export function isAttachableMediaPath(path: string): boolean {
+  return getMediaKind(path) !== null;
+}
+
 export function isMediaPath(path: string): boolean {
   const lower = path.toLowerCase();
   for (const ext of MEDIA_EXTENSIONS) {
@@ -161,13 +211,13 @@ function sourceDirectory(sourcePath: string): string {
     : "";
 }
 
-function findImageBasenameMatches(
+export function findMediaBasenameMatches(
   fileName: string,
   vaultIndex: VaultFileIndex,
 ): string[] {
   const basenameKey = basename(fileName);
   return (vaultIndex.byBasename.get(basenameKey) ?? []).filter(
-    (path) => vaultIndex.files.has(path) && isImageMediaPath(path),
+    (path) => vaultIndex.files.has(path) && isMediaPath(path),
   );
 }
 
@@ -214,16 +264,6 @@ export function pickScopedAttachmentMatch(
   );
   if (inAttachmentFolder.length === 1) {
     return inAttachmentFolder[0]!;
-  }
-
-  if (underSource.length > 1) {
-    const scopedPick = pickScopedAttachmentMatch(underSource, sourcePath, {
-      ...options,
-      attachmentFolder,
-    });
-    if (scopedPick) {
-      return scopedPick;
-    }
   }
 
   if (options.linkFormat === "shortest") {
@@ -275,7 +315,7 @@ export function resolveAttachmentPath(
   }
 
   return pickScopedAttachmentMatch(
-    findImageBasenameMatches(target, vaultIndex),
+    findMediaBasenameMatches(target, vaultIndex),
     sourcePath,
     options,
   );

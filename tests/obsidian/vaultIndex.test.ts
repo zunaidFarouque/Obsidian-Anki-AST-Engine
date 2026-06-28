@@ -35,9 +35,10 @@ describe("resolveAttachmentPath", () => {
       join(import.meta.dir, "../fixtures/assets/media/koala.webp"),
       join(noteDir, "attachments", "koala.webp"),
     );
+    await mkdir(join(root, "assets", "media"), { recursive: true });
     await copyFile(
       join(import.meta.dir, "../fixtures/assets/media/jpeg-home.jpg"),
-      join(root, "assets", "media", "jpeg-home.jpg"),
+      join(root, "assets", "media", "koala.webp"),
     );
 
     const index = await buildVaultFileIndex(root);

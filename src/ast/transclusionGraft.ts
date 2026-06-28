@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { Content, Image, Root } from "mdast";
+import type { Content, Root } from "mdast";
 import type { Parent } from "unist";
 import { visit } from "unist-util-visit";
 import { parseMarkdown } from "./processor";
@@ -13,9 +13,10 @@ import {
 } from "../obsidian/linkResolver";
 import type { VaultFileIndex } from "../obsidian/vaultIndex";
 import {
-  isImageMediaPath,
+  getMediaKind,
   resolveAttachmentPath,
 } from "../obsidian/vaultIndex";
+import { createResolvedMediaNode } from "./vaultMediaNodes";
 import { stripFrontmatter } from "../io/frontmatterFilter";
 
 export type GraftContext = {
@@ -23,6 +24,7 @@ export type GraftContext = {
   sourcePath: string;
   vaultIndex: VaultFileIndex;
   attachmentFolder?: string;
+  linkFormat?: "shortest" | "relative" | "absolute";
   visiting?: Set<string>;
   unresolvedEmbeds?: string[];
 };
@@ -156,12 +158,14 @@ async function resolveParsedEmbed(
     vaultPath: string;
     vaultIndex: VaultFileIndex;
     attachmentFolder?: string;
+    linkFormat?: "shortest" | "relative" | "absolute";
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
 ): Promise<Content[]> {
-  if (isImageMediaPath(parsed.path) && !parsed.subpath) {
-    return resolveImageMediaEmbed(parsed, before, after, sourcePath, context);
+  const mediaKind = getMediaKind(parsed.path);
+  if (mediaKind && !parsed.subpath) {
+    return resolveVaultMediaEmbed(parsed, before, after, sourcePath, context);
   }
 
   const destPath = getFirstLinkpathDest(
@@ -211,7 +215,7 @@ async function resolveParsedEmbed(
   return buildReplacementNodes(before, wrapper.children, after);
 }
 
-function resolveImageMediaEmbed(
+function resolveVaultMediaEmbed(
   parsed: ReturnType<typeof parseLinktext>,
   before: string,
   after: string,
@@ -219,14 +223,25 @@ function resolveImageMediaEmbed(
   context: {
     vaultIndex: VaultFileIndex;
     attachmentFolder?: string;
+    linkFormat?: "shortest" | "relative" | "absolute";
     unresolvedEmbeds: string[];
   },
 ): Content[] {
+  const mediaKind = getMediaKind(parsed.path);
+  if (!mediaKind) {
+    const marker = formatWikilink(parsed);
+    context.unresolvedEmbeds.push(marker);
+    return buildReplacementNodes(before, [createTextParagraph(marker)], after);
+  }
+
   const resolved = resolveAttachmentPath(
     parsed.path,
     sourcePath,
     context.vaultIndex,
-    context.attachmentFolder,
+    {
+      attachmentFolder: context.attachmentFolder,
+      linkFormat: context.linkFormat,
+    },
   );
 
   if (!resolved) {
@@ -236,13 +251,13 @@ function resolveImageMediaEmbed(
   }
 
   const fileName = resolved.split("/").pop() ?? resolved;
-  const image: Image = {
-    type: "image",
-    url: fileName,
-    alt: parsed.displayText ?? "",
-  };
+  const mediaNode = createResolvedMediaNode(
+    mediaKind,
+    fileName,
+    parsed.displayText,
+  );
 
-  return buildReplacementNodes(before, [image], after);
+  return buildReplacementNodes(before, [mediaNode], after);
 }
 
 async function loadFileNodes(

@@ -209,11 +209,13 @@ Obsidian image embeds are resolved **before** card compile and uploaded to the A
 
 | Vault syntax | Engine behavior | Anki field |
 |--------------|-----------------|------------|
-| `![[photo.png]]` | Resolved as attachment (not note transclusion) → `image` mdast node | `<img src="photo.png">` |
-| `![[folder/photo.jpg]]` | Same; `src` is basename only (`photo.jpg`) | `<img src="photo.jpg">` |
+| `![[photo.png]]` | Basename-only vault search (note folder, attachment folder, shortest path) → `image` node | `<img src="photo.png">` |
+| `![[folder/photo.jpg]]` | Explicit path when provided; `src` is basename only (`photo.jpg`) | `<img src="photo.jpg">` |
 | `![](relative/path.png)` | Standard markdown image; URL rewritten to basename | `<img src="path.png">` |
 
 Filenames with spaces are rewritten for Anki (`Cell Diagram final.png` → `Cell_Diagram_final.png` in both `src` and the uploaded collection media name). Vault files keep their original names.
+
+**Basename collisions:** When multiple vault files share the same sanitized basename in one sync run, the engine hashes file **content** (SHA-256, first 8 hex chars) and inserts it before the extension with the `_=_` separator — e.g. `koala_=_a3f9b2c1.webp` vs `koala_=_7e2d1044.webp`. Unique basenames stay plain (`path.png`). Identical bytes under colliding names share one Anki file. See [`mediaNaming.ts`](../src/anki/mediaNaming.ts). Dry-run / stderr emits `media_warning` events when disambiguation occurs.
 
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` (see [`vaultIndex.ts`](../src/obsidian/vaultIndex.ts)). SVG, PDF, audio, and video are out of scope for V2.
 

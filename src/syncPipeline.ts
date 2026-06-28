@@ -14,7 +14,7 @@ import {
 import { batchInjectIdsIntoFile, buildInjectionPlan, mergeInjectionMetadata } from "./io/surgicalInjector";
 import { parseMarkdown } from "./ast/processor";
 import { graftTransclusions } from "./ast/transclusionGraft";
-import { resolveMedia } from "./ast/mediaResolver";
+import { collectResolvedMediaPaths, resolveMedia } from "./ast/mediaResolver";
 import { extractCards } from "./parser/stateMachine";
 import { compileCardFields } from "./ast/cardCompiler";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
@@ -27,8 +27,13 @@ import {
   type DuplicateCardSource,
   type DuplicateWarning,
 } from "./anki/duplicateDetect";
+import {
+  buildAnkiMediaNameMap,
+  type MediaBasenameWarning,
+} from "./anki/mediaNaming";
 
 export type { DuplicateWarning } from "./anki/duplicateDetect";
+export type { MediaBasenameWarning } from "./anki/mediaNaming";
 
 export type SyncAction = {
   action: "add" | "update" | "skip";
@@ -53,6 +58,7 @@ export type SyncOptions = {
 export type SyncRunResult = {
   actions: SyncAction[];
   duplicateWarnings: DuplicateWarning[];
+  mediaWarnings: MediaBasenameWarning[];
 };
 
 export type SyncSummary = {
@@ -111,6 +117,15 @@ export async function runSync(
     }
   }
 
+  const phase1MediaEntries = await collectVaultMediaPaths(
+    config,
+    vaultPath,
+    vaultIndex,
+    filePaths,
+  );
+  const { nameByVaultPath, warnings: mediaWarnings } =
+    await buildAnkiMediaNameMap(phase1MediaEntries);
+
   for (const filePath of filePaths) {
     const { rawText, absolutePath } = await readMarkdownFile(filePath);
     if (!shouldSyncFile(rawText)) {
@@ -148,6 +163,7 @@ export async function runSync(
       sourcePath,
       vaultIndex,
       attachmentFolder: config.attachmentFolder,
+      linkFormat: config.linkFormat,
       unresolvedEmbeds,
     });
 
@@ -156,6 +172,8 @@ export async function runSync(
       sourcePath,
       vaultIndex,
       attachmentFolder: config.attachmentFolder,
+      linkFormat: config.linkFormat,
+      ankiNameByVaultPath: nameByVaultPath,
       dryRun: options.dryRun,
     });
 
@@ -276,6 +294,48 @@ export async function runSync(
       ...detectVaultFrontCollisions(collisionSources),
       ...ankiDuplicateWarnings,
     ],
+    mediaWarnings,
   };
+}
+
+async function collectVaultMediaPaths(
+  config: Config,
+  vaultPath: string,
+  vaultIndex: Awaited<ReturnType<typeof buildVaultFileIndex>>,
+  filePaths: string[],
+) {
+  const entries = [];
+
+  for (const filePath of filePaths) {
+    const { rawText, absolutePath } = await readMarkdownFile(filePath);
+    if (!shouldSyncFile(rawText)) {
+      continue;
+    }
+
+    const sourcePath = relative(vaultPath, absolutePath).replace(/\\/g, "/");
+    const ast = parseMarkdown(rawText, vaultPath);
+    const unresolvedEmbeds: string[] = [];
+
+    await graftTransclusions(ast, {
+      vaultPath,
+      sourcePath,
+      vaultIndex,
+      attachmentFolder: config.attachmentFolder,
+      linkFormat: config.linkFormat,
+      unresolvedEmbeds,
+    });
+
+    entries.push(
+      ...collectResolvedMediaPaths(ast, {
+        vaultPath,
+        sourcePath,
+        vaultIndex,
+        attachmentFolder: config.attachmentFolder,
+        linkFormat: config.linkFormat,
+      }),
+    );
+  }
+
+  return entries;
 }
 
