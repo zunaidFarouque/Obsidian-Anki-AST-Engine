@@ -3,15 +3,11 @@ import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { scanVault } from "../../src/io/scanner";
-import type { DeckMapping } from "../../src/config/configParser";
 
 describe("scanner", () => {
   test("returns markdown files under mapped folders", async () => {
     const vaultPath = await mkdtemp(join(tmpdir(), "anki-vault-"));
-    const deckMappings: DeckMapping[] = [
-      { obsidianFolder: "Notes", ankiDeck: "Default::Notes" },
-      { obsidianFolder: "CS", ankiDeck: "CS" },
-    ];
+    const scanFolders = ["Notes", "CS"];
 
     await mkdir(join(vaultPath, "Notes"), { recursive: true });
     await mkdir(join(vaultPath, "CS", "Algorithms"), { recursive: true });
@@ -30,7 +26,7 @@ describe("scanner", () => {
     await writeFile(trashFile, "# Trash");
     await writeFile(obsidianFile, "# Config");
 
-    const results = await scanVault(vaultPath, deckMappings);
+    const results = await scanVault(vaultPath, scanFolders);
     const normalized = results.map((p) => p.replace(/\\/g, "/"));
 
     expect(normalized).toContain(notesFile.replace(/\\/g, "/"));
@@ -46,9 +42,7 @@ describe("scanner", () => {
     const vaultPath = await mkdtemp(join(tmpdir(), "anki-vault-"));
     await mkdir(join(vaultPath, "Empty"), { recursive: true });
 
-    const results = await scanVault(vaultPath, [
-      { obsidianFolder: "Empty", ankiDeck: "Empty" },
-    ]);
+    const results = await scanVault(vaultPath, ["Empty"]);
     expect(results).toEqual([]);
 
     await rm(vaultPath, { recursive: true, force: true });

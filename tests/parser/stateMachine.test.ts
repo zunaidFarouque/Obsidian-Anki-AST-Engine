@@ -145,7 +145,7 @@ describe("stateMachine", () => {
 
     expect(cards).toHaveLength(3);
     expect(cards[0]?.tag).toBe("Edge Cases::Empty Back");
-    expect(cards[0]?.injectionOffset).toBeUndefined();
+    expect(cards[0]?.injectionOffset).toBeTypeOf("number");
     expect(cards[1]?.tag).toBe("Edge Cases::Declaration As Front");
     expect(cards[2]?.tag).toBe("Edge Cases::Normal Card After Edge Cases");
   });

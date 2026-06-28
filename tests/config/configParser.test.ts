@@ -13,9 +13,9 @@ describe("configParser", () => {
       JSON.stringify({
         vaultPath: "/vault",
         delimiter: "?",
-        deckMappings: [
-          { obsidianFolder: "Notes", ankiDeck: "Default::Notes" },
-        ],
+        scanFolders: ["Notes"],
+        defaultAnkiDeck: "Default::Notes",
+        defaultEngineTag: "Obsidian-Anki-AST",
         ankiConnectUrl: "http://127.0.0.1:8765",
       }),
     );
@@ -23,7 +23,9 @@ describe("configParser", () => {
     const config = await loadConfig(configPath);
     expect(config.vaultPath).toBe("/vault");
     expect(config.delimiter).toBe("?");
-    expect(config.deckMappings).toHaveLength(1);
+    expect(config.scanFolders).toEqual(["Notes"]);
+    expect(config.defaultAnkiDeck).toBe("Default::Notes");
+    expect(config.defaultEngineTag).toBe("Obsidian-Anki-AST");
     expect(config.ankiConnectUrl).toBe("http://127.0.0.1:8765");
     expect(config.defaultCardDeclarationHeadingLevel).toBe(4);
     expect(config.includeParentHeadersAsTags).toBe(true);
@@ -41,7 +43,7 @@ describe("configParser", () => {
       configPath,
       JSON.stringify({
         vaultPath: "/vault",
-        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        scanFolders: ["Notes"],
         ankiConnectApiKey: "secret",
         noteModelName: "Basic",
         autoCreateDecks: false,
@@ -53,6 +55,8 @@ describe("configParser", () => {
     expect(config.ankiConnectApiKey).toBe("secret");
     expect(config.autoCreateDecks).toBe(false);
     expect(config.syncTagPrefix).toBe("oid");
+    expect(config.defaultAnkiDeck).toBe("Synced from Obsidian");
+    expect(config.defaultEngineTag).toBe("Obsidian-Anki-AST");
 
     await rm(dir, { recursive: true, force: true });
   });
@@ -65,7 +69,7 @@ describe("configParser", () => {
       JSON.stringify({
         vaultPath: "/vault",
         delimiter: "---",
-        deckMappings: [{ obsidianFolder: "Cards", ankiDeck: "Cards" }],
+        scanFolders: ["Cards"],
       }),
     );
 
@@ -82,7 +86,7 @@ describe("configParser", () => {
       configPath,
       JSON.stringify({
         delimiter: "?",
-        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        scanFolders: ["Notes"],
       }),
     );
 
@@ -91,7 +95,7 @@ describe("configParser", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  test("rejects empty deckMappings", async () => {
+  test("rejects empty scanFolders", async () => {
     const dir = await mkdtemp(join(tmpdir(), "anki-config-"));
     const configPath = join(dir, "config.json");
     await writeFile(
@@ -99,11 +103,11 @@ describe("configParser", () => {
       JSON.stringify({
         vaultPath: "/vault",
         delimiter: "?",
-        deckMappings: [],
+        scanFolders: [],
       }),
     );
 
-    expect(loadConfig(configPath)).rejects.toThrow(/deckMappings/i);
+    expect(loadConfig(configPath)).rejects.toThrow(/scanFolders/i);
 
     await rm(dir, { recursive: true, force: true });
   });
@@ -115,7 +119,7 @@ describe("configParser", () => {
       configPath,
       JSON.stringify({
         vaultPath: "/vault",
-        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        scanFolders: ["Notes"],
       }),
     );
 
@@ -132,7 +136,7 @@ describe("configParser", () => {
       configPath,
       JSON.stringify({
         vaultPath: "/vault",
-        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        scanFolders: ["Notes"],
       }),
     );
 
@@ -150,7 +154,7 @@ describe("configParser", () => {
       JSON.stringify({
         vaultPath: "/vault",
         delimiter: "?",
-        deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Notes" }],
+        scanFolders: ["Notes"],
         ankiConnectUrl: "not-a-url",
       }),
     );

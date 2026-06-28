@@ -9,26 +9,37 @@ flowchart TD
   scan[scanner: mapped .md files]
   gate[frontmatterFilter: AnkiSync enabled?]
   parse[processor: mdast]
+  extractPre[extractCards on source AST]
   graft[transclusionGraft + mediaResolver]
-  extract[stateMachine: declaration or legacy mode]
+  merge[mergeInjectionMetadata]
+  extractPost[extractCards on grafted AST]
+  compile[compileCardFields → HTML]
+  dup[detectVaultFrontCollisions]
+  anki[syncEngine: add / update / skip]
   inject[surgicalInjector]
   scan --> gate
   gate -->|no| skip[skip file]
   gate -->|on true yes| parse
-  parse --> graft --> extract --> inject
+  parse --> extractPre --> graft --> extractPost --> merge
+  merge --> compile --> dup
+  compile --> anki
+  anki --> inject
 ```
 
 Implemented in [`src/syncPipeline.ts`](../src/syncPipeline.ts):
 
-1. **Scan** — `fast-glob` over vault folders mapped in `deckMappings`
+1. **Scan** — `fast-glob` over vault folders listed in `scanFolders`
 2. **Gate** — skip files unless `AnkiSync` is enabled (see below)
 3. **Parse** — full raw file → mdast via `remark-gfm`, `remark-math`, and wiki-link plugins (frontmatter remains in tree; extractor uses `bodyStartOffset`)
-4. **Graft** — resolve `![[embeds]]` via vault index and block IDs
-5. **Media** — resolve attachment paths; queue dry-run uploads
-6. **Extract** — state machine splits front/back at structural delimiter
-7. **Compile** — `compileCardFields` → `frontHtml` / `backHtml` (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
-8. **Inject** — plan or write `<!--anki-id: uuid-->` at byte offsets (live sync after successful `addNote`)
-9. **Anki sync** — `addNote` / `updateNoteFields` / `updateNoteTags` via AnkiConnect (see [Anki-Integration.md](Anki-Integration.md))
+4. **Extract (source)** — card boundaries and **injection offsets** from the **pre-graft** AST (byte positions in the vault file)
+5. **Graft** — resolve `![[embeds]]` via vault index and block IDs; replace embed nodes with cloned subtrees from target files
+6. **Media** — resolve attachment paths; queue dry-run uploads
+7. **Extract (grafted)** — re-run state machine on grafted AST for **compile** buffers (transcluded content in front/back HTML)
+8. **Merge** — `mergeInjectionMetadata` copies `ankiId` and `injectionOffset` from source cards onto grafted cards by index
+9. **Compile** — `compileCardFields` → `frontHtml` / `backHtml` (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
+10. **Duplicate scan** — after all files are compiled, group by `deck + frontHtml`; emit `duplicate_warning` for collisions (see [Anki-Integration.md](Anki-Integration.md#duplicate-detection))
+11. **Anki sync** — `addNote` / `updateNoteFields` / `updateNoteTags` with code-block line-ending normalization (see [Anki-Integration.md](Anki-Integration.md#field-comparison-and-code-blocks))
+12. **Inject** — plan or write `<!--anki-id: uuid-->` at pre-graft byte offsets (live sync after successful card sync)
 
 ## Read-only AST and vault safety
 
@@ -71,6 +82,18 @@ flowchart LR
 
 Dry-run reports `wouldInjectId` without writing. Live sync will call `injectIdIntoFile` under a per-file mutex.
 
+### Transclusion and injection offsets
+
+Grafted nodes carry **byte positions from the embedded file**, not the host note. If injection offsets were taken from the post-graft AST, IDs could land inside unrelated regions of the host file (e.g. an HTML checklist comment at the top of a stress-test fixture instead of after `![[embed_me#…]]`).
+
+**Rule:** injection offsets always come from the **source** (pre-graft) extraction. Grafted extraction is used only for HTML compilation.
+
+[`mergeInjectionMetadata`](../src/io/surgicalInjector.ts) pairs cards by index after grafting and copies `ankiId` + `injectionOffset` from source onto grafted cards.
+
+[`batchInjectIdsIntoFile`](../src/io/surgicalInjector.ts) refuses to splice inside an existing `<!-- … -->` HTML comment (`isOffsetInsideHtmlComment`), as a second guard rail.
+
+Regression: [`tests/syncPipeline.injectionOffset.test.ts`](../tests/syncPipeline.injectionOffset.test.ts), fixture [`card-feature-stress-test.md`](../tests/fixtures/card-feature-stress-test.md) (transclusion on back).
+
 ### Minimal example
 
 Source note:
@@ -103,6 +126,26 @@ Regression fixtures: [`missing-id-injection.md`](../tests/fixtures/missing-id-in
 
 Further detail on failure modes and mutex locking: [Starter Arch DR.md](Starter%20Arch%20DR.md) (surgical injection and Bottleneck 3).
 
+## Per-file sync transaction
+
+For each sync-eligible file ([`syncPipeline.ts`](../src/syncPipeline.ts)):
+
+1. **Media upload** — `storeMediaFile` with concurrency 3. If upload fails, no cards in that file are synced or injected.
+2. **Per-card Anki sync** — each card is synced independently; one card’s failure does not abort siblings.
+3. **Batch ID injection** — successful cards without an `anki-id` receive `<!--anki-id-->` in **reverse offset order** so earlier splices do not shift later offsets.
+
+Partial success is intentional: a file with three new cards where one hits a non-recoverable error still injects IDs for the two that succeeded.
+
+## Duplicate detection (vault-wide)
+
+After compiling all cards in the run, the pipeline groups by **target deck + `frontHtml`**. Groups with more than one source card produce a `duplicate_warning` on stderr (dry-run and live). If backs differ within a group, the kind is `back_mismatch` — treated as an authoring error, not auto-merged.
+
+Anki-level duplicate recovery (when `addNote` is rejected) is separate; it emits `anki_duplicate_recovered`. See [Anki-Integration.md](Anki-Integration.md#duplicate-detection).
+
+## HTML sync normalization
+
+Field diffing and Anki writes normalize line endings inside `<pre><code>` blocks only ([`htmlNormalize.ts`](../src/anki/htmlNormalize.ts)). This prevents false `update` actions when Windows CRLF in source fenced code differs from LF stored in Anki.
+
 ## Sync gate: `AnkiSync` frontmatter
 
 Files without YAML front matter, or without an `AnkiSync` key, are **ignored entirely**.
@@ -126,6 +169,8 @@ AnkiSync: on
 cardDeclarationHeadingLevel: 4
 delimiter: ":::"
 includeParentHeadersAsTags: true
+target_anki_deck: "My Custom Deck"
+file_anki_tags: exam-prep, biology
 ---
 ```
 
@@ -145,7 +190,9 @@ Validated by Zod in [`src/config/configParser.ts`](../src/config/configParser.ts
 |-------|---------|---------|
 | `vaultPath` | (required) | Absolute path to Obsidian vault |
 | `delimiter` | `:::` | Front/back split token |
-| `deckMappings` | (required) | `obsidianFolder` → `ankiDeck` |
+| `scanFolders` | (required) | Vault subfolders to glob for `.md` files |
+| `defaultAnkiDeck` | `Synced from Obsidian` | Default Anki deck for synced cards |
+| `defaultEngineTag` | `Obsidian-Anki-AST` | Tag applied to every synced note |
 | `ankiConnectUrl` | `http://127.0.0.1:8765` | AnkiConnect endpoint |
 | `linkFormat` | `shortest` | Link path style: `shortest`, `relative`, `absolute` |
 | `attachmentFolder` | optional | Obsidian attachment folder name |
@@ -156,12 +203,9 @@ Validated by Zod in [`src/config/configParser.ts`](../src/config/configParser.ts
 {
   "vaultPath": "/path/to/your/ObsidianVault",
   "delimiter": ":::",
-  "deckMappings": [
-    {
-      "obsidianFolder": "01 - Computer Science",
-      "ankiDeck": "Computer Science::Algorithms"
-    }
-  ],
+  "scanFolders": ["01 - Computer Science", "Notes"],
+  "defaultAnkiDeck": "Synced from Obsidian",
+  "defaultEngineTag": "Obsidian-Anki-AST",
   "ankiConnectUrl": "http://127.0.0.1:8765",
   "linkFormat": "shortest",
   "attachmentFolder": "attachments",
@@ -180,6 +224,8 @@ Resolved in [`src/io/frontmatterFilter.ts`](../src/io/frontmatterFilter.ts). Con
 | `cardDeclarationHeadingLevel` | `defaultCardDeclarationHeadingLevel` |
 | `delimiter` | `delimiter` in config |
 | `includeParentHeadersAsTags` | `includeParentHeadersAsTags` in config |
+| `target_anki_deck` | `defaultAnkiDeck` in config |
+| `file_anki_tags` | Extra Anki tags (comma-separated) after engine tag |
 
 Boolean frontmatter values accept `on`/`off`, `true`/`false`, `yes`/`no` (case-insensitive).
 
@@ -262,6 +308,9 @@ src/
 ├── anki/
 │   ├── client.ts            # AnkiConnect HTTP client
 │   ├── syncEngine.ts        # add/update/skip card sync
+│   ├── duplicateDetect.ts   # vault front collisions + warning payloads
+│   ├── htmlNormalize.ts     # code-block line ending normalization for Anki
+│   ├── tagNormalize.ts      # Anki tag path normalization
 │   └── mediaQueue.ts        # Media upload queue
 └── utils/
     ├── hash.ts
@@ -273,7 +322,9 @@ src/
 
 | Fixture | Tests |
 |---------|-------|
-| `multi-line-card-layout.md` | H4 declaration layout, `:::`, tag paths |
+| `card-feature-stress-test.md` | Full compile-feature stress + transclusion injection offsets |
+| `card-rich-formatting.md` | Rich formatting; duplicate-front pair with stress test (intentional) |
+| `multi-line-card-layout.md` | H4 declaration layout; heading-as-front duplicate pair |
 | `injection-required-no-ids.md` | ID injection offsets |
 | `stress-test-nested-complex.md` | Transclusion + code delimiter ignore |
 | `complex-media-paths.md` | Media resolution |

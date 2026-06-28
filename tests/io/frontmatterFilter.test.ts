@@ -7,6 +7,8 @@ import {
   getCardDeclarationHeadingLevel,
   getDelimiter,
   getIncludeParentHeadersAsTags,
+  getTargetAnkiDeck,
+  getFileAnkiTags,
 } from "../../src/io/frontmatterFilter";
 
 describe("frontmatterFilter", () => {
@@ -168,5 +170,52 @@ includeParentHeadersAsTags: maybe
 
 # Note`;
     expect(getIncludeParentHeadersAsTags(raw, true)).toBe(true);
+  });
+
+  test("getTargetAnkiDeck reads YAML override", () => {
+    const raw = `---
+AnkiSync: on
+target_anki_deck: "My Custom Deck"
+---
+
+# Note`;
+    expect(getTargetAnkiDeck(raw, "Synced from Obsidian")).toBe("My Custom Deck");
+  });
+
+  test("getTargetAnkiDeck falls back when frontmatter omits key", () => {
+    const raw = `---
+AnkiSync: on
+---
+
+# Note`;
+    expect(getTargetAnkiDeck(raw, "Synced from Obsidian")).toBe("Synced from Obsidian");
+  });
+
+  test("getFileAnkiTags parses comma-separated tags", () => {
+    const raw = `---
+AnkiSync: on
+file_anki_tags: exam-prep, biology
+---
+
+# Note`;
+    expect(getFileAnkiTags(raw)).toEqual(["exam-prep", "biology"]);
+  });
+
+  test("getFileAnkiTags normalizes tags with spaces", () => {
+    const raw = `---
+file_anki_tags: exam prep, biology review
+---
+
+# Note`;
+    expect(getFileAnkiTags(raw)).toEqual(["exam_prep", "biology_review"]);
+  });
+
+  test("getFileAnkiTags returns empty array when frontmatter omits key", () => {
+    const raw = `---
+AnkiSync: on
+---
+
+# Note`;
+    expect(getFileAnkiTags(raw)).toEqual([]);
   });
 });

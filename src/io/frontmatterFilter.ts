@@ -1,3 +1,5 @@
+import { normalizeAnkiTagList } from "../anki/tagNormalize";
+
 export type Frontmatter = Record<string, string>;
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---/;
@@ -126,6 +128,32 @@ export function getIncludeParentHeadersAsTags(
   }
 
   return parsed;
+}
+
+export function getTargetAnkiDeck(rawText: string, fallback: string): string {
+  const frontmatter = parseFrontmatter(rawText);
+  const rawValue = getFrontmatterField(frontmatter ?? {}, "target_anki_deck");
+  if (rawValue === undefined) {
+    return fallback;
+  }
+
+  const deck = unquoteYamlValue(rawValue.trim());
+  return deck.length > 0 ? deck : fallback;
+}
+
+export function getFileAnkiTags(rawText: string): string[] {
+  const frontmatter = parseFrontmatter(rawText);
+  const rawValue = getFrontmatterField(frontmatter ?? {}, "file_anki_tags");
+  if (rawValue === undefined) {
+    return [];
+  }
+
+  return normalizeAnkiTagList(
+    unquoteYamlValue(rawValue)
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0),
+  );
 }
 
 function getFrontmatterField(

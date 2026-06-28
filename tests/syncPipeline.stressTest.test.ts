@@ -12,6 +12,7 @@ const baseConfig = {
   linkFormat: "shortest" as const,
   defaultCardDeclarationHeadingLevel: 4,
   includeParentHeadersAsTags: true,
+  defaultEngineTag: "Obsidian-Anki-AST",
 };
 
 function findByTag(actions: SyncAction[], suffix: string): SyncAction {
@@ -36,11 +37,12 @@ describe("syncPipeline stress fixture", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Stress::Deck" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Stress::Deck",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
 
     expect(actions).toHaveLength(14);
 

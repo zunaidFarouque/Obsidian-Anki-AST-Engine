@@ -60,6 +60,7 @@ function extractCardsWithDeclarationLevel(
   let frontNodes: Content[] = [];
   let backNodes: Content[] = [];
   let phase: "none" | "front" | "back" = "none";
+  let delimiterEndOffset: number | undefined;
 
   const buildTag = (): string => {
     const parts: string[] = [];
@@ -92,15 +93,24 @@ function extractCardsWithDeclarationLevel(
 
     if (frontNodes.length === 0 && backNodes.length === 0) {
       phase = "none";
+      delimiterEndOffset = undefined;
       return;
     }
 
     cards.push(
-      buildCard(currentTag, frontNodes, backNodes, contextByDepth, cards.length),
+      buildCard(
+        currentTag,
+        frontNodes,
+        backNodes,
+        contextByDepth,
+        cards.length,
+        delimiterEndOffset,
+      ),
     );
     frontNodes = [];
     backNodes = [];
     phase = "none";
+    delimiterEndOffset = undefined;
   };
 
   const startDeclaration = (heading: Heading) => {
@@ -108,6 +118,7 @@ function extractCardsWithDeclarationLevel(
     currentDeclaration = getHeadingText(heading);
     currentTag = buildTag();
     phase = "front";
+    delimiterEndOffset = undefined;
   };
 
   const updateContext = (depth: number, text: string) => {
@@ -129,6 +140,9 @@ function extractCardsWithDeclarationLevel(
         applyHeadingAsFrontIfNeeded();
         if (split.back) {
           backNodes.push(split.back);
+        }
+        if (split.delimiterEndOffset !== undefined) {
+          delimiterEndOffset = split.delimiterEndOffset;
         }
         phase = "back";
       } else {
@@ -189,6 +203,7 @@ function extractCardsLegacy(
   let frontNodes: Content[] = [];
   let backNodes: Content[] = [];
   let phase: "none" | "front" | "back" = "none";
+  let delimiterEndOffset: number | undefined;
 
   const finalizeCard = () => {
     if (phase === "none") {
@@ -197,6 +212,7 @@ function extractCardsLegacy(
 
     if (frontNodes.length === 0 && backNodes.length === 0) {
       phase = "none";
+      delimiterEndOffset = undefined;
       return;
     }
 
@@ -207,11 +223,13 @@ function extractCardsLegacy(
         backNodes,
         new Map<number, string>(),
         cards.length,
+        delimiterEndOffset,
       ),
     );
     frontNodes = [];
     backNodes = [];
     phase = "none";
+    delimiterEndOffset = undefined;
   };
 
   for (const child of ast.children) {
@@ -245,6 +263,9 @@ function extractCardsLegacy(
         }
         if (split.back) {
           backNodes.push(split.back);
+        }
+        if (split.delimiterEndOffset !== undefined) {
+          delimiterEndOffset = split.delimiterEndOffset;
         }
         phase = "back";
       } else {
@@ -288,9 +309,13 @@ function buildCard(
   backNodes: Content[],
   sectionDepths: Map<number, string>,
   ordinal: number,
+  delimiterEndOffset?: number,
 ): ExtractedCard {
   const ankiId = extractAnkiId(backNodes);
-  const injectionOffset = ankiId ? undefined : getInjectionOffset(backNodes);
+  let injectionOffset = ankiId ? undefined : getInjectionOffset(backNodes);
+  if (injectionOffset === undefined && !ankiId && delimiterEndOffset !== undefined) {
+    injectionOffset = delimiterEndOffset;
+  }
 
   return {
     tag,
@@ -347,6 +372,7 @@ function getInjectionOffset(backNodes: Content[]): number | undefined {
 type SplitResult = {
   front?: Content;
   back?: Content;
+  delimiterEndOffset?: number;
 };
 
 function splitNodeAtDelimiter(
@@ -400,6 +426,12 @@ function splitNodeAtDelimiter(
     return null;
   }
 
+  const textStart = textNode.position?.start?.offset;
+  const delimiterEndOffset =
+    textStart !== undefined
+      ? textStart + delimiterIndex + delimiter.length
+      : undefined;
+
   const frontText = textNode.value.slice(0, delimiterIndex).trimEnd();
   const backText = textNode.value
     .slice(delimiterIndex + delimiter.length)
@@ -432,6 +464,7 @@ function splitNodeAtDelimiter(
   return {
     front: isEmptyNode(frontClone) ? undefined : frontClone,
     back: isEmptyNode(backClone) ? undefined : backClone,
+    delimiterEndOffset,
   };
 }
 

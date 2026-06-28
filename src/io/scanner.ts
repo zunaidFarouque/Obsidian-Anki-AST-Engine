@@ -1,15 +1,14 @@
 import fg from "fast-glob";
 import { resolve } from "node:path";
-import type { DeckMapping } from "../config/configParser";
 
 export async function scanVault(
   vaultPath: string,
-  deckMappings: DeckMapping[],
+  scanFolders: string[],
 ): Promise<string[]> {
   const absoluteVault = resolve(vaultPath);
-  const patterns = deckMappings.map((mapping) => {
-    const folder = mapping.obsidianFolder.replace(/\\/g, "/");
-    return `${folder}/**/*.md`;
+  const patterns = scanFolders.map((folder) => {
+    const normalized = folder.replace(/\\/g, "/");
+    return `${normalized}/**/*.md`;
   });
 
   const matches = await fg(patterns, {

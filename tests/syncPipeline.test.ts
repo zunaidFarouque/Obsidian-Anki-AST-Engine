@@ -10,6 +10,7 @@ const baseConfig = {
   linkFormat: "shortest" as const,
   defaultCardDeclarationHeadingLevel: 4,
   includeParentHeadersAsTags: true,
+  defaultEngineTag: "Obsidian-Anki-AST",
 };
 
 describe("syncPipeline", () => {
@@ -41,11 +42,12 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science::Physics" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatchObject({
@@ -94,11 +96,12 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
 
     expect(actions).toHaveLength(1);
     expect(actions[0]?.action).toBe("update");
@@ -136,11 +139,12 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
     expect(actions).toHaveLength(0);
 
     await rm(root, { recursive: true, force: true });
@@ -175,11 +179,12 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
 
     expect(actions).toHaveLength(1);
     expect(actions[0]?.tag).toBe("Science::Gravity");
@@ -205,11 +210,12 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
     expect(actions).toHaveLength(1);
     expect(actions[0]?.wouldUploadMedia?.length).toBeGreaterThanOrEqual(1);
     expect(actions[0]?.tag).toBe("Cell Biology::Organelle Identification");
@@ -234,14 +240,106 @@ describe("syncPipeline", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Science" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
       ...baseConfig,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
     expect(actions).toHaveLength(1);
     expect(actions[0]?.unresolvedEmbeds?.length).toBeGreaterThan(0);
     expect(actions[0]?.transclusionResolved).toBe(false);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("uses target_anki_deck frontmatter override for deck", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-deck-override-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "custom-deck.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      'target_anki_deck: "My Custom Deck"',
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Gravity",
+      "",
+      "What is g",
+      "",
+      ":::",
+      "",
+      "9.8 m/s^2",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Synced from Obsidian",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.deck).toBe("My Custom Deck");
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("dry-run reports duplicate warnings when vault cards share the same front", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-sync-dup-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const sharedFront = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Course",
+      "",
+      "#### Shared Question",
+      "",
+      "What is entropy?",
+      "",
+      ":::",
+      "",
+    ].join("\n");
+
+    await writeFile(
+      join(notesDir, "note-a.md"),
+      `${sharedFront}Answer from note A.\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(notesDir, "note-b.md"),
+      `${sharedFront}Answer from note B.\n`,
+      "utf8",
+    );
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
+      ...baseConfig,
+    };
+
+    const { actions, duplicateWarnings } = await runSync(config, { dryRun: true });
+    expect(actions).toHaveLength(2);
+    expect(duplicateWarnings).toHaveLength(1);
+    expect(duplicateWarnings[0]?.kind).toBe("back_mismatch");
+    expect(duplicateWarnings[0]?.sources).toHaveLength(2);
 
     await rm(root, { recursive: true, force: true });
   });

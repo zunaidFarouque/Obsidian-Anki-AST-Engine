@@ -24,10 +24,12 @@ describe("syncPipeline scoped footnotes", () => {
       delimiter: ":::",
       defaultCardDeclarationHeadingLevel: 4,
       includeParentHeadersAsTags: true,
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "DryRun::Fixtures" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "DryRun::Fixtures",
+      defaultEngineTag: "Obsidian-Anki-AST",
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
     const cardA = actions.find((a) => a.tag.endsWith("Card A"));
     const cardB = actions.find((a) => a.tag.endsWith("Card B"));
     const cardC = actions.find((a) => a.tag.endsWith("Card C"));

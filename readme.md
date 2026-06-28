@@ -11,7 +11,9 @@ This engine solves that by transforming your Obsidian vault into a traversable *
 * **Deterministic AST Parsing:** Powered by the unified and remark ecosystem. Parses flashcard layouts structurally, completely ignoring delimiters hidden inside code, inlineCode, or math blocks.  
 * **Deep Transclusion Resolution:** Native support for Obsidian block embeds (\!\[\[SourceNote\#^block-id\]\]). The engine recursively fetches, parses, and grafts transcluded content directly into your flashcards before syncing.  
 * **Local Media Syncing:** Automatically detects embedded media (\!\[\[image.png\]\]), converts files to Base64 payloads, and queues them for injection via AnkiConnect.  
-* **Surgical Two-Way Binding:** Generates and tracks unique UUIDs via HTML comments (\<\!--anki-id: uuid--\>). IDs are injected by splicing the raw file at AST-derived byte offsets—never by round-tripping Markdown through a serializer. See [Docs/Engine-Architecture.md](Docs/Engine-Architecture.md#read-only-ast-and-vault-safety).
+* **Surgical Two-Way Binding:** Generates and tracks unique UUIDs via HTML comments (\<\!--anki-id: uuid--\>). IDs are injected by splicing the raw file at AST-derived byte offsets—never by round-tripping Markdown through a serializer. Pre-graft offsets are preserved when transclusions expand card content for HTML compile. See [Docs/Engine-Architecture.md](Docs/Engine-Architecture.md#read-only-ast-and-vault-safety).
+* **Duplicate detection:** Flags vault cards that compile to the same Front HTML (and `back_mismatch` when answers differ). Warnings are emitted on stderr as JSON for future in-editor notifications. See [Docs/Anki-Integration.md](Docs/Anki-Integration.md#duplicate-detection).
+* **Stable Anki updates:** Normalizes line endings inside compiled code blocks before comparing to Anki, so Windows CRLF does not cause false `update` actions.
 * **Stateless Concurrency Control:** Safely handles large media vaults using throttled async queues (p-limit) to prevent overwhelming the AnkiConnect Python server.
 
 ## **🚀 Architecture Overview**
@@ -22,8 +24,8 @@ The system operates strictly headlessly, reading from an absolute vault path and
 2. **Processor:** Converts raw text to mdast (Markdown AST).  
 3. **Transclusion & Media:** Resolves local file paths and fetches linked block nodes.  
 4. **Layout Extractor:** Uses state-machine logic to chunk nodes into Front and Back card buffers based on heading depth and user-defined delimiters (default `:::`; `?` and other strings are supported).
-5. **Injector:** Calculates exact byte-offsets to safely inject tracking IDs back into the source Obsidian file via async-mutex locking.  
-6. **Anki Sync:** Compiles AST buffers to raw HTML and dispatches throttled addNote / updateNoteFields payloads to Anki.
+5. **Injector:** Calculates exact byte-offsets on the **pre-graft** AST to safely inject tracking IDs back into the source Obsidian file via async-mutex locking; merges grafted compile buffers without shifting offsets.  
+6. **Anki Sync:** Compiles AST buffers to raw HTML, detects duplicate fronts vault-wide, normalizes code-block line endings for field compare, and dispatches throttled addNote / updateNoteFields payloads to Anki.
 
 ## **📦 Prerequisites**
 
@@ -52,12 +54,9 @@ Create a `config.json` in the root directory. This config is strictly validated 
 {
   "vaultPath": "/Users/username/Documents/ObsidianVault",
   "delimiter": ":::",
-  "deckMappings": [
-    {
-      "obsidianFolder": "01 - Computer Science",
-      "ankiDeck": "Computer Science::Algorithms"
-    }
-  ],
+  "scanFolders": ["01 - Computer Science", "Notes"],
+  "defaultAnkiDeck": "Synced from Obsidian",
+  "defaultEngineTag": "Obsidian-Anki-AST",
   "ankiConnectUrl": "http://127.0.0.1:8765",
   "linkFormat": "shortest",
   "attachmentFolder": "attachments",
@@ -74,7 +73,7 @@ To execute a dry-run (parses AST and logs intended Anki actions without modifyin
 bun run sync -- --dry-run
 ```
 
-Each line of output is a JSON `SyncAction` with compiled `frontHtml` and `backHtml` fields (see [Docs/Card-Rendering.md](Docs/Card-Rendering.md)).
+Each line of output is a JSON `SyncAction` with compiled `frontHtml` and `backHtml` fields (see [Docs/Card-Rendering.md](Docs/Card-Rendering.md)). Duplicate warnings (if any) are printed to **stderr** as `{"event":"duplicate_warning",…}`.
 
 To execute a full synchronization (requires Anki Desktop + AnkiConnect):
 

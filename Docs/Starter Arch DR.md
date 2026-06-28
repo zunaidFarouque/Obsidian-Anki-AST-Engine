@@ -97,7 +97,9 @@ Before AST processing, each file is read and parsed for YAML frontmatter. Files 
 
 Per-file overrides (when present): `cardDeclarationHeadingLevel`, `delimiter`, `includeParentHeadersAsTags`.
 
-For each sync-eligible file, `syncPipeline.ts` orchestrates parse → graft → media → extract → injection planning.
+For each sync-eligible file, `syncPipeline.ts` orchestrates parse → **extract (source)** → graft → media → **extract (grafted)** → **merge injection metadata** → compile → Anki sync → inject.
+
+**Injection vs grafting:** Card boundaries and `injectionOffset` values are computed on the **pre-graft** AST so byte positions refer to the host vault file. After transclusion grafting, extraction runs again for HTML compilation only; `mergeInjectionMetadata` copies `ankiId` and `injectionOffset` from source cards onto grafted cards by index. Without this split, grafted nodes (with offsets from embedded files) could place `<!--anki-id-->` in the wrong place in the host note.
 
 ## **AST Parsing and Transclusion Resolution**
 
@@ -153,12 +155,18 @@ const newRawContent \= rawText.slice(0, offset) \+ \`\\n\<\!--anki-id: ${uuid}--
 
 Before this new string is written to the disk, the thread must acquire an exclusive write lock for the specific file path via async-mutex16. This precise memory-offset manipulation guarantees zero formatting mutation outside of the explicitly injected HTML comment, preserving the integrity of the Obsidian vault.
 
+**Guards:** `batchInjectIdsIntoFile` refuses offsets that fall inside an existing `<!-- … -->` HTML comment. Offsets always originate from the pre-graft extraction pass (see orchestration above).
+
 ## **AnkiConnect Synchronization Engine**
 
 Once the flashcards are extracted and assigned unique identifiers, the AST buffers for the Front and Back are compiled into raw HTML strings using remark-rehype and rehype-stringify32. This HTML payload, alongside the derived tags and media references, is passed to the AnkiConnect synchronization engine.  
 The synchronization module relies heavily on the p-limit utility to throttle HTTP requests to http://localhost:8765, ensuring the single-threaded Python server underpinning AnkiConnect is not overwhelmed5. For each card, the engine constructs a notesInfo payload to query the Anki database22.  
-If the query returns null, indicating the UUID does not exist in the Anki database, the system constructs an addNote request, mapping the HTML strings to the configured Front and Back fields of the target deck22.  
-Conversely, if the query returns an existing note, the engine performs a local diff against the retrieved fields. If the compiled HTML differs from the stored HTML, the system executes an updateNoteFields request, explicitly passing the updated Front and Back strings to overwrite the stale data22. Following a successful update, an updateNoteTags request is dispatched to ensure the Anki tags remain perfectly synchronized with the Obsidian heading hierarchy.
+If the query returns null, indicating the UUID does not exist in the Anki database, the system constructs an addNote request, mapping the HTML strings to the configured Front and Back fields of the target deck22. If Anki rejects the note as a duplicate (identical Front in the same deck), the engine recovers by linking to the existing note, reusing or adding the `obsidian-id::<uuid>` tag, and injecting `<!--anki-id-->` into the vault when missing.  
+Conversely, if the query returns an existing note, the engine performs a local diff against the retrieved fields. **Code-block line endings** (`\r\n` vs `\n` inside `<pre><code>`) are normalized before compare and before write so unchanged cards report `skip` instead of false `update` actions. If the compiled HTML differs from the stored HTML, the system executes an updateNoteFields request22. Following a successful update, an updateNoteTags request is dispatched to ensure the Anki tags remain synchronized with the Obsidian heading hierarchy.
+
+### **Duplicate detection**
+
+After all cards in a sync run are compiled, the pipeline groups vault cards by **deck + compiled Front HTML**. Multiple sources in one group emit a structured `duplicate_warning` on stderr (`vault_front_collision` or `back_mismatch` when backs differ). One Front must map to one Back for spaced repetition to remain meaningful; the engine logs collisions rather than silently merging unlike content. A future Obsidian plugin may surface these warnings in the editor.
 
 ## **Test-Driven Development (TDD) Roadmap**
 
@@ -211,12 +219,12 @@ IF node \=== image OR media wikiLink:
 (e) Detect `<!--anki-id: [UUID]-->` html node at end of Back buffer.  
 \[PHASE 6: TWO-WAY BINDING & SURGICAL INJECTION\]  
 (7) FOR EACH extracted flashcard:  
-(a) Compile Front and Back AST arrays \-\> HTML via remark-rehype & rehype-stringify.  
+(a) Compile Front and Back AST arrays \-\> HTML via remark-rehype & rehype-stringify (grafted buffers).  
 (b) IF Card lacks ID:  
 \-\> Generate UUID.  
 \-\> Acquire async-mutex write lock for origin file path.  
-\-\> Slice raw text buffer using node.position.end.offset.  
-\-\> Inject \<\!--anki-id: UUID--\> string.  
+\-\> Slice raw text buffer using **pre-graft** node.position.end.offset (from source extraction; merged onto grafted card list).  
+\-\> Inject \<\!--anki-id: UUID--\> string (refuse offsets inside existing HTML comments).  
 \-\> fs.writeFile to disk \-\> Release write lock.  
 \-\> Route to Sync Queue as addNote.  
 (c) IF Card possesses ID:  

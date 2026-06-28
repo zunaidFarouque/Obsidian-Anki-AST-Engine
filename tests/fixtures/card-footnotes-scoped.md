@@ -16,7 +16,11 @@ What is entropy[^shared]?
 :::
 
 Heat dispersal.
-<!--anki-id: 8af3bdf7-c5a6-400e-8856-cbf33759f4b5-->
+<!--anki-id: 6da3adc5-7abe-46da-876e-6042217e0cbd-->
+
+
+
+
 
 
 #### Card B
@@ -28,7 +32,11 @@ Define enthalpy[^shared][^week].
 Constant-pressure heat.
 
 [^week]: Card-local override example.
-<!--anki-id: 9b21089c-f33e-447f-9b50-f34fcd767219-->
+<!--anki-id: 3a919a38-1e08-4b79-a786-ea23bd65cac7-->
+
+
+
+
 
 
 # Other chapter
@@ -42,5 +50,9 @@ Question[^other].
 :::
 
 Answer.
-<!--anki-id: a7098eac-65a7-488c-aff6-27086506b636-->
+<!--anki-id: c8a61772-ead1-46de-9e6b-9eced77adfd5-->
+
+
+
+
 

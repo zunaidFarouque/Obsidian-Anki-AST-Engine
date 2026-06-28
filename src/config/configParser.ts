@@ -2,15 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
-const DeckMappingSchema = z.object({
-  obsidianFolder: z.string(),
-  ankiDeck: z.string(),
-});
-
 export const ConfigSchema = z.object({
   vaultPath: z.string().min(1),
   delimiter: z.string().min(1).default(":::"),
-  deckMappings: z.array(DeckMappingSchema).min(1),
+  scanFolders: z.array(z.string().min(1)).min(1),
+  defaultAnkiDeck: z.string().min(1).default("Synced from Obsidian"),
+  defaultEngineTag: z.string().min(1).default("Obsidian-Anki-AST"),
   ankiConnectUrl: z.string().url().default("http://127.0.0.1:8765"),
   ankiConnectApiKey: z.string().min(1).optional(),
   noteModelName: z.string().min(1).default("Basic"),
@@ -29,7 +26,6 @@ export const ConfigSchema = z.object({
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
-export type DeckMapping = z.infer<typeof DeckMappingSchema>;
 
 export async function loadConfig(configPath?: string): Promise<Config> {
   const resolvedPath = configPath ?? join(process.cwd(), "config.json");

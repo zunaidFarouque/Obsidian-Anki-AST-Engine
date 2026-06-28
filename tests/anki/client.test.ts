@@ -62,7 +62,8 @@ describe("AnkiConnectClient", () => {
       ankiConnectUrl: "http://127.0.0.1:8765",
       vaultPath: "/vault",
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: ".", ankiDeck: "Default" }],
+      scanFolders: ["."],
+      defaultAnkiDeck: "Default",
     });
 
     await expect(client.canConnect()).resolves.toBe(true);

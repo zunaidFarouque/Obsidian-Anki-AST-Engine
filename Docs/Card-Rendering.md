@@ -196,7 +196,7 @@ flowchart LR
 | [`card-feature-stress-test.md`](../tests/fixtures/card-feature-stress-test.md) | Full permutation matrix (14 cards); CI via `syncPipeline.stressTest.test.ts` |
 | [`embed_me.md`](../tests/fixtures/embed_me.md) | Transclusion target for heading-section embed (`![[embed_me#This section is for embedding]]`) |
 
-**Manual dry-run:** point `config.json` `vaultPath` at `tests/fixtures` (with `deckMappings` covering that folder), ensure `embed_me.md` sits beside `card-feature-stress-test.md`, then run `bun run sync -- --dry-run`.
+**Manual dry-run:** point `config.json` `vaultPath` at `tests/fixtures` (with `scanFolders` covering that folder), ensure `embed_me.md` sits beside `card-feature-stress-test.md`, then run `bun run sync -- --dry-run`.
 
 ## Extension points
 

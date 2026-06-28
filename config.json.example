@@ -1,12 +1,9 @@
 {
   "vaultPath": "/path/to/your/ObsidianVault",
   "delimiter": ":::",
-  "deckMappings": [
-    {
-      "obsidianFolder": "01 - Computer Science",
-      "ankiDeck": "Computer Science::Algorithms"
-    }
-  ],
+  "scanFolders": ["01 - Computer Science", "Notes"],
+  "defaultAnkiDeck": "Synced from Obsidian",
+  "defaultEngineTag": "Obsidian-Anki-AST",
   "ankiConnectUrl": "http://127.0.0.1:8765",
   "noteModelName": "Basic",
   "autoCreateDecks": true,

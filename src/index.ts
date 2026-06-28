@@ -33,15 +33,19 @@ async function main(): Promise<void> {
     return;
   }
 
-  const actions = await runSync(config, { dryRun });
+  const { actions, duplicateWarnings } = await runSync(config, { dryRun });
 
   for (const action of actions) {
     console.log(JSON.stringify(action));
   }
 
+  for (const warning of duplicateWarnings) {
+    console.error(JSON.stringify({ event: "duplicate_warning", ...warning }));
+  }
+
   const summary = summarizeSyncActions(actions);
   console.error(
-    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}`,
+    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}${duplicateWarnings.length > 0 ? `, duplicate warning(s) ${duplicateWarnings.length}` : ""}`,
   );
 
   if (summary.failed > 0) {

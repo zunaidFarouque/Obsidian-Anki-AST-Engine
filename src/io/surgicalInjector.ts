@@ -8,6 +8,54 @@ export type InjectionPlan = {
   uuid: string;
 };
 
+export function isOffsetInsideHtmlComment(
+  rawText: string,
+  offset: number,
+): boolean {
+  let searchFrom = 0;
+
+  while (searchFrom < rawText.length) {
+    const open = rawText.indexOf("<!--", searchFrom);
+    if (open === -1) {
+      return false;
+    }
+
+    const close = rawText.indexOf("-->", open + 4);
+    if (close === -1) {
+      return false;
+    }
+
+    const commentEnd = close + 3;
+    if (offset > open && offset < commentEnd) {
+      return true;
+    }
+
+    searchFrom = commentEnd;
+  }
+
+  return false;
+}
+
+export function mergeInjectionMetadata(
+  graftedCards: ExtractedCard[],
+  sourceCards: ExtractedCard[],
+): ExtractedCard[] {
+  if (graftedCards.length !== sourceCards.length) {
+    throw new Error(
+      `Card count mismatch after grafting (${sourceCards.length} source vs ${graftedCards.length} grafted)`,
+    );
+  }
+
+  return graftedCards.map((card, index) => {
+    const source = sourceCards[index]!;
+    return {
+      ...card,
+      ankiId: source.ankiId,
+      injectionOffset: source.injectionOffset,
+    };
+  });
+}
+
 export function spliceIdAtOffset(
   rawText: string,
   offset: number,
@@ -51,6 +99,11 @@ export async function batchInjectIdsIntoFile(
     const sorted = [...injections].sort((a, b) => b.offset - a.offset);
 
     for (const injection of sorted) {
+      if (isOffsetInsideHtmlComment(rawText, injection.offset)) {
+        throw new Error(
+          `Refusing to inject anki-id inside HTML comment at offset ${injection.offset}`,
+        );
+      }
       updated = spliceIdAtOffset(updated, injection.offset, injection.uuid);
     }
 

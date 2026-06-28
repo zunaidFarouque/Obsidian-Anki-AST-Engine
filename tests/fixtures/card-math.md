@@ -24,5 +24,9 @@ Delimiter inside display math must not split:
 $$
 print(":::")
 $$
-<!--anki-id: da640a01-ad51-4feb-b315-cae507af1c92-->
+<!--anki-id: 35820f93-2611-4aa2-96ba-99ffc75355e6-->
+
+
+
+
 

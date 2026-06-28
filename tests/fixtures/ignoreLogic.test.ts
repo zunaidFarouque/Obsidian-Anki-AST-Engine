@@ -24,14 +24,16 @@ describe("ignoreLogic", () => {
     const config: Config = {
       vaultPath,
       delimiter: ":::",
-      deckMappings: [{ obsidianFolder: "Notes", ankiDeck: "Blog" }],
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Blog",
+      defaultEngineTag: "Obsidian-Anki-AST",
       ankiConnectUrl: "http://127.0.0.1:8765",
       linkFormat: "shortest",
       defaultCardDeclarationHeadingLevel: 4,
       includeParentHeadersAsTags: true,
     };
 
-    const actions = await runSync(config, { dryRun: true });
+    const { actions } = await runSync(config, { dryRun: true });
 
     expect(actions).toHaveLength(0);
 

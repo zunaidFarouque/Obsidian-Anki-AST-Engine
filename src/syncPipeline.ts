@@ -1,9 +1,17 @@
-import { relative, resolve } from "node:path";
-import type { Config, DeckMapping } from "./config/configParser";
+import { relative } from "node:path";
+import type { Config } from "./config/configParser";
 import { scanVault } from "./io/scanner";
 import { readMarkdownFile } from "./io/reader";
-import { shouldSyncFile, getBodyStartOffset, getCardDeclarationHeadingLevel, getDelimiter, getIncludeParentHeadersAsTags } from "./io/frontmatterFilter";
-import { batchInjectIdsIntoFile, buildInjectionPlan } from "./io/surgicalInjector";
+import {
+  shouldSyncFile,
+  getBodyStartOffset,
+  getCardDeclarationHeadingLevel,
+  getDelimiter,
+  getIncludeParentHeadersAsTags,
+  getTargetAnkiDeck,
+  getFileAnkiTags,
+} from "./io/frontmatterFilter";
+import { batchInjectIdsIntoFile, buildInjectionPlan, mergeInjectionMetadata } from "./io/surgicalInjector";
 import { parseMarkdown } from "./ast/processor";
 import { graftTransclusions } from "./ast/transclusionGraft";
 import { resolveMedia } from "./ast/mediaResolver";
@@ -14,6 +22,13 @@ import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
 import { AnkiConnectError, createAnkiClient } from "./anki/client";
 import { syncFileCards, type CardSyncPayload } from "./anki/syncEngine";
+import {
+  detectVaultFrontCollisions,
+  type DuplicateCardSource,
+  type DuplicateWarning,
+} from "./anki/duplicateDetect";
+
+export type { DuplicateWarning } from "./anki/duplicateDetect";
 
 export type SyncAction = {
   action: "add" | "update" | "skip";
@@ -33,6 +48,11 @@ export type SyncAction = {
 
 export type SyncOptions = {
   dryRun: boolean;
+};
+
+export type SyncRunResult = {
+  actions: SyncAction[];
+  duplicateWarnings: DuplicateWarning[];
 };
 
 export type SyncSummary = {
@@ -71,11 +91,13 @@ export function summarizeSyncActions(actions: SyncAction[]): SyncSummary {
 export async function runSync(
   config: Config,
   options: SyncOptions,
-): Promise<SyncAction[]> {
+): Promise<SyncRunResult> {
   clearMediaDryRunQueue();
   const vaultIndex = await buildVaultFileIndex(config.vaultPath);
-  const filePaths = await scanVault(config.vaultPath, config.deckMappings);
+  const filePaths = await scanVault(config.vaultPath, config.scanFolders);
   const actions: SyncAction[] = [];
+  const collisionSources: DuplicateCardSource[] = [];
+  const ankiDuplicateWarnings: DuplicateWarning[] = [];
 
   let client = options.dryRun ? undefined : createAnkiClient(config);
 
@@ -89,15 +111,13 @@ export async function runSync(
   }
 
   for (const filePath of filePaths) {
-    const deck = resolveDeck(filePath, config.vaultPath, config.deckMappings);
-    if (!deck) {
-      continue;
-    }
-
     const { rawText, absolutePath } = await readMarkdownFile(filePath);
     if (!shouldSyncFile(rawText)) {
       continue;
     }
+
+    const deck = getTargetAnkiDeck(rawText, config.defaultAnkiDeck);
+    const fileAnkiTags = getFileAnkiTags(rawText);
 
     const sourcePath = relative(config.vaultPath, absolutePath).replace(
       /\\/g,
@@ -105,6 +125,22 @@ export async function runSync(
     );
     const ast = parseMarkdown(rawText, config.vaultPath);
     const unresolvedEmbeds: string[] = [];
+
+    const delimiter = getDelimiter(rawText, config.delimiter);
+    const declarationLevel = getCardDeclarationHeadingLevel(
+      rawText,
+      config.defaultCardDeclarationHeadingLevel,
+    );
+    const bodyStartOffset = getBodyStartOffset(rawText);
+    const extractOptions = {
+      bodyStartOffset,
+      cardDeclarationHeadingLevel: declarationLevel,
+      includeParentHeadersAsTags: getIncludeParentHeadersAsTags(
+        rawText,
+        config.includeParentHeadersAsTags,
+      ),
+    };
+    const sourceCards = extractCards(ast, delimiter, extractOptions);
 
     await graftTransclusions(ast, {
       vaultPath: config.vaultPath,
@@ -121,20 +157,10 @@ export async function runSync(
       dryRun: options.dryRun,
     });
 
-    const delimiter = getDelimiter(rawText, config.delimiter);
-    const declarationLevel = getCardDeclarationHeadingLevel(
-      rawText,
-      config.defaultCardDeclarationHeadingLevel,
+    const cards = mergeInjectionMetadata(
+      extractCards(ast, delimiter, extractOptions),
+      sourceCards,
     );
-    const bodyStartOffset = getBodyStartOffset(rawText);
-    const cards = extractCards(ast, delimiter, {
-      bodyStartOffset,
-      cardDeclarationHeadingLevel: declarationLevel,
-      includeParentHeadersAsTags: getIncludeParentHeadersAsTags(
-        rawText,
-        config.includeParentHeadersAsTags,
-      ),
-    });
 
     const footnoteScopeIndex =
       declarationLevel !== undefined
@@ -173,6 +199,15 @@ export async function runSync(
         transclusionResolved: unresolvedEmbeds.length === 0,
       });
 
+      collisionSources.push({
+        file: absolutePath,
+        deck,
+        tag: card.tag,
+        frontHtml,
+        backHtml,
+        ankiId: card.ankiId,
+      });
+
       syncItems.push({
         payload: {
           deck,
@@ -181,6 +216,8 @@ export async function runSync(
           backHtml,
           ankiId: card.ankiId,
           wouldInjectId: injectionPlan?.uuid,
+          fileAnkiTags,
+          sourceFile: absolutePath,
         },
         injectionOffset: injectionPlan?.offset,
       });
@@ -193,26 +230,6 @@ export async function runSync(
 
     try {
       await uploadMediaPlans(mediaResult.plans, client!, { concurrency: 3 });
-      const fileSync = await syncFileCards(client!, syncItems, config);
-
-      for (let index = 0; index < fileActions.length; index += 1) {
-        const result = fileSync.results[index];
-        const action = fileActions[index]!;
-        if (result) {
-          action.action = result.action;
-          action.ankiNoteId = result.ankiNoteId;
-        }
-      }
-
-      if (fileSync.injections.length > 0) {
-        await batchInjectIdsIntoFile(
-          absolutePath,
-          rawText,
-          fileSync.injections,
-        );
-      }
-
-      actions.push(...fileActions);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);
@@ -220,34 +237,43 @@ export async function runSync(
         action.syncError = message;
         actions.push(action);
       }
+      continue;
     }
+
+    const fileSync = await syncFileCards(client!, syncItems, config);
+
+    for (let index = 0; index < fileActions.length; index += 1) {
+      const result = fileSync.results[index];
+      const action = fileActions[index]!;
+      if (result) {
+        action.action = result.action;
+        action.ankiNoteId = result.ankiNoteId;
+        if (result.error) {
+          action.syncError = result.error;
+        }
+        if (result.duplicateWarning) {
+          ankiDuplicateWarnings.push(result.duplicateWarning);
+        }
+      }
+    }
+
+    if (fileSync.injections.length > 0) {
+      await batchInjectIdsIntoFile(
+        absolutePath,
+        rawText,
+        fileSync.injections,
+      );
+    }
+
+    actions.push(...fileActions);
   }
 
-  return actions;
+  return {
+    actions,
+    duplicateWarnings: [
+      ...detectVaultFrontCollisions(collisionSources),
+      ...ankiDuplicateWarnings,
+    ],
+  };
 }
 
-export function resolveDeck(
-  filePath: string,
-  vaultPath: string,
-  deckMappings: DeckMapping[],
-): string | undefined {
-  const absoluteVault = resolve(vaultPath);
-  const absoluteFile = resolve(filePath);
-  const relativePath = relative(absoluteVault, absoluteFile).replace(/\\/g, "/");
-
-  let bestMatch: DeckMapping | undefined;
-
-  for (const mapping of deckMappings) {
-    const folder = mapping.obsidianFolder.replace(/\\/g, "/");
-    const inFolder =
-      folder === "."
-        ? true
-        : relativePath === folder || relativePath.startsWith(`${folder}/`);
-
-    if (inFolder && (!bestMatch || folder.length > bestMatch.obsidianFolder.length)) {
-      bestMatch = mapping;
-    }
-  }
-
-  return bestMatch?.ankiDeck;
-}
