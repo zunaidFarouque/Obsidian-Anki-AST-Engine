@@ -1,0 +1,389 @@
+[
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-callouts.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Study notes::Callout Card",
+    "frontHtml": "<p>What is a callout?</p>",
+    "backHtml": "<div class=\"callout callout-note\"><p>This is a note callout body on the second line.</p></div>\n<div class=\"callout callout-warning\"><p class=\"callout-title\">Custom title</p><p>Warning body continues here.</p></div>\n<p>Regular paragraph after callouts.</p>",
+    "wouldInjectId": "68c37051-1158-4397-b64e-ee222e2d41e8",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Rich Formatting Baseline",
+    "frontHtml": "<p>What is entropy in thermodynamics?</p>\n<p>It measures how dispersed energy is in a closed system.</p>\n<p>Line one<br>\nLine two in the same paragraph.</p>",
+    "backHtml": "<h2>Preview section title</h2>\n<p>This answer has <strong>bold</strong>, <em>italic</em>, and <em><strong>both</strong></em>.</p>\n<table>\n<thead>\n<tr>\n<th>Column A</th>\n<th>Column B</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>alpha</td>\n<td>beta</td>\n</tr>\n</tbody>\n</table>\n<hr>\n<p><mark>highlighted</mark> text follows.</p>\n<pre><code class=\"language-python\"># delimiter inside code must not split the card\r\nprint(\":::\")\n</code></pre>",
+    "wouldInjectId": "8ea1d683-60ba-4963-a182-619f6e04bedb",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Inline Math On Front",
+    "frontHtml": "<p>What is Newton's second law? Use <span class=\"math-inline\">\\(F=ma\\)</span> on the front.</p>",
+    "backHtml": "<p>Force equals mass times acceleration.</p>",
+    "wouldInjectId": "273c0d66-1992-45a3-9485-1d26d8fd7532",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Display Math On Back",
+    "frontHtml": "<p>What is the integral of x squared from 0 to 1?</p>",
+    "backHtml": "<div class=\"math-display\">\\[\\int_0^1 x^2\\,dx\\]</div>",
+    "wouldInjectId": "e4affbd5-a04c-4198-a1e6-344b469e3dd4",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Footnotes Set A",
+    "frontHtml": "<p>Question with first ref<sup>1</sup> and second<sup>2</sup>.</p>",
+    "backHtml": "<p>Answer cites<sup>1</sup> and mentions<sup>2</sup> again.</p>\n<hr>\n<ol>\n<li>First footnote definition for set A.</li>\n<li>Second footnote definition for set A.</li>\n</ol>",
+    "wouldInjectId": "31a87dc4-7e95-4818-80e8-bcc82949f29a",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Footnotes Set B",
+    "frontHtml": "<p>Another card with ref<sup>1</sup> only on the front.</p>",
+    "backHtml": "<p>Back cites<sup>1</sup> with a different definition block.</p>\n<hr>\n<ol>\n<li>Footnote definition for set B (card-scoped, not shared with card 4).</li>\n</ol>",
+    "wouldInjectId": "c4fcaed2-179e-42ed-bdda-e612585e482f",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Callouts Only",
+    "frontHtml": "<p>What is an Obsidian callout?</p>",
+    "backHtml": "<div class=\"callout callout-note\"><p>Note callout body on the second line.</p></div>\n<div class=\"callout callout-warning\"><p class=\"callout-title\">Custom warning title</p><p>Warning body continues here.</p></div>",
+    "wouldInjectId": "0f28c282-85d1-4b30-b44d-a4e79e30ec50",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection A::Transclusion On Front",
+    "frontHtml": "<p>This paragraph should be visible.</p>\n<p>Second paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>both</strong></em>, <del>strikethrough</del>, and <mark>highlight</mark>.</p>\n<table>\n<thead>\n<tr>\n<th>Col</th>\n<th>Val</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>graft</td>\n<td>ok</td>\n</tr>\n</tbody>\n</table>\n<div class=\"callout callout-tip\"><p class=\"callout-title\">Grafted callout</p><p>Callout body from embed target.</p></div>\n<p>Inline math from embed: <span class=\"math-inline\">\\(a^2+b^2=c^2\\)</span>.</p>\n<p>Footnote in embed<sup>1</sup>.</p>\n<p>What content from the embed should appear on this card front?</p>",
+    "backHtml": "<p>Only this short back answer should appear without the embed block.</p>\n<hr>\n<ol>\n<li>Footnote definition inside embedded section.</li>\n</ol>",
+    "wouldInjectId": "c04e65c2-98dd-41b1-a23a-6a5b3d2a1326",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Transclusion On Back",
+    "frontHtml": "<p>What note is transcluded on the back of this card?</p>",
+    "backHtml": "<p>This paragraph should be visible.</p>\n<p>Second paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>both</strong></em>, <del>strikethrough</del>, and <mark>highlight</mark>.</p>\n<table>\n<thead>\n<tr>\n<th>Col</th>\n<th>Val</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>graft</td>\n<td>ok</td>\n</tr>\n</tbody>\n</table>\n<div class=\"callout callout-tip\"><p class=\"callout-title\">Grafted callout</p><p>Callout body from embed target.</p></div>\n<p>Inline math from embed: <span class=\"math-inline\">\\(a^2+b^2=c^2\\)</span>.</p>\n<p>Footnote in embed<sup>1</sup>.</p>\n<hr>\n<ol>\n<li>Footnote definition inside embedded section.</li>\n</ol>",
+    "wouldInjectId": "f62c7e3b-e79c-4e31-a371-904c0de1df6e",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Embed Plus Math",
+    "frontHtml": "<p>This paragraph should be visible.</p>\n<p>Second paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>both</strong></em>, <del>strikethrough</del>, and <mark>highlight</mark>.</p>\n<table>\n<thead>\n<tr>\n<th>Col</th>\n<th>Val</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>graft</td>\n<td>ok</td>\n</tr>\n</tbody>\n</table>\n<div class=\"callout callout-tip\"><p class=\"callout-title\">Grafted callout</p><p>Callout body from embed target.</p></div>\n<p>Inline math from embed: <span class=\"math-inline\">\\(a^2+b^2=c^2\\)</span>.</p>\n<p>Footnote in embed<sup>1</sup>.</p>\n<p>Front also has inline math <span class=\"math-inline\">\\(E=mc^2\\)</span> and footnote ref<sup>2</sup>.</p>",
+    "backHtml": "<p>Display math on back:</p>\n<div class=\"math-display\">\\[\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\\]</div>\n<hr>\n<ol>\n<li>Footnote definition inside embedded section.</li>\n<li>Footnote on embed-plus-math card back.</li>\n</ol>",
+    "wouldInjectId": "e090b94f-d32d-4610-a850-8d643a9a1f55",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Kitchen Sink",
+    "frontHtml": "<p>Kitchen sink front paragraph one.</p>\n<p>Kitchen sink front paragraph two.</p>\n<p>Soft front<br>\nbreak line.</p>\n<p>Inline <span class=\"math-inline\">\\(F=ma\\)</span> and footnote<sup>1</sup> on front.</p>",
+    "backHtml": "<h2>Kitchen sink answer</h2>\n<p><strong>Bold</strong>, <em>italic</em>, <em><strong>both</strong></em>, <mark>highlight</mark>.</p>\n<table>\n<thead>\n<tr>\n<th>Sink</th>\n<th>OK</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>row</td>\n<td>1</td>\n</tr>\n</tbody>\n</table>\n<hr>\n<div class=\"callout callout-tip\"><p class=\"callout-title\">Sink callout</p><p>Callout inside kitchen sink back.</p></div>\n<pre><code class=\"language-js\">// ::: in code is safe\r\nconst d = \":::\";\n</code></pre>\n<div class=\"math-display\">\\[\\int_0^1 x^2\\,dx\\]</div>\n<hr>\n<ol>\n<li>Kitchen sink footnote definition at bottom.</li>\n</ol>",
+    "wouldInjectId": "9c2fbccd-c65a-42f0-b0b2-8e66f9dc3241",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Delimiter Safety",
+    "frontHtml": "<p>Is this a question with a question mark?</p>",
+    "backHtml": "<pre><code class=\"language-text\">::: delimiter inside fenced code only\n</code></pre>",
+    "wouldInjectId": "df26b8fc-1058-4912-97ca-47f97298352a",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Heading Is The Front",
+    "frontHtml": "<p>Heading Is The Front</p>",
+    "backHtml": "<p>Back paragraph one for heading-as-front card.</p>\n<p>Back paragraph two continues the answer.</p>",
+    "wouldInjectId": "cc9fdd06-b85f-4317-a74b-025ce2a58706",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Legacy Delimiter In Prose",
+    "frontHtml": "<p>The prose token CS101::Week 2::Entropy must not split this card.</p>",
+    "backHtml": "<p>Normal back content for legacy delimiter card.</p>",
+    "wouldInjectId": "e1db3615-56ac-4a2c-b7d2-5120dc63461b",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-feature-stress-test.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Feature Stress Test::Subsection B::Math Delimiter In Display",
+    "frontHtml": "<p>Can display math contain a delimiter-like token?</p>",
+    "backHtml": "<div class=\"math-display\">\\[x ::: y\\]</div>\n<p>The math block above must not have split this card.</p>",
+    "wouldInjectId": "e6d91f1b-a622-4217-bebc-be7dc5e59e9d",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-footnotes.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Research::Footnote Card",
+    "frontHtml": "<p>Question with ref<sup>1</sup> and second<sup>2</sup></p>",
+    "backHtml": "<p>Answer body cites<sup>1</sup> the same source.</p>\n<hr>\n<ol>\n<li>Source citation at bottom.</li>\n<li>Additional note for numbering.</li>\n</ol>",
+    "wouldInjectId": "48d87551-a1bd-47dd-9901-9561796a9f75",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-math.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Physics::Math Card",
+    "frontHtml": "<p>What is Einstein's mass-energy relation?</p>",
+    "backHtml": "<p>The formula is <span class=\"math-inline\">\\(E=mc^2\\)</span> for rest energy.</p>\n<p>Block form:</p>\n<div class=\"math-display\">\\[F = ma\\]</div>\n<p>Delimiter inside display math must not split:</p>\n<div class=\"math-display\">\\[print(\":::\")\\]</div>",
+    "wouldInjectId": "04469441-b361-4d12-ae07-1c35a9d88dac",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\card-rich-formatting.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Physics::Rich Formatting Card",
+    "frontHtml": "<p>What is entropy in thermodynamics?</p>\n<p>It measures how dispersed energy is in a closed system.</p>\n<p>Line one<br>\nLine two in the same paragraph.</p>",
+    "backHtml": "<h2>Preview section title</h2>\n<p>This answer has <strong>bold</strong>, <em>italic</em>, and <em><strong>both</strong></em>.</p>\n<table>\n<thead>\n<tr>\n<th>Column A</th>\n<th>Column B</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>alpha</td>\n<td>beta</td>\n</tr>\n</tbody>\n</table>\n<hr>\n<p><mark>highlighted</mark> text follows.</p>\n<pre><code class=\"language-python\"># delimiter inside code must not split the card\r\nprint(\":::\")\n</code></pre>",
+    "wouldInjectId": "38bf7261-6a8c-4d63-bba2-f2f128fe5cce",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\complex-media-paths.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Cell Biology::Organelle Identification",
+    "frontHtml": "<p>Identify the organelles shown below.</p>\n<p>![[Cell Diagram final.png]]</p>\n<p><img src=\"path.png\" alt=\"\"></p>\n<p>Which structure is responsible for ATP synthesis?</p>",
+    "backHtml": "<p>Mitochondria.</p>\n<p>They carry out oxidative phosphorylation and the citric acid cycle.</p>\n<p>The inner membrane folds into cristae to increase surface area.</p>",
+    "wouldInjectId": "ac442541-8d78-4ecf-ad82-f6cd0d79431e",
+    "wouldUploadMedia": [
+      "Cell Diagram final.png",
+      "path.png"
+    ],
+    "unresolvedEmbeds": [
+      "![[Cell Diagram final.png]]"
+    ],
+    "transclusionResolved": false
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\deep-nested-transclusions.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Design Patterns::Singleton Pattern",
+    "frontHtml": "<p>Singleton Pattern</p>",
+    "backHtml": "<p>Restricts instantiation.</p>\n<p>Only one instance of the class exists in the application.</p>\n<p>Global access is typically provided through a static accessor.</p>",
+    "wouldInjectId": "3c7652db-f2f6-426a-865f-43efc25582f6",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\deep-transclusion-resolution.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Physics::Relativity Formula",
+    "frontHtml": "<p>The transcluded block below includes a nested embed and a formula.</p>\n<p>What does the famous equation represent?</p>",
+    "backHtml": "<p>Energy equals mass times the speed of light squared.</p>\n<p>It follows from special relativity and explains mass-energy equivalence.</p>",
+    "wouldInjectId": "084d62cd-c345-4cfb-b235-e599e00d904d",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\injection-required-no-ids.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Thermodynamics and CS::Entropy",
+    "frontHtml": "<p>What is entropy?</p>\n<p>How does it relate to disorder in a closed system?</p>",
+    "backHtml": "<p>A measure of the number of microstates corresponding to a macrostate.</p>\n<p>It tends to increase in isolated systems according to the second law.</p>",
+    "wouldInjectId": "ff3061c7-522c-4a94-8d13-c59c2ad92930",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\injection-required-no-ids.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Thermodynamics and CS::Depth-First Search",
+    "frontHtml": "<p>What is DFS?</p>\n<p>When is it preferred over BFS?</p>",
+    "backHtml": "<p>Depth-first search explores as far as possible along each branch before backtracking.</p>\n<p>It uses less memory than BFS on deep graphs when the tree depth is large.</p>",
+    "wouldInjectId": "653f8efa-6ead-4ac2-b13b-1bb907b6249a",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\injection-required-no-ids.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Thermodynamics and CS::TCP Protocol",
+    "frontHtml": "<p>What is TCP?</p>",
+    "backHtml": "<p>Transmission Control Protocol.</p>\n<p>It provides reliable, ordered, and error-checked delivery of bytes between applications.</p>",
+    "wouldInjectId": "a49369bf-95c4-4e8a-83a0-83341a2f0e12",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\malformed-boundary-headings.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Edge Cases::Empty Back",
+    "frontHtml": "<p>Front text with delimiter but no back content follows.</p>",
+    "backHtml": "",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\malformed-boundary-headings.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Edge Cases::Declaration As Front",
+    "frontHtml": "<p>Declaration As Front</p>",
+    "backHtml": "<p>Only the back should appear here.</p>\n<p>The declaration line itself is the front of this card.</p>",
+    "wouldInjectId": "f5c39dcb-1501-4d98-a907-b036c4c94761",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\malformed-boundary-headings.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Edge Cases::Normal Card After Edge Cases",
+    "frontHtml": "<p>What is the capital of France?</p>",
+    "backHtml": "<p>Paris.</p>\n<p>It is the largest city in France and a major European cultural center.</p>",
+    "wouldInjectId": "928c0797-8a5b-4c9c-9176-8a797c70319b",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\malformed-html-comments.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Mechanics::Gravitational Acceleration",
+    "frontHtml": "<p>What is standard gravitational acceleration near Earth's surface?</p>\n<p>Express the value with units.</p>",
+    "backHtml": "<p>9.8 m/s^2</p>\n<p>This is an approximate average; local gravity varies slightly with altitude and latitude.</p>",
+    "wouldInjectId": "d22e2ae8-30ab-42ad-8dda-784809827bc3",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\multi-line-card-layout.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Computer Science::Card With Separate Front",
+    "frontHtml": "<p>What is entropy in thermodynamics?</p>\n<p>It measures how dispersed energy is in a closed system.</p>",
+    "backHtml": "<p>A statistical measure of the number of microstates compatible with a macrostate.</p>\n<p>Often described informally as disorder, though that metaphor is imperfect.</p>",
+    "wouldInjectId": "7b5cea3f-5cad-4d16-9033-a40fceebbed6",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\multi-line-card-layout.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Computer Science::Heading Is The Front",
+    "frontHtml": "<p>Heading Is The Front</p>",
+    "backHtml": "<p>Dijkstra's algorithm finds shortest paths in graphs with non-negative edge weights.</p>\n<p>It uses a priority queue to repeatedly relax the closest unvisited node.</p>",
+    "wouldInjectId": "006949ca-3966-48ec-9b10-9f7789060804",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\multi-line-card-layout.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Computer Science::Graph Algorithms::Shortest Path Without Separate Front",
+    "frontHtml": "<p>Shortest Path Without Separate Front</p>",
+    "backHtml": "<p>Bellman-Ford handles negative edge weights and detects negative cycles.</p>\n<p>It relaxes all edges repeatedly for V-1 iterations.</p>",
+    "wouldInjectId": "eaa549eb-1819-447c-b56e-5cdbd3b6fde7",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\multi-line-card-layout.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Computer Science::Graph Algorithms::Another Card In Subsection",
+    "frontHtml": "<p>What is a spanning tree?</p>\n<p>A subset of graph edges connecting all vertices without cycles.</p>",
+    "backHtml": "<p>A minimum spanning tree minimizes total edge weight across the tree.</p>",
+    "wouldInjectId": "84e6fb9d-dc49-4814-91b0-765142c0a44b",
+    "wouldUploadMedia": [],
+    "transclusionResolved": true
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\obsidian-parity\\unresolved-embed.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Obsidian Parity::Missing Embed Target",
+    "frontHtml": "<p>The embed below should remain unresolved when the target note is absent.</p>\n<p>![[Does Not Exist#^missing]]</p>",
+    "backHtml": "<p>Should preserve embed marker in the unresolved state.</p>",
+    "wouldInjectId": "06a34bd9-bca9-443d-bd80-ffd9ffc71500",
+    "wouldUploadMedia": [],
+    "unresolvedEmbeds": [
+      "![[Does Not Exist#^missing]]"
+    ],
+    "transclusionResolved": false
+  },
+  {
+    "action": "add",
+    "file": "D:\\_installed\\VScode repos\\AI\\Cursor\\Obsidian-Anki-AST-Engine\\tests\\fixtures\\stress-test-nested-complex.md",
+    "deck": "DryRun::Fixtures",
+    "tag": "Distributed Systems::Message Broker",
+    "frontHtml": "<p>What is a message broker?</p>\n<p>Why do teams introduce one between services?</p>",
+    "backHtml": "<p>A system that stores and forwards messages between producers and consumers.</p>\n<p>It decouples senders from receivers and can smooth traffic spikes.</p>\n<p>Common examples include RabbitMQ and Kafka.</p>",
+    "wouldInjectId": "d9e451eb-a936-4b8b-a72b-873896e2ace9",
+    "wouldUploadMedia": [
+      "Diagram.png"
+    ],
+    "unresolvedEmbeds": [
+      "![[Diagram.png]]"
+    ],
+    "transclusionResolved": false
+  }
+]

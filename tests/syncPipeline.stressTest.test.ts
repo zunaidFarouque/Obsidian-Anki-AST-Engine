@@ -45,7 +45,9 @@ describe("syncPipeline stress fixture", () => {
     expect(actions).toHaveLength(14);
 
     for (const action of actions) {
-      expect(action.frontHtml).toMatch(/<p>|<h2>|mjx-container|callout|should be visible/i);
+      expect(action.frontHtml).toMatch(
+        /<p>|<h2>|math-inline|callout|should be visible/i,
+      );
       expect(action.backHtml.length).toBeGreaterThan(0);
     }
 
@@ -57,12 +59,12 @@ describe("syncPipeline stress fixture", () => {
     expect(rich.backHtml).toContain('print(":::")');
 
     const inlineMath = findByTag(actions, "Inline Math On Front");
-    expect(inlineMath.frontHtml).toMatch(/mjx-container/i);
-    expect(inlineMath.backHtml).not.toMatch(/mjx-container/i);
+    expect(inlineMath.frontHtml).toContain("\\(F=ma\\)");
+    expect(inlineMath.backHtml).not.toContain("\\(F=ma\\)");
 
     const displayMath = findByTag(actions, "Display Math On Back");
-    expect(displayMath.frontHtml).not.toMatch(/mjx-container/i);
-    expect(displayMath.backHtml).toMatch(/mjx-container/i);
+    expect(displayMath.frontHtml).not.toMatch(/\\\[|\\int/);
+    expect(displayMath.backHtml).toMatch(/\\\[|\\int/);
 
     const footnotesA = findByTag(actions, "Footnotes Set A");
     expect(footnotesA.frontHtml).toContain("<sup>1</sup>");
@@ -92,16 +94,16 @@ describe("syncPipeline stress fixture", () => {
 
     const embedMath = findByTag(actions, "Embed Plus Math");
     expect(embedMath.frontHtml).toContain("should be visible");
-    expect(embedMath.frontHtml).toMatch(/mjx-container/i);
+    expect(embedMath.frontHtml).toContain("\\(E=mc^2\\)");
     expect(embedMath.backHtml).toContain("<hr>");
-    expect(embedMath.backHtml).toMatch(/mjx-container/i);
+    expect(embedMath.backHtml).toMatch(/\\\[|\\sum/);
 
     const kitchenSink = findByTag(actions, "Kitchen Sink");
     expect(kitchenSink.frontHtml).toContain("<br>");
     expect(kitchenSink.backHtml).toContain("<h2>Kitchen sink answer</h2>");
     expect(kitchenSink.backHtml).toContain('class="callout callout-tip"');
     expect(kitchenSink.backHtml).toContain("<hr>");
-    expect(kitchenSink.backHtml).toMatch(/mjx-container/i);
+    expect(kitchenSink.backHtml).toMatch(/\\\[|\\int/);
 
     const headingFront = findByTag(actions, "Heading Is The Front");
     expect(headingFront.frontHtml).toContain("Heading Is The Front");
@@ -112,7 +114,7 @@ describe("syncPipeline stress fixture", () => {
     expect(legacyDelimiter.backHtml).toContain("Normal back content");
 
     const mathDelimiter = findByTag(actions, "Math Delimiter In Display");
-    expect(mathDelimiter.backHtml).toMatch(/mjx-container/i);
+    expect(mathDelimiter.backHtml).toMatch(/\\\[|:::/);
     expect(mathDelimiter.tag).toContain("Math Delimiter In Display");
 
     await rm(root, { recursive: true, force: true });

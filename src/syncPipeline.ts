@@ -131,7 +131,9 @@ export function resolveDeck(
   for (const mapping of deckMappings) {
     const folder = mapping.obsidianFolder.replace(/\\/g, "/");
     const inFolder =
-      relativePath === folder || relativePath.startsWith(`${folder}/`);
+      folder === "."
+        ? true
+        : relativePath === folder || relativePath.startsWith(`${folder}/`);
 
     if (inFolder && (!bestMatch || folder.length > bestMatch.obsidianFolder.length)) {
       bestMatch = mapping;

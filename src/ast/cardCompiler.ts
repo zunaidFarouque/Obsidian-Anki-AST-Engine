@@ -1,4 +1,4 @@
-import rehypeMathjax from "rehype-mathjax";
+import type { InlineMath, Math } from "mdast";
 import rehypeStringify from "rehype-stringify";
 import type { State } from "mdast-util-to-hast";
 import type { Content, Parents, Root } from "mdast";
@@ -67,9 +67,30 @@ const compiler = unified()
         state.patch(node, result);
         return state.applyData(node, result);
       },
+      inlineMath(state: State, node): Element {
+        const mathNode = node as InlineMath;
+        const result: Element = {
+          type: "element",
+          tagName: "span",
+          properties: { className: ["math-inline"] },
+          children: [{ type: "text", value: `\\(${mathNode.value}\\)` }],
+        };
+        state.patch(node, result);
+        return result;
+      },
+      math(state: State, node): Element {
+        const mathNode = node as Math;
+        const result: Element = {
+          type: "element",
+          tagName: "div",
+          properties: { className: ["math-display"] },
+          children: [{ type: "text", value: `\\[${mathNode.value}\\]` }],
+        };
+        state.patch(node, result);
+        return result;
+      },
     },
   } as Parameters<typeof remarkRehype>[0])
-  .use(rehypeMathjax)
   .use(rehypeStringify);
 
 export type CompiledCardFields = {

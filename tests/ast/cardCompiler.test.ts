@@ -82,15 +82,16 @@ describe("cardCompiler", () => {
     expect(frontHtml).toContain("dispersed energy");
   });
 
-  test("compileCardField renders inline and display math with MathJax", async () => {
+  test("compileCardField renders inline and display math as MathJax delimiters", async () => {
     const cards = await loadFixtureCards("card-math");
     expect(cards).toHaveLength(1);
 
     const backHtml = compileCardField(cards[0]!.backNodes);
 
     expect(backHtml).not.toContain("$E=mc^2$");
-    expect(backHtml).toMatch(/mjx-container|E=mc|mc\^2/i);
-    expect(backHtml).toContain("F");
+    expect(backHtml).toContain("\\(E=mc^2\\)");
+    expect(backHtml).toContain("F = ma");
+    expect(backHtml).toMatch(/\\\[|math-display/);
   });
 
   test("card-math fixture keeps delimiter inside display math from splitting card", async () => {

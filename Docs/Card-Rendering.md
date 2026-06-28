@@ -42,7 +42,7 @@ Implementation: [`src/ast/cardCompiler.ts`](../src/ast/cardCompiler.ts) (`compil
 | `code` (fenced) | `<pre><code>` |
 | `inlineCode` | `<code>` |
 | `blockquote` | `<blockquote>` (or callout `<div>` when `> [!type]`) |
-| `inlineMath` / `math` | MathJax HTML (`mjx-container`) |
+| `inlineMath` / `math` | `\(...\)` / `\[...\]` in span/div (Anki MathJax renders) |
 | `image` | `<img>` |
 | `link` | `<a href="…">` |
 | `html` | passed through (e.g. `<!--anki-id-->` stripped before compile) |
@@ -89,10 +89,13 @@ Syntax: `: #{1,6} title text` (colon, space, hashes, space, title).
 
 `==highlighted text==` → `<mark>highlighted text</mark>` via compile-time plugin. Not parsed as GFM; applied only during card compilation.
 
-## Math (MathJax)
+## Math (MathJax delimiters)
 
 - **Parse time** ([`processor.ts`](../src/ast/processor.ts)): `remark-math` turns `$E=mc^2$` and `$$...$$` into `inlineMath` / `math` mdast nodes. Delimiters inside math are ignored by [`delimiterCheck.ts`](../src/parser/delimiterCheck.ts).
-- **Compile time** ([`cardCompiler.ts`](../src/ast/cardCompiler.ts)): `rehype-mathjax` pre-renders LaTeX to MathJax HTML at sync time (no runtime MathJax JS in the card). Anki note styling may need minor CSS for `mjx-container` layout.
+- **Compile time** ([`cardCompiler.ts`](../src/ast/cardCompiler.ts)): math nodes become lightweight HTML with LaTeX delimiters Anki MathJax already understands:
+  - Inline: `<span class="math-inline">\(E=mc^2\)</span>`
+  - Display: `<div class="math-display">\[...\]</div>`
+- **No SVG pre-render** — Anki (and Obsidian) render math at display time, same as `$...$` in source. Keeps `frontHtml`/`backHtml` small and readable in dry-run JSON.
 
 ## Obsidian callouts
 
@@ -149,7 +152,7 @@ flowchart LR
   hi[obsidianHighlight]
   co[obsidianCallout]
   rr[remark-rehype]
-  mj[rehype-mathjax]
+  mj[mathDelimiters]
   rs[rehype-stringify]
   fn --> ph --> hi --> co --> rr --> mj --> rs
 ```
