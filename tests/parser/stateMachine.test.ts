@@ -106,6 +106,21 @@ describe("stateMachine", () => {
     expect(cards[0]?.injectionOffset).toBeUndefined();
   });
 
+  test("sets injectionOffset after removing valid anki-id but leaving malformed comment", () => {
+    const rawText = [
+      "### Entropy",
+      "",
+      "Measure ::: Randomness.",
+      "<!-- anki-id: -->",
+    ].join("\n");
+    const ast = parseMarkdown(rawText, "/vault");
+    const cards = extractCards(ast, DEFAULT_DELIMITER);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.ankiId).toBeUndefined();
+    expect(cards[0]?.injectionOffset).toBeTypeOf("number");
+  });
+
   test("sets injectionOffset for cards without anki-id", () => {
     const rawText = "### Entropy\n\nMeasure ::: Randomness.";
     const ast = parseMarkdown(rawText, "/vault");

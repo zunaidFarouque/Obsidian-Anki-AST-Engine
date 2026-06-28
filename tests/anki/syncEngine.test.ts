@@ -244,6 +244,58 @@ describe("syncEngine", () => {
     expect(result.duplicateWarning?.message).toContain("duplicate Front");
   });
 
+  test("syncCard links existing note when Anki front differs only by letter casing", async () => {
+    let addNoteCalled = false;
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query.includes("fear of returning")) {
+          return [88];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 88,
+          tags: ["obsidian-id::existing-uuid"],
+          fields: {
+            Front: {
+              value: "<p>Do you have any fear of returning to Bangladesh?</p>",
+              order: 0,
+            },
+            Back: {
+              value:
+                "<p>No, not at all. Bangladesh is my home, and my family, professional network, and long-term career goals are all there.</p>",
+              order: 1,
+            },
+          },
+        },
+      ],
+      addNote: async () => {
+        addNoteCalled = true;
+        throw new AnkiConnectError(
+          "cannot create note because it is a duplicate",
+        );
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "General Questions::Follow-up Questions::Do You Have Any Fear of Returning to Bangladesh?",
+        frontHtml: "<p>Do You Have Any Fear of Returning to Bangladesh?</p>",
+        backHtml:
+          "<p>No, not at all. Bangladesh is my home, and my family, professional network, and long-term career goals are all there.</p>",
+        wouldInjectId: "new-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(addNoteCalled).toBe(false);
+    expect(result.injectedId).toBe("existing-uuid");
+    expect(result.ankiNoteId).toBe(88);
+  });
+
   test("syncCard links existing note by front before attempting add when vault id was removed", async () => {
     let addNoteCalled = false;
     const client = createMockClient({

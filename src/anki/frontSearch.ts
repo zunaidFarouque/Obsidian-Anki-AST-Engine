@@ -1,3 +1,6 @@
+import type { AnkiConnectClient, NoteInfo } from "./client";
+import { normalizeCodeBlockLineEndings } from "./htmlNormalize";
+
 const MAX_FRONT_SEARCH_CHARS = 80;
 
 export function stripHtmlForSearch(html: string): string {
@@ -11,57 +14,25 @@ function escapeAnkiQuotedText(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-export function escapeAnkiSearchText(value: string): string {
-  return escapeAnkiQuotedText(value);
-}
-
-export function buildFrontOnlySearchQuery(frontHtml: string): string | undefined {
-  const plain = buildFrontSearchPlainText(frontHtml).slice(
-    0,
-    MAX_FRONT_SEARCH_CHARS,
-  );
-  if (plain.length === 0) {
-    return undefined;
-  }
-  return `front:"${escapeAnkiQuotedText(plain)}"`;
-}
-
-export function buildFrontDuplicateSearchQuery(
-  deck: string,
-  frontHtml: string,
-): string {
-  const escapedDeck = escapeAnkiQuotedText(deck);
-  const plain = buildFrontSearchPlainText(frontHtml).slice(
-    0,
-    MAX_FRONT_SEARCH_CHARS,
-  );
-
-  if (plain.length > 0) {
-    return `deck:"${escapedDeck}" front:"${escapeAnkiQuotedText(plain)}"`;
-  }
-
-  const mediaToken = buildMediaFrontSearchToken(frontHtml);
-  if (mediaToken) {
-    return `deck:"${escapedDeck}" front:"${escapeAnkiQuotedText(mediaToken)}"`;
-  }
-
-  return `deck:"${escapedDeck}"`;
+export function normalizeSyncFieldHtml(html: string): string {
+  return normalizeCodeBlockLineEndings(html);
 }
 
 export function buildFrontSearchPlainText(html: string): string {
   return stripHtmlForSearch(normalizeSyncFieldHtml(html)).trim();
 }
 
-export function normalizeSyncFieldHtml(html: string): string {
-  return normalizeCodeBlockLineEndings(html);
-}
+function plainTextsMatchForRecovery(left: string, right: string): boolean {
+  if (left.length === 0 || right.length === 0) {
+    return false;
+  }
 
-export function buildMediaFrontSearchToken(html: string): string | undefined {
-  const tokens = extractMediaSrcTokens(normalizeSyncFieldHtml(html));
-  return tokens[0];
-}
+  if (left === right) {
+    return true;
+  }
 
-import { normalizeCodeBlockLineEndings } from "./htmlNormalize";
+  return left.toLocaleLowerCase() === right.toLocaleLowerCase();
+}
 
 function extractMediaSrcTokens(html: string): string[] {
   const tokens: string[] = [];
@@ -72,6 +43,11 @@ function extractMediaSrcTokens(html: string): string[] {
     match = pattern.exec(html);
   }
   return [...new Set(tokens)].sort();
+}
+
+export function buildMediaFrontSearchToken(html: string): string | undefined {
+  const tokens = extractMediaSrcTokens(normalizeSyncFieldHtml(html));
+  return tokens[0];
 }
 
 export function frontsMatchForRecovery(
@@ -86,7 +62,7 @@ export function frontsMatchForRecovery(
 
   const plainAnki = buildFrontSearchPlainText(ankiFront);
   const plainCompiled = buildFrontSearchPlainText(compiledFront);
-  if (plainAnki.length > 0 && plainAnki === plainCompiled) {
+  if (plainTextsMatchForRecovery(plainAnki, plainCompiled)) {
     return true;
   }
 
@@ -103,11 +79,69 @@ export function frontsMatchForRecovery(
   return false;
 }
 
+export function buildFrontOnlySearchQuery(frontHtml: string): string | undefined {
+  return buildFrontSearchQueries(undefined, frontHtml)[0];
+}
+
+function buildDeckFrontSearchQuery(deck: string, frontPlain: string): string {
+  return `deck:"${escapeAnkiQuotedText(deck)}" front:"${escapeAnkiQuotedText(frontPlain)}"`;
+}
+
+function buildFrontSearchPlainVariants(frontHtml: string): string[] {
+  const plain = buildFrontSearchPlainText(frontHtml).slice(
+    0,
+    MAX_FRONT_SEARCH_CHARS,
+  );
+  if (plain.length === 0) {
+    const mediaToken = buildMediaFrontSearchToken(frontHtml);
+    return mediaToken ? [mediaToken] : [];
+  }
+
+  return [...new Set([plain, plain.toLocaleLowerCase()])];
+}
+
+export function buildFrontSearchQueries(
+  deck: string | undefined,
+  frontHtml: string,
+): string[] {
+  const queries: string[] = [];
+  const plainVariants = buildFrontSearchPlainVariants(frontHtml);
+
+  for (const plain of plainVariants) {
+    if (deck) {
+      queries.push(buildDeckFrontSearchQuery(deck, plain));
+    }
+    queries.push(`front:"${escapeAnkiQuotedText(plain)}"`);
+  }
+
+  const mediaToken = buildMediaFrontSearchToken(frontHtml);
+  if (mediaToken) {
+    if (deck) {
+      queries.push(buildDeckFrontSearchQuery(deck, mediaToken));
+    }
+    queries.push(`front:"${escapeAnkiQuotedText(mediaToken)}"`);
+  } else if (deck && plainVariants.length === 0) {
+    queries.push(`deck:"${escapeAnkiQuotedText(deck)}"`);
+  }
+
+  return [...new Set(queries)];
+}
+
+export function buildFrontDuplicateSearchQuery(
+  deck: string,
+  frontHtml: string,
+): string {
+  return (
+    buildFrontSearchQueries(deck, frontHtml)[0] ??
+    `deck:"${escapeAnkiQuotedText(deck)}"`
+  );
+}
+
 function pickSingleFrontMatch(
-  notes: Array<{ noteId: number; fields: Record<string, { value: string }> }>,
+  notes: NoteInfo[],
   frontHtml: string,
   deck: string,
-): (typeof notes)[number] | undefined {
+): NoteInfo | undefined {
   const matches = notes.filter((note) =>
     frontsMatchForRecovery(note.fields.Front?.value ?? "", frontHtml),
   );
@@ -122,5 +156,48 @@ function pickSingleFrontMatch(
     );
   }
 
+  return undefined;
+}
+
+async function findNotesAndPickMatch(
+  client: AnkiConnectClient,
+  query: string,
+  frontHtml: string,
+  deck: string,
+): Promise<NoteInfo | undefined> {
+  const noteIds = await client.findNotes(query);
+  if (noteIds.length === 0) {
+    return undefined;
+  }
+
+  const notes = await client.notesInfo(noteIds);
+  return pickSingleFrontMatch(notes, frontHtml, deck);
+}
+
+export async function findNoteByFrontInDeck(
+  client: AnkiConnectClient,
+  deck: string,
+  frontHtml: string,
+  cache?: Map<string, NoteInfo | undefined>,
+): Promise<NoteInfo | undefined> {
+  const cacheKey = `${deck}\0${normalizeSyncFieldHtml(frontHtml)}`;
+  if (cache?.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  for (const query of buildFrontSearchQueries(deck, frontHtml)) {
+    const match = await findNotesAndPickMatch(
+      client,
+      query,
+      frontHtml,
+      deck,
+    );
+    if (match) {
+      cache?.set(cacheKey, match);
+      return match;
+    }
+  }
+
+  cache?.set(cacheKey, undefined);
   return undefined;
 }

@@ -25,6 +25,7 @@ export type ExtractOptions = {
 
 const ANKI_ID_REGEX =
   /<!--\s*anki-id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*-->/i;
+const ANKI_ID_COMMENT_HINT = /<!--[\s\S]*anki-id[\s\S]*-->/i;
 
 export function extractCards(
   ast: Root,
@@ -352,16 +353,21 @@ function extractAnkiId(backNodes: Content[]): string | undefined {
   return undefined;
 }
 
+function isRemovableAnkiIdHtmlNode(node: Content): boolean {
+  if (node.type !== "html" || !("value" in node)) {
+    return false;
+  }
+
+  const value = String(node.value);
+  return ANKI_ID_REGEX.test(value) || ANKI_ID_COMMENT_HINT.test(value);
+}
+
 function getInjectionOffset(backNodes: Content[]): number | undefined {
   const nodes = [...backNodes];
 
   while (nodes.length > 0) {
     const last = nodes[nodes.length - 1];
-    if (
-      last?.type === "html" &&
-      "value" in last &&
-      ANKI_ID_REGEX.test(String(last.value))
-    ) {
+    if (last && isRemovableAnkiIdHtmlNode(last)) {
       nodes.pop();
       continue;
     }

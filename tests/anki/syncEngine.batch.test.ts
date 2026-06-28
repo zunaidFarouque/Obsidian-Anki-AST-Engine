@@ -66,6 +66,25 @@ describe("syncEngine batched file sync", () => {
     expect(match?.noteId).toBe(55);
   });
 
+  test("findNoteByFrontInDeck matches when Anki front uses different html wrapper", async () => {
+    const client = createMockClient({
+      findNotes: async () => [55],
+      notesInfo: async () => [
+        {
+          noteId: 55,
+          tags: ["legacy"],
+          fields: {
+            Front: { value: "<div>Q</div>", order: 0 },
+            Back: { value: "<p>A</p>", order: 1 },
+          },
+        },
+      ],
+    });
+
+    const match = await findNoteByFrontInDeck(client, "Test::Deck", "<p>Q</p>");
+    expect(match?.noteId).toBe(55);
+  });
+
   test("findNoteByFrontInDeck matches when Anki front differs only by code block line endings", async () => {
     const ankiFront =
       '<pre><code class="language-js">// comment\nconst d = ":::";\n</code></pre>';

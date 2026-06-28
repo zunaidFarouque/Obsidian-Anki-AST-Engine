@@ -3,15 +3,18 @@ import type { AnkiConnectClient, NoteInfo } from "./client";
 import { AnkiConnectError } from "./client";
 import type { Config } from "../config/configParser";
 import { createDeckEnsurer, type DeckEnsurer } from "./deckEnsurer";
-import { buildFrontDuplicateSearchQuery } from "./frontSearch";
+import {
+  findNoteByFrontInDeck,
+  normalizeSyncFieldHtml,
+} from "./frontSearch";
 import { normalizeAnkiTagList, normalizeAnkiTagPath } from "./tagNormalize";
 import {
   buildAnkiDuplicateRecoveredWarning,
   type DuplicateWarning,
 } from "./duplicateDetect";
-import { normalizeCodeBlockLineEndings } from "./htmlNormalize";
 
 export type { DuplicateWarning } from "./duplicateDetect";
+export { findNoteByFrontInDeck } from "./frontSearch";
 
 export type CardSyncPayload = {
   deck: string;
@@ -117,43 +120,6 @@ export async function findNoteByObsidianId(
   return noteIds[0];
 }
 
-export async function findNoteByFrontInDeck(
-  client: AnkiConnectClient,
-  deck: string,
-  frontHtml: string,
-  cache?: Map<string, NoteInfo | undefined>,
-): Promise<NoteInfo | undefined> {
-  const cacheKey = `${deck}\0${frontHtml}`;
-  if (cache?.has(cacheKey)) {
-    return cache.get(cacheKey);
-  }
-
-  const noteIds = await client.findNotes(
-    buildFrontDuplicateSearchQuery(deck, frontHtml),
-  );
-  if (noteIds.length === 0) {
-    cache?.set(cacheKey, undefined);
-    return undefined;
-  }
-
-  const notes = await client.notesInfo(noteIds);
-  const normalizedFront = normalizeSyncFieldHtml(frontHtml);
-  const matches = notes.filter(
-    (note) =>
-      normalizeSyncFieldHtml(note.fields.Front?.value ?? "") === normalizedFront,
-  );
-
-  if (matches.length > 1) {
-    throw new Error(
-      `Multiple Anki notes in deck "${deck}" with identical Front field`,
-    );
-  }
-
-  const match = matches[0];
-  cache?.set(cacheKey, match);
-  return match;
-}
-
 export async function ensureDeck(
   client: AnkiConnectClient,
   deckName: string,
@@ -169,10 +135,6 @@ export async function ensureDeck(
   }
 
   await client.createDeck(deckName);
-}
-
-function normalizeSyncFieldHtml(html: string): string {
-  return normalizeCodeBlockLineEndings(html);
 }
 
 function buildSyncFields(
@@ -295,7 +257,9 @@ async function recoverDuplicateNote(
     context?.frontMatchCache,
   );
   if (!duplicate) {
-    throw new AnkiConnectError("cannot create note because it is a duplicate");
+    throw new AnkiConnectError(
+      `cannot create note because it is a duplicate, but no matching Anki note was found by Front in deck "${payload.deck}"`,
+    );
   }
 
   return linkExistingNoteByFront(
@@ -484,6 +448,22 @@ async function addPreparedCard(
   config: SyncEngineConfig,
   context?: SyncRunContext,
 ): Promise<CardSyncResult> {
+  const existingByFront = await findNoteByFrontInDeck(
+    client,
+    prepared.item.payload.deck,
+    prepared.item.payload.frontHtml,
+    context?.frontMatchCache,
+  );
+  if (existingByFront) {
+    return linkExistingNoteByFront(
+      client,
+      prepared.item.payload,
+      config,
+      existingByFront,
+      prepared.fields,
+    );
+  }
+
   try {
     const noteId = await client.addNote({
       deckName: prepared.item.payload.deck,

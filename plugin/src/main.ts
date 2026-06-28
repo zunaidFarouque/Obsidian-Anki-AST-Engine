@@ -97,10 +97,18 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			);
 
 			const summary = summarizeSyncActions(actions);
+			const failed = actions.filter((action) => action.syncError);
 			notice.setMessage(
 				`Sync complete: added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}`,
 			);
 			window.setTimeout(() => notice.hide(), 8000);
+
+			for (const action of failed.slice(0, 3)) {
+				new Notice(
+					`Sync failed for ${action.file} (${action.tag}): ${action.syncError}`,
+					15000,
+				);
+			}
 
 			this.showDuplicateWarnings(duplicateWarnings);
 			this.showMediaWarnings(mediaWarnings);
