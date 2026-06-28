@@ -8,4 +8,17 @@ this paragraph should not be visible
 
 This paragraph should be visible.
 
-It will have different formatting stuff like **bold**, *italic*, ***bold-italic***, _underline_, ==highlight== etc etc obsidian flavoured markdown stuff. also tables, callouts, images will be added later.
+Second paragraph with **bold**, *italic*, ***both***, ~~strikethrough~~, and ==highlight==.
+
+| Col | Val |
+| --- | --- |
+| graft | ok  |
+
+> [!tip] Grafted callout
+> Callout body from embed target.
+
+Inline math from embed: $a^2+b^2=c^2$.
+
+Footnote in embed[^embed-fn].
+
+[^embed-fn]: Footnote definition inside embedded section.
