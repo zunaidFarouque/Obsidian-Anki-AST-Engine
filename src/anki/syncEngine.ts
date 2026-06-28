@@ -92,7 +92,7 @@ export function isDuplicateNoteError(error: unknown): boolean {
   );
 }
 
-function extractUuidFromTags(
+export function extractUuidFromTags(
   tags: string[],
   syncTagPrefix: string,
 ): string | undefined {

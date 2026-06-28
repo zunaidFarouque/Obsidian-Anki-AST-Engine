@@ -2,8 +2,10 @@ import { App, Modal } from 'obsidian';
 import type {
 	DuplicateWarning,
 	MediaBasenameWarning,
+	OrphanAction,
 	SyncAction,
 	SyncSummary,
+	VaultOrphan,
 } from 'obsidian-anki-ast-engine/sync';
 import { stripHtmlForSearch } from 'obsidian-anki-ast-engine/sync';
 import { openVaultCard } from '../navigation/openVaultCard';
@@ -20,6 +22,9 @@ export type SyncResultsPayload = {
 	duplicateWarnings: DuplicateWarning[];
 	mediaWarnings: MediaBasenameWarning[];
 	skippedDuplicateFrontCount?: number;
+	orphans?: VaultOrphan[];
+	orphanActions?: OrphanAction[];
+	orphanChoice?: 'cancel' | 'suspend' | 'delete';
 };
 
 type DuplicateWarningEntry = {
@@ -87,6 +92,7 @@ export class SyncResultsModal extends Modal {
 		this.renderSkippedConflictsSection(scroll);
 		this.renderDuplicateSection(scroll);
 		this.renderMediaSection(scroll);
+		this.renderOrphanSection(scroll);
 
 		const footer = contentEl.createDiv({ cls: 'anki-ast-sync-duplicate-footer' });
 		footer
@@ -217,6 +223,44 @@ export class SyncResultsModal extends Modal {
 			} else {
 				button.disabled = true;
 			}
+		}
+	}
+
+	private renderOrphanSection(container: HTMLElement): void {
+		const orphans = this.payload.orphans ?? [];
+		if (orphans.length === 0) {
+			return;
+		}
+
+		container.createEl('h3', {
+			cls: 'anki-ast-sync-results-heading',
+			text: 'Orphaned notes',
+		});
+
+		const { dryRun, orphanChoice, orphanActions } = this.payload;
+		let summary: string;
+		if (dryRun) {
+			summary = `${orphans.length} orphaned Anki note(s) would be reported on a live sync.`;
+		} else if (orphanChoice === 'suspend') {
+			summary = `Suspended ${orphanActions?.length ?? orphans.length} orphaned note(s).`;
+		} else if (orphanChoice === 'delete') {
+			summary = `Deleted ${orphanActions?.length ?? orphans.length} orphaned note(s).`;
+		} else {
+			summary = `Found ${orphans.length} orphaned note(s); no action taken.`;
+		}
+
+		container.createEl('p', {
+			cls: 'anki-ast-sync-results-note',
+			text: summary,
+		});
+
+		const list = container.createEl('ul', { cls: 'anki-ast-sync-duplicate-list' });
+		for (const orphan of orphans) {
+			const item = list.createEl('li');
+			item.createEl('span', {
+				cls: 'anki-ast-sync-duplicate-item-front',
+				text: `Note ${orphan.ankiNoteId} · ${orphan.uuid}`,
+			});
 		}
 	}
 }

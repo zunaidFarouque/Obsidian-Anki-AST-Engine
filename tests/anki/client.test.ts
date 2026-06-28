@@ -88,4 +88,33 @@ describe("AnkiConnectClient", () => {
     });
     expect(noteId).toBe(12345);
   });
+
+  test("deleteNotes sends note ids", async () => {
+    mockFetch(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.action).toBe("deleteNotes");
+      expect(body.params.notes).toEqual([10, 20]);
+      return new Response(JSON.stringify({ result: null, error: null }));
+    });
+
+    const client = new AnkiConnectClient({ url: "http://127.0.0.1:8765" });
+    await client.deleteNotes([10, 20]);
+  });
+
+  test("findCards and suspendCards invoke expected actions", async () => {
+    const calls: string[] = [];
+    mockFetch(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      calls.push(body.action);
+      if (body.action === "findCards") {
+        return new Response(JSON.stringify({ result: [501], error: null }));
+      }
+      return new Response(JSON.stringify({ result: null, error: null }));
+    });
+
+    const client = new AnkiConnectClient({ url: "http://127.0.0.1:8765" });
+    await expect(client.findCards("nid:99")).resolves.toEqual([501]);
+    await client.suspendCards([501]);
+    expect(calls).toEqual(["findCards", "suspendCards"]);
+  });
 });

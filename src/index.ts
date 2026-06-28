@@ -33,7 +33,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { actions, duplicateWarnings, mediaWarnings } = await runSync(config, { dryRun });
+  const { actions, duplicateWarnings, mediaWarnings, orphans } = await runSync(config, { dryRun });
 
   for (const action of actions) {
     console.log(JSON.stringify(action));
@@ -47,9 +47,13 @@ async function main(): Promise<void> {
     console.error(JSON.stringify({ event: "media_warning", ...warning }));
   }
 
+  for (const orphan of orphans) {
+    console.error(JSON.stringify({ event: "vault_orphan", ...orphan }));
+  }
+
   const summary = summarizeSyncActions(actions);
   console.error(
-    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}${duplicateWarnings.length > 0 ? `, duplicate warning(s) ${duplicateWarnings.length}` : ""}${mediaWarnings.length > 0 ? `, media warning(s) ${mediaWarnings.length}` : ""}`,
+    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}${duplicateWarnings.length > 0 ? `, duplicate warning(s) ${duplicateWarnings.length}` : ""}${mediaWarnings.length > 0 ? `, media warning(s) ${mediaWarnings.length}` : ""}${orphans.length > 0 ? `, vault orphan(s) ${orphans.length}` : ""}`,
   );
 
   if (summary.failed > 0) {

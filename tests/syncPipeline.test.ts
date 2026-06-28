@@ -507,4 +507,64 @@ describe("syncPipeline", () => {
 
     await rm(root, { recursive: true, force: true });
   });
+
+  test("emits file progress for sync-eligible files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-sync-progress-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const syncableNote = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "#### Card",
+      "",
+      "Question",
+      "",
+      ":::",
+      "",
+      "Answer",
+    ].join("\n");
+
+    await writeFile(join(notesDir, "note-a.md"), syncableNote, "utf8");
+    await writeFile(join(notesDir, "note-b.md"), syncableNote, "utf8");
+    await writeFile(
+      join(notesDir, "ignored.md"),
+      "# No frontmatter\n\nNot syncable.\n",
+      "utf8",
+    );
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
+      ...baseConfig,
+    };
+
+    const progressEvents: Array<{
+      phase: string;
+      current?: number;
+      total?: number;
+      file?: string;
+    }> = [];
+
+    await runSync(config, {
+      dryRun: true,
+      onProgress: (event) => {
+        progressEvents.push(event);
+      },
+    });
+
+    const fileEvents = progressEvents.filter((event) => event.phase === "file");
+    expect(fileEvents).toHaveLength(2);
+    expect(fileEvents[0]).toMatchObject({ current: 1, total: 2 });
+    expect(fileEvents[1]).toMatchObject({ current: 2, total: 2 });
+    expect(progressEvents.some((event) => event.phase === "media")).toBe(true);
+
+    await rm(root, { recursive: true, force: true });
+  });
 });

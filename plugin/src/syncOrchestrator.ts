@@ -2,13 +2,17 @@ import type { App } from 'obsidian';
 import { Notice } from 'obsidian';
 import type { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import {
+	applyOrphanAction,
 	buildExcludedCardKeysFromWarnings,
 	runSync,
 	shouldSyncFile,
 	summarizeSyncActions,
 	type DuplicateWarning,
 	type MediaBasenameWarning,
+	type OrphanAction,
 	type SyncAction,
+	type SyncProgressEvent,
+	type VaultOrphan,
 } from 'obsidian-anki-ast-engine/sync';
 import { buildPluginConfig } from './configBuilder';
 import { createObsidianVaultAdapter } from './obsidianVaultAdapter';
@@ -16,7 +20,9 @@ import { isOutsideScanFolders } from './scanFolders';
 import type { AnkiAstSyncSettings } from './settings';
 import { showRelinkNotice } from './ui/relinkNotice';
 import { SyncResultsModal } from './ui/syncResultsModal';
+import { basename } from './ui/syncDisplayUtils';
 import { VaultDuplicateConflictModal } from './ui/vaultDuplicateConflictModal';
+import { VaultOrphanModal } from './ui/vaultOrphanModal';
 
 export type RunSyncFlowOptions = {
 	dryRun: boolean;
@@ -49,12 +55,45 @@ function logSyncDetails(
 	actions: SyncAction[],
 	duplicateWarnings: DuplicateWarning[],
 	mediaWarnings: MediaBasenameWarning[],
+	orphans: VaultOrphan[],
 ): void {
 	console.info(`[Anki AST Sync] ${label}`, {
 		actions,
 		duplicateWarnings,
 		mediaWarnings,
+		orphans,
 	});
+}
+
+function createProgressHandler(
+	notice: Notice,
+	dryRun: boolean,
+	preflight = false,
+): (event: SyncProgressEvent) => void {
+	return (event) => {
+		if (event.phase === 'file') {
+			const label = dryRun
+				? preflight
+					? 'Checking duplicates'
+					: 'Dry-running'
+				: 'Syncing';
+			notice.setMessage(
+				`${label} file ${event.current}/${event.total}: ${basename(event.file)}`,
+			);
+			return;
+		}
+
+		if (event.phase === 'media') {
+			notice.setMessage(
+				dryRun ? 'Preparing dry-run media map…' : 'Preparing media…',
+			);
+			return;
+		}
+
+		if (event.phase === 'orphan') {
+			notice.setMessage(event.message);
+		}
+	};
 }
 
 function showSyncResults(
@@ -64,6 +103,9 @@ function showSyncResults(
 		actions: SyncAction[];
 		duplicateWarnings: DuplicateWarning[];
 		mediaWarnings: MediaBasenameWarning[];
+		orphans: VaultOrphan[];
+		orphanActions?: OrphanAction[];
+		orphanChoice?: 'cancel' | 'suspend' | 'delete';
 		skippedDuplicateFrontCount?: number;
 	},
 ): void {
@@ -73,8 +115,18 @@ function showSyncResults(
 		actions: payload.actions,
 		duplicateWarnings: payload.duplicateWarnings,
 		mediaWarnings: payload.mediaWarnings,
+		orphans: payload.orphans,
+		orphanActions: payload.orphanActions,
+		orphanChoice: payload.orphanChoice,
 		skippedDuplicateFrontCount: payload.skippedDuplicateFrontCount,
 	});
+}
+
+function shouldDetectOrphans(
+	settings: AnkiAstSyncSettings,
+	files: string[] | undefined,
+): boolean {
+	return settings.orphanHandling === 'ask' && !files?.length;
 }
 
 export async function runSyncFlow(
@@ -85,18 +137,23 @@ export async function runSyncFlow(
 ): Promise<void> {
 	const vault = createObsidianVaultAdapter(app);
 	const config = buildPluginConfig(app, settings);
+	const detectOrphans = shouldDetectOrphans(settings, options.files);
 	const progressLabel = options.dryRun ? 'Dry-running sync…' : 'Checking vault for duplicate fronts…';
 	const notice = new Notice(progressLabel, 0);
 
 	try {
 		if (options.dryRun) {
 			notice.setMessage('Dry-running sync…');
-			const { actions, duplicateWarnings, mediaWarnings } = await runSync(
+			const dryRunClient = detectOrphans ? createAnkiClient() : undefined;
+			const { actions, duplicateWarnings, mediaWarnings, orphans } = await runSync(
 				config,
 				{
 					dryRun: true,
 					vault,
 					files: options.files,
+					detectOrphans,
+					ankiClient: dryRunClient,
+					onProgress: createProgressHandler(notice, true),
 				},
 			);
 
@@ -106,8 +163,9 @@ export async function runSyncFlow(
 				actions,
 				duplicateWarnings,
 				mediaWarnings,
+				orphans,
 			});
-			logSyncDetails('dry-run', actions, duplicateWarnings, mediaWarnings);
+			logSyncDetails('dry-run', actions, duplicateWarnings, mediaWarnings, orphans);
 			return;
 		}
 
@@ -116,7 +174,12 @@ export async function runSyncFlow(
 		let syncedDespiteConflicts = false;
 
 		if (useVaultWidePreflight) {
-			const preflight = await runSync(config, { dryRun: true, vault });
+			const preflight = await runSync(config, {
+				dryRun: true,
+				vault,
+				detectOrphans: false,
+				onProgress: createProgressHandler(notice, true, true),
+			});
 			const vaultCollisions = preflight.duplicateWarnings.filter(
 				isVaultCollisionWarning,
 			);
@@ -138,7 +201,7 @@ export async function runSyncFlow(
 
 		notice.setMessage('Syncing vault to Anki…');
 		const client = createAnkiClient();
-		const { actions, duplicateWarnings, mediaWarnings } = await runSync(
+		const { actions, duplicateWarnings, mediaWarnings, orphans } = await runSync(
 			config,
 			{
 				dryRun: false,
@@ -147,8 +210,25 @@ export async function runSyncFlow(
 				forceBase64Media: true,
 				ankiClient: client,
 				excludeCardKeys,
+				detectOrphans,
+				onProgress: createProgressHandler(notice, false),
 			},
 		);
+
+		let orphanActions: OrphanAction[] | undefined;
+		let orphanChoice: 'cancel' | 'suspend' | 'delete' | undefined;
+		if (detectOrphans && orphans.length > 0) {
+			notice.hide();
+			orphanChoice = await VaultOrphanModal.open(app, orphans, client);
+			if (orphanChoice === 'suspend' || orphanChoice === 'delete') {
+				notice.setMessage(
+					orphanChoice === 'suspend'
+						? 'Suspending orphaned Anki notes…'
+						: 'Deleting orphaned Anki notes…',
+				);
+				orphanActions = await applyOrphanAction(client, orphans, orphanChoice);
+			}
+		}
 
 		notice.hide();
 		showSyncResults(app, {
@@ -156,6 +236,9 @@ export async function runSyncFlow(
 			actions,
 			duplicateWarnings,
 			mediaWarnings,
+			orphans,
+			orphanActions,
+			orphanChoice,
 			skippedDuplicateFrontCount: syncedDespiteConflicts
 				? actions.filter(
 						(action) => action.skipReason === 'vault_duplicate_front',
@@ -163,7 +246,7 @@ export async function runSyncFlow(
 				: undefined,
 		});
 		showLiveRelinkWarnings(app, client, duplicateWarnings);
-		logSyncDetails('live', actions, duplicateWarnings, mediaWarnings);
+		logSyncDetails('live', actions, duplicateWarnings, mediaWarnings, orphans);
 	} catch (error) {
 		notice.hide();
 		const message = error instanceof Error ? error.message : String(error);

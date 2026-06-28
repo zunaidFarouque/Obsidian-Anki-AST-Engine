@@ -154,6 +154,14 @@ Implementation: [`src/anki/htmlNormalize.ts`](../src/anki/htmlNormalize.ts)
 
 If markdown has a valid `anki-id` but Anki has no matching tag, the engine **re-adds** the note with the same UUID tag (no new markdown comment).
 
+### Vault orphans
+
+The opposite case: Anki has an engine-managed note with `obsidian-id::<uuid>` (and the default engine tag), but **no vault card** in the current full-vault scan carries that UUID. These are **vault orphans** — the vault card was removed or the UUID no longer appears in sync-eligible files.
+
+On a **full-vault** sync (not single-file), the engine can detect orphans via `findNotes` + `notesInfo` ([`orphanDetect.ts`](../src/anki/orphanDetect.ts)). The Obsidian plugin prompts each live sync (**Ask each sync** setting) to **Cancel**, **Suspend**, or **Delete** before Anki is modified ([`orphanHandler.ts`](../src/anki/orphanHandler.ts)). Dry-run reports orphans in the results modal without changing Anki. Set **Orphan handling** to **Off** in plugin settings to skip detection.
+
+Do not confuse vault orphans with **Orphan UUID** above (vault has id, Anki missing → re-add).
+
 ### Duplicate recovery
 
 If `addNote` / `addNotes` rejects a card because Anki already has a note with the same **Front** field in the target deck, the engine:
@@ -288,6 +296,5 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 
 - Reversible / Cloze card types
 - Custom note types with configurable field maps
-- Suspend/delete orphaned Anki notes when cards are removed from vault
 - Exact in-note scroll to card byte offset (plugin uses heading anchors today)
 - Full plugin orchestrator tests with mocked Obsidian `requestUrl`

@@ -15,6 +15,7 @@ export interface AnkiAstSyncSettings {
 	autoCreateDecks: boolean;
 	noteModelName: string;
 	syncTagPrefix: string;
+	orphanHandling: 'off' | 'ask';
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -31,6 +32,7 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	autoCreateDecks: true,
 	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
+	orphanHandling: 'ask',
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {
@@ -216,6 +218,22 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.syncTagPrefix)
 					.onChange(async (value) => {
 						this.plugin.settings.syncTagPrefix = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Orphan handling')
+			.setDesc(
+				'On full-vault live sync, prompt to suspend or delete Anki notes whose vault UUID no longer appears in the scan. Single-file sync never prompts. Set to Off to skip detection for speed.',
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('ask', 'Ask each sync')
+					.addOption('off', 'Off')
+					.setValue(this.plugin.settings.orphanHandling)
+					.onChange(async (value) => {
+						this.plugin.settings.orphanHandling = value as AnkiAstSyncSettings['orphanHandling'];
 						await this.plugin.saveSettings();
 					}),
 			);

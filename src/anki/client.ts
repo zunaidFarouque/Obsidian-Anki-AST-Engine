@@ -250,6 +250,26 @@ export class AnkiConnectClient {
   async mediaFiles(): Promise<string[]> {
     return this.invoke<string[]>("getMediaFilesNames");
   }
+
+  async deleteNotes(noteIds: number[]): Promise<void> {
+    if (noteIds.length === 0) {
+      return;
+    }
+
+    await this.invoke<null>("deleteNotes", { notes: noteIds });
+  }
+
+  async findCards(query: string): Promise<number[]> {
+    return this.invoke<number[]>("findCards", { query });
+  }
+
+  async suspendCards(cardIds: number[]): Promise<void> {
+    if (cardIds.length === 0) {
+      return;
+    }
+
+    await this.invoke<null>("suspendCards", { cards: cardIds });
+  }
 }
 
 export function createAnkiClient(config: Config): AnkiConnectClient {

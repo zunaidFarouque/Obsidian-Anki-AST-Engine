@@ -23,7 +23,7 @@ Living reference for post–Step 1 plugin work. Step 1 (vault adapter + live syn
 
 - Full orchestrator integration tests with mocked `requestUrl` (engine vault tests cover sync path)
 - Heading-only scroll (no exact card offset navigation)
-- Phase 4 items: auto-sync, progress UI, orphan handling, community release
+- Phase 4 items: auto-sync, community release
 
 ---
 
@@ -73,8 +73,8 @@ Do in parallel with Phase 1–2 or immediately after.
 ### Phase 4 — Later (larger scope)
 
 - **Auto-sync on save** (debounced) — needs conflict handling if user edits during sync
-- **Progress UI** for large vaults (“Syncing 12/240 files…”)
-- **Orphan handling** — suspend/delete Anki notes when cards removed from vault (see engine deferred list in `Anki-Integration.md`)
+- **Progress UI** — **Done** — file-level sync progress via `onProgress` + Obsidian Notice
+- **Orphan handling** — **Done** — full-vault detection + confirmation modal (suspend/delete); see `Anki-Integration.md` **Vault orphans**
 - **Cloze / custom note types** — engine is `Basic` only today
 - **Community plugin release** — README, screenshots, `versions.json`, GitHub releases
 
@@ -88,7 +88,7 @@ Do in parallel with Phase 1–2 or immediately after.
 | Day 3–4 | Results modal with warnings and failures |
 | Day 5 | Fix fixture test drift + harden deploy/build |
 
-**Single best next task:** Phase 4 — auto-sync on save or progress UI for large vaults.
+**Single best next task:** Phase 4 — auto-sync on save or community plugin release.
 
 ---
 

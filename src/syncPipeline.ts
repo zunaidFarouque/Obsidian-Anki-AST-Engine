@@ -33,6 +33,10 @@ import {
 import type { VaultAdapter } from "./io/vaultAdapter";
 import { toActionFilePath } from "./io/vaultAdapter";
 import { createNodeVaultAdapter } from "./io/nodeVaultAdapter";
+import {
+  detectVaultOrphans,
+  type VaultOrphan,
+} from "./anki/orphanDetect";
 
 export type { DuplicateWarning } from "./anki/duplicateDetect";
 export {
@@ -43,6 +47,15 @@ export { stripHtmlForSearch } from "./anki/frontSearch";
 export { shouldSyncFile } from "./io/frontmatterFilter";
 export type { MediaBasenameWarning } from "./anki/mediaNaming";
 export type { VaultAdapter } from "./io/vaultAdapter";
+export type { VaultOrphan } from "./anki/orphanDetect";
+export type { OrphanAction } from "./anki/orphanHandler";
+export { applyOrphanAction } from "./anki/orphanHandler";
+export { detectVaultOrphans } from "./anki/orphanDetect";
+
+export type SyncProgressEvent =
+  | { phase: "media"; message: string }
+  | { phase: "file"; current: number; total: number; file: string }
+  | { phase: "orphan"; message: string };
 
 export type SyncAction = {
   action: "add" | "update" | "skip";
@@ -75,12 +88,16 @@ export type SyncOptions = {
   excludeCardKeys?: ReadonlySet<string>;
   /** Vault-relative markdown paths to limit sync scope. */
   files?: string[];
+  onProgress?: (event: SyncProgressEvent) => void;
+  /** Full-vault orphan detection (requires AnkiConnect). Skipped when `files` is set. */
+  detectOrphans?: boolean;
 };
 
 export type SyncRunResult = {
   actions: SyncAction[];
   duplicateWarnings: DuplicateWarning[];
   mediaWarnings: MediaBasenameWarning[];
+  orphans: VaultOrphan[];
 };
 
 export type SyncSummary = {
@@ -145,6 +162,36 @@ function filterFilePaths(
   );
 }
 
+type SyncEligibleFile = {
+  sourcePath: string;
+  rawText: string;
+};
+
+async function loadSyncEligibleFiles(
+  vault: VaultAdapter,
+  filePaths: string[],
+): Promise<SyncEligibleFile[]> {
+  const eligible: SyncEligibleFile[] = [];
+
+  for (const sourcePath of filePaths) {
+    const rawText = await vault.readText(sourcePath);
+    if (shouldSyncFile(rawText)) {
+      eligible.push({ sourcePath, rawText });
+    }
+  }
+
+  return eligible;
+}
+
+function trackVaultBoundUuid(
+  vaultBoundUuids: Set<string>,
+  uuid: string | undefined,
+): void {
+  if (uuid) {
+    vaultBoundUuids.add(uuid);
+  }
+}
+
 export async function runSync(
   config: Config,
   options: SyncOptions,
@@ -163,12 +210,28 @@ export async function runSync(
       actions: [],
       duplicateWarnings: [],
       mediaWarnings: [],
+      orphans: [],
     };
   }
+
+  const eligibleFiles = await loadSyncEligibleFiles(vault, filePaths);
+  const syncEligibleTotal = eligibleFiles.length;
+  const vaultBoundUuids = new Set<string>();
 
   const actions: SyncAction[] = [];
   const collisionSources: DuplicateCardSource[] = [];
   const ankiDuplicateWarnings: DuplicateWarning[] = [];
+
+  const shouldDetectOrphans =
+    (options.detectOrphans ?? !options.dryRun) && !options.files;
+  let orphanClient = options.ankiClient;
+  if (shouldDetectOrphans && !orphanClient) {
+    orphanClient = new AnkiConnectClient({
+      url: config.ankiConnectUrl,
+      apiKey: config.ankiConnectApiKey,
+      fetchImpl: options.fetchImpl,
+    });
+  }
 
   let client = options.dryRun
     ? undefined
@@ -190,20 +253,26 @@ export async function runSync(
     syncContext = createSyncRunContext(client, config);
   }
 
+  options.onProgress?.({ phase: "media", message: "Preparing media…" });
+
   const phase1MediaEntries = await collectVaultMediaPaths(
     config,
     vault,
     vaultIndex,
-    filePaths,
+    eligibleFiles,
   );
   const { nameByVaultPath, warnings: mediaWarnings } =
     await buildAnkiMediaNameMap(phase1MediaEntries, vault);
 
-  for (const sourcePath of filePaths) {
-    const rawText = await vault.readText(sourcePath);
-    if (!shouldSyncFile(rawText)) {
-      continue;
-    }
+  let fileProgressCurrent = 0;
+  for (const { sourcePath, rawText } of eligibleFiles) {
+    fileProgressCurrent += 1;
+    options.onProgress?.({
+      phase: "file",
+      current: fileProgressCurrent,
+      total: syncEligibleTotal,
+      file: sourcePath,
+    });
 
     const deck = getTargetAnkiDeck(rawText, config.defaultAnkiDeck);
     const fileAnkiTags = getFileAnkiTags(rawText);
@@ -266,6 +335,8 @@ export async function runSync(
 
     for (const card of cards) {
       const injectionPlan = buildInjectionPlan(card);
+      trackVaultBoundUuid(vaultBoundUuids, card.ankiId);
+      trackVaultBoundUuid(vaultBoundUuids, injectionPlan?.uuid);
       const inheritedFootnoteDefs = footnoteScopeIndex?.resolveForCard(card);
       const { frontHtml, backHtml } = compileCardFields(
         card.frontNodes,
@@ -378,6 +449,10 @@ export async function runSync(
         }
         if (result.duplicateWarning) {
           ankiDuplicateWarnings.push(result.duplicateWarning);
+          trackVaultBoundUuid(
+            vaultBoundUuids,
+            result.duplicateWarning.linkedObsidianId,
+          );
         }
       }
     }
@@ -394,6 +469,29 @@ export async function runSync(
     actions.push(...fileActions);
   }
 
+  let orphans: VaultOrphan[] = [];
+  if (shouldDetectOrphans && orphanClient) {
+    options.onProgress?.({
+      phase: "orphan",
+      message: "Checking for orphaned Anki notes…",
+    });
+    try {
+      orphans = await detectVaultOrphans({
+        client: orphanClient,
+        config,
+        vaultBoundUuids,
+      });
+    } catch (error) {
+      if (!options.dryRun) {
+        throw error;
+      }
+      console.warn(
+        "[Anki AST Sync] Orphan detection skipped during dry-run:",
+        error,
+      );
+    }
+  }
+
   return {
     actions,
     duplicateWarnings: [
@@ -401,6 +499,7 @@ export async function runSync(
       ...ankiDuplicateWarnings,
     ],
     mediaWarnings,
+    orphans,
   };
 }
 
@@ -408,16 +507,11 @@ async function collectVaultMediaPaths(
   config: Config,
   vault: VaultAdapter,
   vaultIndex: Awaited<ReturnType<typeof buildVaultFileIndex>>,
-  filePaths: string[],
+  eligibleFiles: SyncEligibleFile[],
 ) {
   const entries = [];
 
-  for (const sourcePath of filePaths) {
-    const rawText = await vault.readText(sourcePath);
-    if (!shouldSyncFile(rawText)) {
-      continue;
-    }
-
+  for (const { sourcePath, rawText } of eligibleFiles) {
     const ast = parseMarkdown(rawText, vault.vaultRoot);
     const unresolvedEmbeds: string[] = [];
 
