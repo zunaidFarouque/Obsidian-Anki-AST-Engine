@@ -1,0 +1,15 @@
+{
+  "vaultPath": "/path/to/your/ObsidianVault",
+  "delimiter": ":::",
+  "deckMappings": [
+    {
+      "obsidianFolder": "01 - Computer Science",
+      "ankiDeck": "Computer Science::Algorithms"
+    }
+  ],
+  "ankiConnectUrl": "http://127.0.0.1:8765",
+  "linkFormat": "shortest",
+  "attachmentFolder": "attachments",
+  "defaultCardDeclarationHeadingLevel": 4,
+  "includeParentHeadersAsTags": true
+}

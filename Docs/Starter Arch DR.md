@@ -1,7 +1,6 @@
-[Pasted from website, formatting may be broken]
-
-
 # **Technical Design Document: Headless Obsidian-to-Anki AST Sync Engine**
+
+> **Living document.** For the authoritative engine contract (AnkiSync gate, `:::` delimiter, declaration-mode cards, tag settings), see [Engine-Architecture.md](Engine-Architecture.md).
 
 ## **Architectural Context and The AST Paradigm Shift**
 
@@ -10,43 +9,55 @@ To circumvent the fundamental limitations of string-matching algorithms, this ar
 
 ## **Directory Structure and Domain-Driven Design**
 
-The system architecture adheres to Domain-Driven Design (DDD) principles, ensuring a rigid separation of concerns between file system input/output (I/O), abstract syntax tree manipulation, state management, and HTTP synchronization with the local Anki instance. The following directory structure maps the specific modules to their architectural responsibilities.  
-/  
-├── package.json  
-├── tsconfig.json  
-├── config.json  
-├── /src  
-│ ├── index.ts  
-│ ├── /config  
-│ │ └── configParser.ts  
-│ ├── /io  
-│ │ ├── scanner.ts  
-│ │ ├── reader.ts  
-│ │ └── surgicalInjector.ts  
-│ ├── /ast  
-│ │ ├── processor.ts  
-│ │ ├── transclusionGraft.ts  
-│ │ ├── mediaResolver.ts  
-│ │ └── blockIdTagging.ts  
-│ ├── /parser  
-│ │ ├── stateMachine.ts  
-│ │ └── delimiterCheck.ts  
-│ ├── /anki  
-│ │ ├── client.ts  
-│ │ ├── mediaQueue.ts  
-│ │ └── syncEngine.ts  
-│ └── /utils  
-│ ├── hash.ts  
-│ └── mutexMap.ts  
-└── /tests  
-├── /fixtures  
-├── /ast  
-├── /parser  
-└── /anki  
-The /src/ast/ directory serves as the core processing hub for the unified plugins. Because Obsidian embeds are not part of the standard CommonMark specification, custom visitor functions are required to parse \!\[\[link\]\] nodes. The modules in this directory utilize remark-wiki-link to identify these custom nodes, fetch the corresponding file's AST, and substitute the embed node with the target's children1. This allows the system to build a complete, flattened representation of the note before extraction begins.  
-The /src/parser/ directory contains the state machine responsible for iterating over the flattened AST array. It groups standard Markdown headings and content into discrete Anki flashcards, relying on the structural hierarchy of the AST rather than line breaks or regex boundaries.  
-The /src/io/ directory handles all interactions with the local file system. Most critically, the surgicalInjector.ts module manages the two-way binding between Obsidian and Anki. Rather than using remark-stringify—which destructively reformats Markdown by standardizing list markers or spacing—this module uses the AST node's exact byte-offset coordinates to surgically inject \<\!--anki-id: uuid--\> directly into the raw text buffer, preserving the user's bespoke formatting3.  
-The /src/anki/ directory encapsulates all network operations directed at the local AnkiConnect server. It abstracts the complex queuing and rate-limiting required to prevent Node.js from overwhelming the Python-based Anki plugin during large media syncs4.
+The system architecture adheres to Domain-Driven Design (DDD) principles, ensuring a rigid separation of concerns between file system input/output (I/O), abstract syntax tree manipulation, state management, and HTTP synchronization with the local Anki instance.
+
+```
+/
+├── package.json
+├── tsconfig.json
+├── config.json
+├── src/
+│   ├── index.ts
+│   ├── syncPipeline.ts
+│   ├── config/
+│   │   └── configParser.ts
+│   ├── io/
+│   │   ├── scanner.ts
+│   │   ├── reader.ts
+│   │   ├── frontmatterFilter.ts
+│   │   └── surgicalInjector.ts
+│   ├── ast/
+│   │   ├── processor.ts
+│   │   ├── obsidianLinks.ts
+│   │   ├── transclusionGraft.ts
+│   │   ├── mediaResolver.ts
+│   │   └── blockIdTagging.ts
+│   ├── parser/
+│   │   ├── stateMachine.ts
+│   │   └── delimiterCheck.ts
+│   ├── obsidian/
+│   │   ├── linkResolver.ts
+│   │   └── vaultIndex.ts
+│   ├── anki/
+│   │   ├── client.ts          # AnkiConnect HTTP (stub)
+│   │   ├── syncEngine.ts      # Live sync dispatch (stub)
+│   │   └── mediaQueue.ts
+│   └── utils/
+│       ├── hash.ts
+│       ├── mutexMap.ts
+│       └── textPreview.ts
+└── tests/
+    ├── fixtures/
+    ├── ast/
+    ├── parser/
+    └── ...
+```
+
+The `/src/ast/` directory is the core processing hub. Obsidian embeds are handled via `obsidianLinks.ts` and `remark-wiki-link`, then resolved through `transclusionGraft.ts` and `src/obsidian/linkResolver.ts`.  
+The `/src/parser/` directory contains the state machine that groups headings and content into discrete Anki flashcards using declaration-level headings (default H4) or legacy `###` mode.  
+The `/src/io/frontmatterFilter.ts` module gates sync on `AnkiSync` frontmatter and resolves per-file overrides for delimiter, declaration level, and tag behavior.  
+The `/src/io/surgicalInjector.ts` module injects `<!--anki-id: uuid-->` at exact byte offsets without remark-stringify reformatting.  
+The `/src/anki/` directory encapsulates AnkiConnect operations and throttled media upload queuing.
 
 ## **Dependency Matrix and Ecosystem Justification**
 
@@ -69,9 +80,24 @@ The decision to utilize p-limit over alternatives like p-queue stems from the ar
 
 ## **Configuration and Input Orchestration**
 
-The engine operates entirely in a headless environment, driven by a strict config.json schema validated at runtime by Zod. The configuration file dictates the absolute path to the target Obsidian vault, the mapping of specific sub-directories to specific Anki decks, and the structural delimiter used to separate the front and back of a flashcard (e.g., ?, \---, or \===).  
-Upon initialization, the configuration parser reads the file and instantiates the Zod schema. If the validation fails, the pipeline terminates immediately with a detailed error trace, preventing catastrophic syncing errors. Following validation, the system utilizes fast-glob to recursively scan the designated vault directories for all files bearing the .md extension. The scanner explicitly ignores .obsidian configuration folders, .trash directories, and any hidden files.  
-For each discovered Markdown file, the orchestration engine pushes the file path into a processing queue. Due to the independent nature of flashcard extraction, the primary AST compilation phase can run highly concurrently across the discovered file list, limited only by the physical core count of the host machine and the memory overhead of the V8 JavaScript engine.
+The engine operates entirely in a headless environment, driven by a strict `config.json` schema validated at runtime by Zod. The configuration dictates:
+
+- Absolute vault path and folder-to-deck mappings
+- Default delimiter (`:::`) and optional per-file override via frontmatter
+- Default card declaration heading level (H4) and parent-header tag behavior
+- AnkiConnect URL, link format, and attachment folder rules
+
+See [Engine-Architecture.md](Engine-Architecture.md) for the full schema.
+
+Upon initialization, the configuration parser reads the file and instantiates the Zod schema. If validation fails, the pipeline terminates immediately. The scanner uses fast-glob to locate `.md` files under mapped folders, ignoring `.obsidian`, `.trash`, and hidden paths.
+
+### **Frontmatter gating (`AnkiSync`)**
+
+Before AST processing, each file is read and parsed for YAML frontmatter. Files are **skipped** unless `AnkiSync` is set to `on`, `true`, or `yes` (case-insensitive). Files without frontmatter, without the key, with `off`/`false`/`no`, or with invalid values are ignored. This replaces the former `type: flashcard` + `status: active` gate.
+
+Per-file overrides (when present): `cardDeclarationHeadingLevel`, `delimiter`, `includeParentHeadersAsTags`.
+
+For each sync-eligible file, `syncPipeline.ts` orchestrates parse → graft → media → extract → injection planning.
 
 ## **AST Parsing and Transclusion Resolution**
 
@@ -90,11 +116,29 @@ A custom visitor searches this secondary AST for block nodes—typically paragra
 
 ## **State-Machine Card Extraction (The Layout)**
 
-With the AST fully resolved and expanded, the system shifts to the extraction phase. Standard Markdown parsers process documents hierarchically into HTML strings. However, this engine requires semantic chunking—isolating specific sections of the document based on the structural hierarchy of headings and user-defined delimiters.  
-The stateMachine.ts module iterates linearly over the children array of the root AST node. The state machine maintains three primary variables: the current contextual heading, an array of nodes representing the Front of the card, and an array of nodes representing the Back of the card.  
-When the iterator encounters a heading node, it evaluates its depth (e.g., depth: 3 for an \#\#\# heading)28. The text value of this heading dictates the Anki tags for the resulting flashcard, allowing users to organize their decks organically using Markdown structures. The state machine transitions to "Front Collection" mode, pushing all subsequent sibling nodes into the frontNodes buffer.  
-To locate the pivot point of the flashcard, the engine continuously checks the incoming nodes for the user-defined delimiter (e.g., ?). Because the delimiter is often a plain text character, there is a high risk of false positives if the character appears naturally within a code snippet or a mathematical formula. To mitigate this, the engine utilizes unist-util-visit-parents10. When a text node containing the delimiter is identified, the utility inspects the entire stack of ancestors for that node. If any ancestor possesses the type code, inlineCode, or math, the delimiter is strictly ignored, preventing the catastrophic truncation of a flashcard due to a rogue question mark within a JavaScript snippet.  
-If the delimiter is validated as structural, the text node is bifurcated if necessary, and the state machine transitions to "Back Collection" mode. All subsequent nodes are pushed into the backNodes array. This collection continues until the iterator encounters another heading node with a depth less than or equal to the current card's originating heading, signaling the semantic end of the flashcard block.
+With the AST fully resolved and expanded, the system shifts to the extraction phase. The `stateMachine.ts` module iterates over the root AST children, maintaining front/back node buffers and a phase state.
+
+### **Declaration mode (default)**
+
+When `cardDeclarationHeadingLevel` is set (default **4** from config):
+
+- Headings **above** the declaration level (H1–H3) accumulate **tag context** (e.g. `CS101::Week 2`)
+- Headings **at** the declaration level (H4) start a new card
+- The declaration heading may serve as the front, or separate prose may precede the delimiter
+- When `includeParentHeadersAsTags` is `true`, the tag joins context + declaration: `CS101::Week 2::Entropy`
+- When `false`, the tag is the declaration heading only: `Entropy`
+
+### **Legacy mode**
+
+When extraction runs without a declaration level, any heading starts a card and the tag equals the heading text.
+
+### **Delimiter pivot (`:::` default)**
+
+The engine checks text nodes for the configured delimiter (default `:::`). `delimiterCheck.ts` uses `unist-util-visit-parents` to ignore delimiters inside `code`, `inlineCode`, or `math`. A structural match bifurcates the text node if needed and transitions to back collection. Standalone delimiter paragraphs (a line containing only `:::`) are supported.
+
+The `?` delimiter remains available via config or frontmatter override, with additional rules to avoid ternary-operator false positives.
+
+Collection continues until the next card boundary (declaration heading or equal/higher depth heading in legacy mode).
 
 ## **ID Management, Two-Way Binding, and Surgical Injection**
 
@@ -122,23 +166,27 @@ The architectural complexity of AST traversal and string manipulation necessitat
 
 | Fixture Name | Purpose and Constraints | Input Content Example | Expected AST Behavior |
 | :---- | :---- | :---- | :---- |
-| edge-case-delimiters-in-code.md | Verifies that the AST parser ignores the user-defined delimiter when it is encapsulated within an inlineCode or code block. | The ternary operator is condition ? true : false. ? It is a shorthand. | The unist-util-visit-parents traversal must detect the ? in the inlineCode node and bypass it10. The state machine must only trigger a Front/Back split at the root-level text node containing the standalone ?. |
-| deep-nested-transclusions.md | Ensures the engine can resolve a block embed that points to a file, which in turn points to another block embed, preventing cyclical loops. | \!\[\[Design\#^singleton\]\] ? Restricts instantiation. | The transclusionGraft.ts module must asynchronously read the target file, generate a secondary AST, isolate the target paragraph, and graft it seamlessly replacing the original wikiLink embed1. |
-| missing-id-injection.md | Verifies the exact byte-offset logic for UUID generation and raw string splicing at the end of a card. | \#\#\# Entropy Measure of disorder? ? Randomness. \#\#\# Next | The system must calculate the byte-offset of the word "Randomness", generate \<\!--anki-id: uuid--\>, and use fs.write to splice it directly before \#\#\# Next, ensuring subsequent headings remain untouched3. |
-| complex-media-paths.md | Tests the mediaResolver.ts module against nested paths, spaces in filenames, and non-standard extensions. | Identify this: \!\[\[Cell Diagram final.png\]\] ? Mitochondria. | Both wikiLink and image nodes must be intercepted2. The absolute path is resolved, the buffer is converted to Base64, and the node's URL is rewritten to match the Anki internal filename after the throttled storeMediaFile upload22. |
-| malformed-html-comments.md | Tests parser resilience against user-tampered, empty, or structurally invalid ID tags. | Acceleration? ? 9.8 m/s^2. \<\!-- anki-id: \--\> | The parser must identify the empty tag as an html node lacking a valid UUID30. It must drop the malformed node, treat the card as new, generate a fresh UUID, and inject a well-formed comment, overwriting the broken tag entirely. |
+| edge-case-delimiters-triple-colon.md | Verifies `:::` delimiter ignores `::` inside inline code. | Rust uses `foo::bar` in snippets, then standalone `:::` line. | Only the standalone `:::` triggers front/back split; code-span `::` is ignored. |
+| edge-case-delimiters-in-code.md | Regression for `?` delimiter override; ternary in code must not split. | `condition ? true : false`. ? It is a shorthand. | `?` inside inlineCode ignored; standalone `?` splits. |
+| multi-line-card-layout.md | Canonical H4 declaration layout with `AnkiSync: on` and `:::`. | H4 card with multi-line front, standalone `:::`, multi-line back. | Tags like `Computer Science::Card With Separate Front`; heading-as-front cards supported. |
+| deep-nested-transclusions.md | Block embed resolution with cyclical guard. | `![[Design#^singleton]]` then `:::`. | Grafted singleton text; embed marker removed from output. |
+| missing-id-injection.md | Byte-offset UUID splice at card end. | `### Entropy ... ? ::: Randomness.` | Offset after back text; inject before next heading. |
+| complex-media-paths.md | Media paths, spaces, nested assets. | `![[Cell Diagram final.png]]` then `:::`. | Media queued; card extracts with declaration-level tag. |
+| malformed-html-comments.md | Empty or invalid `anki-id` comments. | `::: ` then `9.8 m/s^2` with `<!-- anki-id: -->`. | Treat as new card; plan fresh UUID injection. |
+| ignore-invalid-no-sync-trigger.md | No `AnkiSync` key — file must be skipped. | Blog prose with card-shaped headings, no frontmatter gate. | `shouldSyncFile` returns false; zero sync actions. |
 
 ## **Text-Based Data Flow Diagram**
 
 The operational pipeline functions as a sequential, heavily asynchronous directed acyclic graph (DAG). The following orchestration flow details the logical progression of data through the system's core modules.  
-\[PHASE 1: INITIALIZATION & DISCOVERY\]  
-(1) Parse config.json \-\> Validate via Zod (Vault Path, Delimiter ?, Deck mappings).  
-(2) Execute fast-glob \-\> Generate array of all .md file paths in target directories.  
-\[PHASE 2: PRIMARY AST COMPILATION\]  
-(3) FOR EACH file in array (Concurrently limited to physical CPU cores):  
-(a) fs.readFile(path, 'utf8') \-\> Read into memory as raw text buffer.  
-(b) unified().use(remarkParse)... \-\> Tokenize text into Primary AST (mdast).  
-\[PHASE 3: TRANSCLUSION RESOLUTION (ASYNC)\]  
+**[PHASE 1: INITIALIZATION & DISCOVERY]**  
+(1) Parse config.json → Validate via Zod (vault path, delimiter `:::`, deck mappings, declaration level, tag settings).  
+(2) Execute fast-glob → Generate array of all .md file paths in mapped directories.  
+**[PHASE 2: PER-FILE GATE & AST COMPILATION]**  
+(3) FOR EACH file in array:  
+(a) fs.readFile(path, 'utf8') → Read into memory as raw text buffer.  
+(b) frontmatterFilter.shouldSyncFile → Skip unless AnkiSync is on/true/yes.  
+(c) unified().use(remarkParse)... → Tokenize text into Primary AST (mdast).  
+**[PHASE 3: TRANSCLUSION RESOLUTION (ASYNC)]**  
 (4) Traverse Primary AST via unist-util-visit.  
 IF node \=== wikiLink AND embed \=== true:  
 (a) Extract target file name and ^block-id.  
@@ -154,14 +202,13 @@ IF node \=== image OR media wikiLink:
 (b) Read file buffer \-\> Encode to Base64.  
 (c) Push to p-limit Media Queue \-\> HTTP POST storeMediaFile.  
 (d) Rewrite AST node URL property to match Anki's internal database filename.  
-\[PHASE 5: LAYOUT EXTRACTION (STATE MACHINE)\]  
-(6) Iterate over root block children array.  
-(a) IF node \=== heading \-\> Start new card, set Tag string based on heading value.  
-(b) Push nodes into Front buffer array.  
-(c) IF node contains delimiter ? AND unist-util-visit-parents confirms no code ancestry:  
-\-\> Shift state to Back buffer array.  
-(d) Push nodes into Back buffer until next equal/higher depth heading is found.  
-(e) Detect \<\!--anki-id: \[UUID\]--\> html node at end of Back buffer.  
+**[PHASE 5: LAYOUT EXTRACTION (STATE MACHINE)]**  
+(6) Iterate over root block children (respecting bodyStartOffset past frontmatter).  
+(a) IF heading at declaration level (default H4) → Start new card; build tag from parent headers when enabled.  
+(b) Push nodes into Front buffer until structural `:::` (or configured delimiter).  
+(c) IF delimiter validated AND unist-util-visit-parents confirms no code ancestry → Shift state to Back buffer.  
+(d) Push nodes into Back until next declaration heading or card boundary.  
+(e) Detect `<!--anki-id: [UUID]-->` html node at end of Back buffer.  
 \[PHASE 6: TWO-WAY BINDING & SURGICAL INJECTION\]  
 (7) FOR EACH extracted flashcard:  
 (a) Compile Front and Back AST arrays \-\> HTML via remark-rehype & rehype-stringify.  
