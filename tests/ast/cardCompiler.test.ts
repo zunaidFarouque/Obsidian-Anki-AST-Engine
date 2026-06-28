@@ -61,6 +61,38 @@ describe("cardCompiler", () => {
     expect(backHtml).toContain('print(":::")');
   });
 
+  test("strips trailing section separator rules before next heading", async () => {
+    const rawText = [
+      "# General",
+      "",
+      "#### Fear of return",
+      "",
+      ":::",
+      "",
+      "No, not at all.",
+      "",
+      "---",
+      "",
+      "# Extra Info",
+    ].join("\n");
+    const ast = parseMarkdown(rawText, "/vault");
+    const cards = extractCards(ast, DEFAULT_DELIMITER, {
+      cardDeclarationHeadingLevel: 4,
+    });
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.backNodes.some((node) => node.type === "thematicBreak")).toBe(
+      false,
+    );
+
+    const { backHtml } = compileCardFields(
+      cards[0]!.frontNodes,
+      cards[0]!.backNodes,
+    );
+    expect(backHtml).toBe("<p>No, not at all.</p>");
+    expect(backHtml).not.toContain("<hr>");
+  });
+
   test("multi-line-card-layout front keeps paragraph structure", async () => {
     const cards = await loadFixtureCards("multi-line-card-layout");
     const entropyCard = cards.find((card) =>

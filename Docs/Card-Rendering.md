@@ -39,6 +39,30 @@ Implementation: [`src/ast/cardCompiler.ts`](../src/ast/cardCompiler.ts) (`compil
 | `list` / `listItem` | `<ul>` / `<ol>` + `<li>` |
 | `table` | `<table>` |
 | `thematicBreak` | `<hr>` |
+
+### Trailing section separators (`---`)
+
+In Obsidian, authors often place one or more `---` lines **after** a card’s answer and **before** the next H1–H4 heading to add visual separation. Those lines are still inside the card’s back buffer when the state machine finalizes at the next heading, which would compile to hanging `<hr>` elements at the bottom of the Anki field.
+
+Before compile, [`stripTrailingSectionSeparators`](../src/parser/stripTrailingSectionSeparators.ts) removes **trailing** `thematicBreak` nodes from each card’s `frontNodes` / `backNodes`. Trailing `<!--anki-id-->` html nodes are preserved for vault binding.
+
+| Kept | Removed |
+|------|---------|
+| `---` between paragraphs inside the answer | Trailing `---` immediately before the next section heading |
+| Footnote footer `<hr>` added at compile time | One or more trailing `---` before `<!--anki-id-->` |
+
+```markdown
+#### Question
+
+:::
+
+Answer paragraph.
+
+---        ← stripped (before # Next section)
+
+# Next section
+```
+
 | `code` (fenced) | `<pre><code>` |
 | `inlineCode` | `<code>` |
 | `blockquote` | `<blockquote>` (or callout `<div>` when `> [!type]`) |
