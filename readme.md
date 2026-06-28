@@ -91,7 +91,7 @@ See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID bind
 
 ## **🔌 Obsidian plugin**
 
-An in-vault plugin scaffold lives in [`plugin/`](plugin/). Build it with `bun run build:plugin` (requires `dist/` from the engine). See [plugin/README.md](plugin/README.md) for local install steps.
+An in-vault plugin lives in [`plugin/`](plugin/). Build with `bun run deploy:plugin`. See [plugin/README.md](plugin/README.md) for install steps and [Docs/Plugin-Roadmap.md](Docs/Plugin-Roadmap.md) for planned plugin features.
 
 ## **🧪 Test-Driven Development (TDD)**
 

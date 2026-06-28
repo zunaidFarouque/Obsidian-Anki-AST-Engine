@@ -18,7 +18,7 @@ import { compileCardFields } from "./ast/cardCompiler";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
-import { AnkiConnectError, createAnkiClient, type AnkiConnectClient } from "./anki/client";
+import { AnkiConnectError, AnkiConnectClient } from "./anki/client";
 import { syncFileCards, createSyncRunContext, type CardSyncPayload } from "./anki/syncEngine";
 import {
   detectVaultFrontCollisions,
@@ -62,6 +62,8 @@ export type SyncOptions = {
   vault?: VaultAdapter;
   forceBase64Media?: boolean;
   ankiClient?: AnkiConnectClient;
+  /** Obsidian plugin should pass createObsidianFetch() to avoid browser CORS. */
+  fetchImpl?: typeof fetch;
 };
 
 export type SyncRunResult = {
@@ -129,7 +131,12 @@ export async function runSync(
 
   let client = options.dryRun
     ? undefined
-    : options.ankiClient ?? createAnkiClient(config);
+    : options.ankiClient ??
+      new AnkiConnectClient({
+        url: config.ankiConnectUrl,
+        apiKey: config.ankiConnectApiKey,
+        fetchImpl: options.fetchImpl,
+      });
   let syncContext: ReturnType<typeof createSyncRunContext> | undefined;
 
   if (!options.dryRun && client) {

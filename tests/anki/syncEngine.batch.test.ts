@@ -66,6 +66,93 @@ describe("syncEngine batched file sync", () => {
     expect(match?.noteId).toBe(55);
   });
 
+  test("findNoteByFrontInDeck matches when Anki front differs only by code block line endings", async () => {
+    const ankiFront =
+      '<pre><code class="language-js">// comment\nconst d = ":::";\n</code></pre>';
+    const compiledFront =
+      '<pre><code class="language-js">// comment\r\nconst d = ":::";\r\n</code></pre>';
+
+    const client = createMockClient({
+      findNotes: async () => [55],
+      notesInfo: async () => [
+        {
+          noteId: 55,
+          tags: ["legacy"],
+          fields: {
+            Front: { value: ankiFront, order: 0 },
+            Back: { value: "<p>A</p>", order: 1 },
+          },
+        },
+      ],
+    });
+
+    const match = await findNoteByFrontInDeck(
+      client,
+      "Test::Deck",
+      compiledFront,
+    );
+    expect(match?.noteId).toBe(55);
+  });
+
+  test("syncFileCards links by front before addNotes when vault id was removed", async () => {
+    let addNotesCalls = 0;
+    let addNoteCalls = 0;
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query.includes('front:"Existing Q"')) {
+          return [55];
+        }
+        return [];
+      },
+      addNotes: async () => {
+        addNotesCalls += 1;
+        return [null];
+      },
+      addNote: async () => {
+        addNoteCalls += 1;
+        return 999;
+      },
+      notesInfo: async () => [
+        {
+          noteId: 55,
+          tags: [
+            "Obsidian-Anki-AST",
+            "CS101::Dup",
+            "obsidian-id::existing-uuid",
+          ],
+          fields: {
+            Front: { value: "<p>Existing Q</p>", order: 0 },
+            Back: { value: "<p>A</p>", order: 1 },
+          },
+        },
+      ],
+    });
+
+    const context = createSyncRunContext(client, baseConfig);
+    const fileSync = await syncFileCards(
+      client,
+      [
+        {
+          payload: {
+            deck: "Test::Deck",
+            tag: "CS101::Dup",
+            frontHtml: "<p>Existing Q</p>",
+            backHtml: "<p>A</p>",
+            wouldInjectId: "new-uuid",
+          },
+        },
+      ],
+      baseConfig,
+      context,
+    );
+
+    expect(addNotesCalls).toBe(0);
+    expect(addNoteCalls).toBe(0);
+    expect(fileSync.results[0]?.action).toBe("skip");
+    expect(fileSync.results[0]?.injectedId).toBe("existing-uuid");
+    expect(fileSync.results[0]?.ankiNoteId).toBe(55);
+  });
+
   test("syncFileCards with context batches addNotes for new cards", async () => {
     let addNotesCalls = 0;
     let addNoteCalls = 0;

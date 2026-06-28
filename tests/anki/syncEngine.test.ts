@@ -244,6 +244,52 @@ describe("syncEngine", () => {
     expect(result.duplicateWarning?.message).toContain("duplicate Front");
   });
 
+  test("syncCard links existing note by front before attempting add when vault id was removed", async () => {
+    let addNoteCalled = false;
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query.includes('tag:"obsidian-id::')) {
+          return [];
+        }
+        if (query.includes('front:"Q"')) {
+          return [55];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 55,
+          tags: ["obsidian-id::existing-uuid"],
+          fields: {
+            Front: { value: "<p>Q</p>", order: 0 },
+            Back: { value: "<p>A</p>", order: 1 },
+          },
+        },
+      ],
+      addNote: async () => {
+        addNoteCalled = true;
+        return 1001;
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "CS101::Entropy",
+        frontHtml: "<p>Q</p>",
+        backHtml: "<p>A</p>",
+        wouldInjectId: "new-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(addNoteCalled).toBe(false);
+    expect(result.injectedId).toBe("existing-uuid");
+    expect(result.ankiNoteId).toBe(55);
+    expect(result.duplicateWarning?.kind).toBe("anki_duplicate_recovered");
+  });
+
   test("syncCard duplicate recovery reuses existing obsidian-id tag for injection", async () => {
     const client = createMockClient({
       findNotes: async (query) => {

@@ -17,9 +17,34 @@ For this **Bun/Node CLI**, your AnkiConnect settings are fine as-is:
 - `webBindPort: 8765`
 - `apiKey: null` (no auth header required)
 
-CORS origins (`webCorsOriginList`) only matter for browser-based clients (e.g. a future Obsidian plugin). They do not affect the CLI.
+CORS origins (`webCorsOriginList`) only matter for browser-based clients. They do not affect the CLI.
 
-If you enable `apiKey` in AnkiConnect, set matching `ankiConnectApiKey` in `config.json`.
+### AnkiConnect configuration (Obsidian plugin)
+
+The Obsidian plugin uses Obsidian’s **`requestUrl` API** (not `fetch`), which bypasses browser CORS. Your `webCorsOriginList` is still good to keep, but connection failures are more often:
+
+1. **Anki not running** (or AnkiConnect add-on disabled)
+2. **Wrong URL** in plugin settings (default `http://127.0.0.1:8765`)
+3. **API key mismatch** — if `apiKey` is set in AnkiConnect, match it in plugin settings
+
+Recommended AnkiConnect config when using other tools that still use `fetch`:
+
+```json
+{
+  "apiKey": null,
+  "webBindAddress": "127.0.0.1",
+  "webBindPort": 8765,
+  "webCorsOriginList": [
+    "http://localhost",
+    "http://127.0.0.1",
+    "app://obsidian.md"
+  ]
+}
+```
+
+Restart Anki after changing config. Quick check: open `http://127.0.0.1:8765` in a browser — you should see “AnkiConnect v.6” (or similar).
+
+If you enable `apiKey` in AnkiConnect, set matching `ankiConnectApiKey` in plugin settings (or `config.json` for CLI).
 
 ### Note type
 

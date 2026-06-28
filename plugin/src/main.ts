@@ -7,6 +7,7 @@ import {
 	type MediaBasenameWarning,
 } from 'obsidian-anki-ast-engine/sync';
 import { buildPluginConfig } from './configBuilder';
+import { createObsidianFetch } from './obsidianFetch';
 import { createObsidianVaultAdapter } from './obsidianVaultAdapter';
 import {
 	AnkiAstSyncSettingTab,
@@ -16,6 +17,7 @@ import {
 
 export default class AnkiAstSyncPlugin extends Plugin {
 	settings!: AnkiAstSyncSettings;
+	private readonly ankiFetch = createObsidianFetch();
 
 	async onload() {
 		await this.loadSettings();
@@ -57,24 +59,24 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	private async checkAnkiConnect(): Promise<void> {
-		const client = new AnkiConnectClient({
+	private createAnkiClient(): AnkiConnectClient {
+		return new AnkiConnectClient({
 			url: this.settings.ankiConnectUrl,
 			apiKey: this.settings.ankiConnectApiKey || undefined,
+			fetchImpl: this.ankiFetch,
 		});
+	}
+
+	private async checkAnkiConnect(): Promise<void> {
+		const client = this.createAnkiClient();
 
 		try {
-			const connected = await client.canConnect();
-			if (!connected) {
-				new Notice('AnkiConnect check failed. Is Anki running?');
-				return;
-			}
-
 			const version = await client.version();
 			new Notice(`AnkiConnect OK (API version ${version})`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			new Notice(`AnkiConnect error: ${message}`);
+			new Notice(`AnkiConnect error: ${message}`, 12000);
+			console.error('AnkiConnect check failed:', error);
 		}
 	}
 
@@ -90,6 +92,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 					dryRun: false,
 					vault,
 					forceBase64Media: true,
+					ankiClient: this.createAnkiClient(),
 				},
 			);
 
@@ -105,6 +108,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			notice.hide();
 			const message = error instanceof Error ? error.message : String(error);
 			new Notice(`Sync failed: ${message}`, 10000);
+			console.error('Sync failed:', error);
 		}
 	}
 

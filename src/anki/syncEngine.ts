@@ -137,8 +137,10 @@ export async function findNoteByFrontInDeck(
   }
 
   const notes = await client.notesInfo(noteIds);
+  const normalizedFront = normalizeSyncFieldHtml(frontHtml);
   const matches = notes.filter(
-    (note) => (note.fields.Front?.value ?? "") === frontHtml,
+    (note) =>
+      normalizeSyncFieldHtml(note.fields.Front?.value ?? "") === normalizedFront,
   );
 
   if (matches.length > 1) {
@@ -230,6 +232,54 @@ async function updateExistingNote(
   return "update";
 }
 
+async function linkExistingNoteByFront(
+  client: AnkiConnectClient,
+  payload: CardSyncPayload,
+  config: SyncEngineConfig,
+  existing: NoteInfo,
+  fields: Record<string, string>,
+): Promise<CardSyncResult> {
+  const existingUuid = extractUuidFromTags(
+    existing.tags,
+    config.syncTagPrefix,
+  );
+  const linkUuid = existingUuid ?? payload.wouldInjectId;
+  if (!linkUuid) {
+    throw new Error("Card sync payload missing obsidian uuid for duplicate recovery");
+  }
+
+  const linkTags = buildAnkiTags({
+    engineTag: config.defaultEngineTag,
+    fileTags: payload.fileAnkiTags ?? [],
+    headingTag: payload.tag,
+    syncTagPrefix: config.syncTagPrefix,
+    uuid: linkUuid,
+  });
+
+  const action = await updateExistingNote(
+    client,
+    existing.noteId,
+    existing,
+    fields,
+    linkTags,
+  );
+
+  return {
+    action,
+    ankiNoteId: existing.noteId,
+    injectedId: payload.ankiId ? undefined : linkUuid,
+    duplicateWarning: buildAnkiDuplicateRecoveredWarning({
+      deck: payload.deck,
+      tag: payload.tag,
+      frontHtml: payload.frontHtml,
+      backHtml: payload.backHtml,
+      sourceFile: payload.sourceFile,
+      ankiNoteId: existing.noteId,
+      linkedObsidianId: linkUuid,
+    }),
+  };
+}
+
 async function recoverDuplicateNote(
   client: AnkiConnectClient,
   payload: CardSyncPayload,
@@ -248,45 +298,13 @@ async function recoverDuplicateNote(
     throw new AnkiConnectError("cannot create note because it is a duplicate");
   }
 
-  const existingUuid = extractUuidFromTags(
-    duplicate.tags,
-    config.syncTagPrefix,
-  );
-  const linkUuid = existingUuid ?? payload.wouldInjectId;
-  if (!linkUuid) {
-    throw new Error("Card sync payload missing obsidian uuid for duplicate recovery");
-  }
-
-  const linkTags = buildAnkiTags({
-    engineTag: config.defaultEngineTag,
-    fileTags: payload.fileAnkiTags ?? [],
-    headingTag: payload.tag,
-    syncTagPrefix: config.syncTagPrefix,
-    uuid: linkUuid,
-  });
-
-  const action = await updateExistingNote(
+  return linkExistingNoteByFront(
     client,
-    duplicate.noteId,
+    payload,
+    config,
     duplicate,
     fields,
-    linkTags,
   );
-
-  return {
-    action,
-    ankiNoteId: duplicate.noteId,
-    injectedId: payload.ankiId ? undefined : linkUuid,
-    duplicateWarning: buildAnkiDuplicateRecoveredWarning({
-      deck: payload.deck,
-      tag: payload.tag,
-      frontHtml: payload.frontHtml,
-      backHtml: payload.backHtml,
-      sourceFile: payload.sourceFile,
-      ankiNoteId: duplicate.noteId,
-      linkedObsidianId: linkUuid,
-    }),
-  };
 }
 
 export async function syncCard(
@@ -322,6 +340,22 @@ export async function syncCard(
   );
 
   if (existingNoteId === undefined) {
+    const existingByFront = await findNoteByFrontInDeck(
+      client,
+      payload.deck,
+      payload.frontHtml,
+      context?.frontMatchCache,
+    );
+    if (existingByFront) {
+      return linkExistingNoteByFront(
+        client,
+        payload,
+        config,
+        existingByFront,
+        fields,
+      );
+    }
+
     try {
       const noteId = await client.addNote({
         deckName: payload.deck,
@@ -657,6 +691,44 @@ async function syncFileCardsBatched(
     }
   }
 
+  const frontLinkedResults: Array<{
+    prepared: PreparedCardItem;
+    result: CardSyncResult;
+  }> = [];
+  const remainingAdds: PreparedCardItem[] = [];
+
+  for (const entry of preparedAdds) {
+    const existingByFront = await findNoteByFrontInDeck(
+      client,
+      entry.item.payload.deck,
+      entry.item.payload.frontHtml,
+      context.frontMatchCache,
+    );
+    if (existingByFront) {
+      try {
+        const result = await linkExistingNoteByFront(
+          client,
+          entry.item.payload,
+          config,
+          existingByFront,
+          entry.fields,
+        );
+        frontLinkedResults.push({ prepared: entry, result });
+      } catch (error) {
+        results[entry.index] = {
+          action: "skip",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    } else {
+      remainingAdds.push(entry);
+    }
+  }
+
+  for (const { prepared: entry, result } of frontLinkedResults) {
+    results[entry.index] = result;
+  }
+
   const noteIds = [
     ...new Set(updates.map((entry) => entry.noteId)),
   ];
@@ -670,7 +742,7 @@ async function syncFileCardsBatched(
     context,
     results,
   );
-  await syncPreparedAdds(client, preparedAdds, config, context, results);
+  await syncPreparedAdds(client, remainingAdds, config, context, results);
 
   for (let index = 0; index < results.length; index += 1) {
     if (results[index] === undefined) {

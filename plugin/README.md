@@ -47,6 +47,8 @@ The plugin calls AnkiConnect from the browser. Add your Obsidian origin to `webC
 - **Check AnkiConnect connection** — verifies Anki is reachable.
 - **Sync vault to Anki** — live sync via the AST engine (base64 media, ID injection).
 
+Planned features (dry-run, sync current file, results modal, etc.): [Docs/Plugin-Roadmap.md](../Docs/Plugin-Roadmap.md).
+
 ## Watch mode
 
 ```bash

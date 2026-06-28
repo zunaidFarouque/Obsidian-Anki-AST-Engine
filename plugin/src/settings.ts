@@ -43,12 +43,12 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl('p', {
-			text: 'Vault path is taken from the open Obsidian vault. Media uploads use base64 transport (required for browser-based AnkiConnect).',
+			text: 'Requires Anki Desktop running with AnkiConnect enabled. The plugin uses Obsidian requestUrl (not browser fetch), so CORS is usually not the blocker — ensure Anki is open and the URL matches your AnkiConnect port.',
 		});
 
 		containerEl.createEl('p', {
 			cls: 'setting-item-description',
-			text: 'AnkiConnect CORS: add your Obsidian origin (e.g. app://obsidian.md) to webCorsOriginList in AnkiConnect add-on config. See Docs/Anki-Integration.md in the engine repo.',
+			text: 'If connection still fails: restart Anki after editing AnkiConnect config, confirm http://127.0.0.1:8765 in a browser shows AnkiConnect, and check the developer console (Ctrl+Shift+I) for errors.',
 		});
 
 		new Setting(containerEl)
