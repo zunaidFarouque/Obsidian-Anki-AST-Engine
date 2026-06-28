@@ -21,6 +21,7 @@ import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
 import { AnkiConnectError, AnkiConnectClient } from "./anki/client";
 import { syncFileCards, createSyncRunContext, type CardSyncPayload } from "./anki/syncEngine";
 import {
+  cardExclusionKey,
   detectVaultFrontCollisions,
   type DuplicateCardSource,
   type DuplicateWarning,
@@ -34,6 +35,11 @@ import { toActionFilePath } from "./io/vaultAdapter";
 import { createNodeVaultAdapter } from "./io/nodeVaultAdapter";
 
 export type { DuplicateWarning } from "./anki/duplicateDetect";
+export {
+  buildExcludedCardKeysFromWarnings,
+  cardExclusionKey,
+} from "./anki/duplicateDetect";
+export { stripHtmlForSearch } from "./anki/frontSearch";
 export type { MediaBasenameWarning } from "./anki/mediaNaming";
 export type { VaultAdapter } from "./io/vaultAdapter";
 
@@ -55,6 +61,7 @@ export type SyncAction = {
   unresolvedEmbeds?: string[];
   transclusionResolved?: boolean;
   syncError?: string;
+  skipReason?: "vault_duplicate_front";
 };
 
 export type SyncOptions = {
@@ -64,6 +71,7 @@ export type SyncOptions = {
   ankiClient?: AnkiConnectClient;
   /** Obsidian plugin should pass createObsidianFetch() to avoid browser CORS. */
   fetchImpl?: typeof fetch;
+  excludeCardKeys?: ReadonlySet<string>;
 };
 
 export type SyncRunResult = {
@@ -232,7 +240,18 @@ export async function runSync(
         { inheritedFootnoteDefs },
       );
 
-      const plannedAction: SyncAction["action"] = card.ankiId ? "update" : "add";
+      const exclusionKey = cardExclusionKey(
+        actionFile,
+        card.tag,
+        deck,
+        frontHtml,
+      );
+      const isExcluded = options.excludeCardKeys?.has(exclusionKey) ?? false;
+      const plannedAction: SyncAction["action"] = isExcluded
+        ? "skip"
+        : card.ankiId
+          ? "update"
+          : "add";
 
       fileActions.push({
         action: plannedAction,
@@ -251,6 +270,7 @@ export async function runSync(
         unresolvedEmbeds:
           unresolvedEmbeds.length > 0 ? [...unresolvedEmbeds] : undefined,
         transclusionResolved: unresolvedEmbeds.length === 0,
+        skipReason: isExcluded ? "vault_duplicate_front" : undefined,
       });
 
       collisionSources.push({
@@ -261,6 +281,10 @@ export async function runSync(
         backHtml,
         ankiId: card.ankiId,
       });
+
+      if (isExcluded) {
+        continue;
+      }
 
       syncItems.push({
         payload: {
@@ -278,6 +302,11 @@ export async function runSync(
     }
 
     if (options.dryRun || fileActions.length === 0) {
+      actions.push(...fileActions);
+      continue;
+    }
+
+    if (syncItems.length === 0) {
       actions.push(...fileActions);
       continue;
     }
@@ -300,9 +329,14 @@ export async function runSync(
 
     const fileSync = await syncFileCards(client!, syncItems, config, syncContext);
 
-    for (let index = 0; index < fileActions.length; index += 1) {
-      const result = fileSync.results[index];
-      const action = fileActions[index]!;
+    let syncResultIndex = 0;
+    for (const action of fileActions) {
+      if (action.skipReason === "vault_duplicate_front") {
+        continue;
+      }
+
+      const result = fileSync.results[syncResultIndex];
+      syncResultIndex += 1;
       if (result) {
         action.action = result.action;
         action.ankiNoteId = result.ankiNoteId;

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildExcludedCardKeysFromWarnings,
+  cardExclusionKey,
   detectVaultFrontCollisions,
   type DuplicateCardSource,
+  type DuplicateWarning,
 } from "../../src/anki/duplicateDetect";
 
 function source(
@@ -63,5 +66,64 @@ describe("detectVaultFrontCollisions", () => {
     ]);
 
     expect(warnings).toEqual([]);
+  });
+});
+
+describe("cardExclusionKey", () => {
+  test("builds a stable key from file, tag, deck, and frontHtml", () => {
+    const key = cardExclusionKey(
+      "notes/a.md",
+      "Physics::Entropy",
+      "Test::Deck",
+      "<p>Same front</p>",
+    );
+    expect(key).toContain("notes/a.md");
+    expect(key).toContain("Physics::Entropy");
+    expect(key).toContain("Test::Deck");
+    expect(key).toContain("<p>Same front</p>");
+  });
+});
+
+describe("buildExcludedCardKeysFromWarnings", () => {
+  test("collects keys for vault collision and back mismatch sources only", () => {
+    const collisionWarnings = detectVaultFrontCollisions([
+      source({ file: "a.md", tag: "A::One" }),
+      source({ file: "b.md", tag: "B::Two" }),
+    ]);
+    const relinkWarning: DuplicateWarning = {
+      kind: "anki_duplicate_recovered",
+      deck: "Test::Deck",
+      frontHtml: "<p>Same front</p>",
+      message: "recovered",
+      sources: [{ file: "c.md", tag: "C", backHtml: "<p>back</p>" }],
+      ankiNoteId: 42,
+    };
+
+    const keys = buildExcludedCardKeysFromWarnings([
+      ...collisionWarnings,
+      relinkWarning,
+    ]);
+
+    expect(keys.size).toBe(2);
+    expect(
+      keys.has(
+        cardExclusionKey(
+          "a.md",
+          "A::One",
+          "Test::Deck",
+          "<p>Same front</p>",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      keys.has(
+        cardExclusionKey(
+          "b.md",
+          "B::Two",
+          "Test::Deck",
+          "<p>Same front</p>",
+        ),
+      ),
+    ).toBe(true);
   });
 });

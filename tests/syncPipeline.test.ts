@@ -2,8 +2,46 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile, rm, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { AnkiConnectClient } from "../src/anki/client";
+import { buildExcludedCardKeysFromWarnings } from "../src/anki/duplicateDetect";
 import { runSync } from "../src/syncPipeline";
 import type { Config } from "../src/config/configParser";
+
+function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConnectClient {
+  const findNotesImpl =
+    overrides.findNotes ?? (async () => [] as number[]);
+
+  return {
+    canConnect: async () => true,
+    version: async () => 6,
+    invoke: async () => {
+      throw new Error("Unexpected invoke");
+    },
+    invokeMulti:
+      overrides.invokeMulti ??
+      (async (actions) =>
+        Promise.all(
+          actions.map(async (action) => {
+            if (action.action === "findNotes") {
+              return findNotesImpl(action.params?.query as string);
+            }
+            throw new Error(`unsupported multi action ${action.action}`);
+          }),
+        )),
+    deckNames: async () => ["Science::Physics"],
+    createDeck: async () => 1,
+    modelNames: async () => ["Basic"],
+    findNotes: findNotesImpl,
+    notesInfo: async () => [],
+    addNote: async () => 12345,
+    addNotes: async (notes) => notes.map(() => 12345),
+    updateNoteFields: async () => undefined,
+    updateNoteTags: async () => undefined,
+    storeMediaFile: async () => "ok",
+    mediaFiles: async () => [],
+    ...overrides,
+  } as unknown as AnkiConnectClient;
+}
 
 const baseConfig = {
   ankiConnectUrl: "http://127.0.0.1:8765",
@@ -358,6 +396,22 @@ describe("syncPipeline", () => {
     expect(duplicateWarnings).toHaveLength(1);
     expect(duplicateWarnings[0]?.kind).toBe("back_mismatch");
     expect(duplicateWarnings[0]?.sources).toHaveLength(2);
+
+    const excludeCardKeys = buildExcludedCardKeysFromWarnings(duplicateWarnings);
+    const addNotes = async () => {
+      throw new Error("addNotes should not be called for excluded duplicate fronts");
+    };
+    const live = await runSync(config, {
+      dryRun: false,
+      excludeCardKeys,
+      ankiClient: createMockClient({ addNotes }),
+    });
+
+    expect(live.actions).toHaveLength(2);
+    expect(live.actions.every((action) => action.action === "skip")).toBe(true);
+    expect(
+      live.actions.every((action) => action.skipReason === "vault_duplicate_front"),
+    ).toBe(true);
 
     await rm(root, { recursive: true, force: true });
   });

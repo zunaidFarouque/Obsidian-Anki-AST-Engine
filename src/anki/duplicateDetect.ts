@@ -26,6 +26,43 @@ function collisionKey(deck: string, frontHtml: string): string {
   return `${deck}\0${frontHtml}`;
 }
 
+export function cardExclusionKey(
+  file: string,
+  tag: string,
+  deck: string,
+  frontHtml: string,
+): string {
+  return `${file}\0${tag}\0${deck}\0${frontHtml}`;
+}
+
+export function buildExcludedCardKeysFromWarnings(
+  warnings: DuplicateWarning[],
+): Set<string> {
+  const keys = new Set<string>();
+
+  for (const warning of warnings) {
+    if (
+      warning.kind !== "vault_front_collision" &&
+      warning.kind !== "back_mismatch"
+    ) {
+      continue;
+    }
+
+    for (const source of warning.sources) {
+      keys.add(
+        cardExclusionKey(
+          source.file,
+          source.tag,
+          warning.deck,
+          warning.frontHtml,
+        ),
+      );
+    }
+  }
+
+  return keys;
+}
+
 export function detectVaultFrontCollisions(
   cards: DuplicateCardSource[],
 ): DuplicateWarning[] {

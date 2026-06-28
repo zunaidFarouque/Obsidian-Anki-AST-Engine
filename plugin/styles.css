@@ -1,8 +1,64 @@
-/*
+.anki-ast-sync-duplicate-modal {
+	width: min(42rem, 92vw);
+	max-width: 92vw;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.anki-ast-sync-duplicate-modal .modal-content {
+	overflow-x: hidden;
+}
 
-If your plugin does not need CSS, delete this file.
+.anki-ast-sync-duplicate-intro {
+	margin-bottom: 0.75em;
+}
 
-*/
+.anki-ast-sync-duplicate-list {
+	list-style: none;
+	margin: 0.75em 0 1em;
+	padding: 0;
+}
+
+.anki-ast-sync-duplicate-list li {
+	margin: 0 0 0.5em;
+}
+
+.anki-ast-sync-duplicate-item {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	height: auto;
+	min-height: unset;
+	padding: 0.65em 0.75em;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.anki-ast-sync-duplicate-item-front {
+	display: block;
+	margin-bottom: 0.25em;
+	line-height: 1.35;
+}
+
+.anki-ast-sync-duplicate-item-meta {
+	display: block;
+	font-size: 0.85em;
+	opacity: 0.8;
+	line-height: 1.3;
+}
+
+.anki-ast-sync-duplicate-footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.5em;
+	margin-top: 1em;
+}
+
+.anki-ast-sync-duplicate-footer button {
+	white-space: normal;
+	height: auto;
+	min-height: var(--input-height);
+	padding: 0.45em 0.9em;
+	line-height: 1.3;
+}

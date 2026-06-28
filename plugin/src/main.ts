@@ -1,10 +1,12 @@
 import { Notice, Plugin } from 'obsidian';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import {
+	buildExcludedCardKeysFromWarnings,
 	runSync,
 	summarizeSyncActions,
 	type DuplicateWarning,
 	type MediaBasenameWarning,
+	type SyncAction,
 } from 'obsidian-anki-ast-engine/sync';
 import { buildPluginConfig } from './configBuilder';
 import { createObsidianFetch } from './obsidianFetch';
@@ -14,6 +16,14 @@ import {
 	DEFAULT_SETTINGS,
 	type AnkiAstSyncSettings,
 } from './settings';
+import { showRelinkNotice } from './ui/relinkNotice';
+import { VaultDuplicateConflictModal } from './ui/vaultDuplicateConflictModal';
+
+function isVaultCollisionWarning(warning: DuplicateWarning): boolean {
+	return (
+		warning.kind === 'vault_front_collision' || warning.kind === 'back_mismatch'
+	);
+}
 
 export default class AnkiAstSyncPlugin extends Plugin {
 	settings!: AnkiAstSyncSettings;
@@ -81,18 +91,44 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	}
 
 	private async syncVaultToAnki(): Promise<void> {
-		const notice = new Notice('Syncing vault to Anki…', 0);
+		const notice = new Notice('Checking vault for duplicate fronts…', 0);
 
 		try {
 			const vault = createObsidianVaultAdapter(this.app);
 			const config = buildPluginConfig(this.app, this.settings);
+			const preflight = await runSync(config, { dryRun: true, vault });
+			const vaultCollisions = preflight.duplicateWarnings.filter(
+				isVaultCollisionWarning,
+			);
+
+			let excludeCardKeys: ReadonlySet<string> | undefined;
+			let syncedDespiteConflicts = false;
+
+			if (vaultCollisions.length > 0) {
+				notice.hide();
+				const proceed = await VaultDuplicateConflictModal.open(
+					this.app,
+					vaultCollisions,
+				);
+				if (!proceed) {
+					return;
+				}
+
+				excludeCardKeys = buildExcludedCardKeysFromWarnings(vaultCollisions);
+				syncedDespiteConflicts = true;
+			}
+
+			notice.setMessage('Syncing vault to Anki…');
+
+			const client = this.createAnkiClient();
 			const { actions, duplicateWarnings, mediaWarnings } = await runSync(
 				config,
 				{
 					dryRun: false,
 					vault,
 					forceBase64Media: true,
-					ankiClient: this.createAnkiClient(),
+					ankiClient: client,
+					excludeCardKeys,
 				},
 			);
 
@@ -110,8 +146,12 @@ export default class AnkiAstSyncPlugin extends Plugin {
 				);
 			}
 
-			this.showDuplicateWarnings(duplicateWarnings);
+			this.showDuplicateWarnings(duplicateWarnings, client);
 			this.showMediaWarnings(mediaWarnings);
+
+			if (syncedDespiteConflicts) {
+				this.showSkippedConflictReminder(actions);
+			}
 		} catch (error) {
 			notice.hide();
 			const message = error instanceof Error ? error.message : String(error);
@@ -120,15 +160,29 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		}
 	}
 
-	private showDuplicateWarnings(warnings: DuplicateWarning[]): void {
+	private showSkippedConflictReminder(actions: SyncAction[]): void {
+		const skippedCount = actions.filter(
+			(action) => action.skipReason === 'vault_duplicate_front',
+		).length;
+
+		if (skippedCount === 0) {
+			return;
+		}
+
+		new Notice(
+			`${skippedCount} card(s) skipped due to duplicate fronts — fix conflicts and sync again.`,
+			18000,
+		);
+	}
+
+	private showDuplicateWarnings(
+		warnings: DuplicateWarning[],
+		client: AnkiConnectClient,
+	): void {
 		for (const warning of warnings) {
-			const label =
-				warning.kind === 'back_mismatch'
-					? 'Duplicate front with different backs'
-					: warning.kind === 'vault_front_collision'
-						? 'Duplicate front collision'
-						: 'Anki duplicate recovered';
-			new Notice(`${label}: ${warning.message}`, 12000);
+			if (warning.kind === 'anki_duplicate_recovered') {
+				showRelinkNotice(this.app, client, warning);
+			}
 		}
 	}
 
