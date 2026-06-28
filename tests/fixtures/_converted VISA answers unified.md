@@ -18,7 +18,7 @@ TODO:
 - [ ] watch interviews in YouTube
 - [ ] English pronunciations
 
-# General Questions
+# General Questions 
 
 #### Critical timeline that I need to remember
 
