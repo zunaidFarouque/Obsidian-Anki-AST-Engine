@@ -25,6 +25,7 @@ export function buildPluginConfig(
 		noteModelType: 'basic',
 		autoCreateDecks: settings.autoCreateDecks,
 		syncTagPrefix: settings.syncTagPrefix,
+		orphanIgnoreTag: settings.orphanIgnoreTag,
 		linkFormat: settings.linkFormat,
 		attachmentFolder: settings.attachmentFolder || undefined,
 		defaultCardDeclarationHeadingLevel:

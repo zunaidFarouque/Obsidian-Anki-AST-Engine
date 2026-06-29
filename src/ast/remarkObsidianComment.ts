@@ -164,8 +164,10 @@ function stripCommentsFromContainer(node: Content): Content {
 
   return {
     ...node,
-    children: stripBlockCommentsFromChildren(node.children as Content[]),
-  };
+    children: stripBlockCommentsFromChildren(
+      node.children as Content[],
+    ) as unknown as typeof node.children,
+  } as Content;
 }
 
 export function stripObsidianCommentsFromNodes(nodes: Content[]): Content[] {

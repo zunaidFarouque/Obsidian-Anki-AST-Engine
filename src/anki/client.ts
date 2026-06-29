@@ -56,7 +56,15 @@ export type AddNoteParams = {
 export type NoteInfo = {
   noteId: number;
   tags: string[];
+  cards?: number[];
   fields: Record<string, { value: string; order: number }>;
+};
+
+export type CardInfo = {
+  cardId: number;
+  note: number;
+  deckName: string;
+  question: string;
 };
 
 export type StoreMediaFileParams =
@@ -193,7 +201,7 @@ export class AnkiConnectClient {
     actions: MultiAction[],
   ): Promise<T> {
     if (actions.length === 0) {
-      return [] as T;
+      return [] as unknown as T;
     }
 
     return this.invoke<T>("multi", { actions });
@@ -209,6 +217,14 @@ export class AnkiConnectClient {
     }
 
     return this.invoke<NoteInfo[]>("notesInfo", { notes: noteIds });
+  }
+
+  async cardsInfo(cardIds: number[]): Promise<CardInfo[]> {
+    if (cardIds.length === 0) {
+      return [];
+    }
+
+    return this.invoke<CardInfo[]>("cardsInfo", { cards: cardIds });
   }
 
   async addNote(note: AddNoteParams): Promise<number> {
@@ -263,12 +279,12 @@ export class AnkiConnectClient {
     return this.invoke<number[]>("findCards", { query });
   }
 
-  async suspendCards(cardIds: number[]): Promise<void> {
+  async suspend(cardIds: number[]): Promise<void> {
     if (cardIds.length === 0) {
       return;
     }
 
-    await this.invoke<null>("suspendCards", { cards: cardIds });
+    await this.invoke<boolean>("suspend", { cards: cardIds });
   }
 }
 

@@ -16,6 +16,8 @@ export interface AnkiAstSyncSettings {
 	noteModelName: string;
 	syncTagPrefix: string;
 	orphanHandling: 'off' | 'ask';
+	orphanIgnoreTag: string;
+	orphanAllowSuspend: boolean;
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -33,6 +35,8 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
 	orphanHandling: 'ask',
+	orphanIgnoreTag: 'obsidian-sync-ignore',
+	orphanAllowSuspend: false,
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {
@@ -225,7 +229,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Orphan handling')
 			.setDesc(
-				'On full-vault live sync, prompt to suspend or delete Anki notes whose vault UUID no longer appears in the scan. Single-file sync never prompts. Set to Off to skip detection for speed.',
+				'On full-vault live sync, prompt to ignore or delete Anki notes whose vault UUID no longer appears in the scan. Single-file sync never prompts. Set to Off to skip detection for speed.',
 			)
 			.addDropdown((dropdown) =>
 				dropdown
@@ -234,6 +238,34 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.orphanHandling)
 					.onChange(async (value) => {
 						this.plugin.settings.orphanHandling = value as AnkiAstSyncSettings['orphanHandling'];
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Allow suspend for orphan notes')
+			.setDesc(
+				'When enabled, the orphan modal also offers Suspend (hide cards from review). Default actions are Cancel, Ignore, and Delete.',
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.orphanAllowSuspend)
+					.onChange(async (value) => {
+						this.plugin.settings.orphanAllowSuspend = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Orphan ignore tag')
+			.setDesc(
+				'Anki tag added when you choose Ignore on orphaned notes. Tagged notes are skipped on future syncs but remain active in Anki.',
+			)
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.orphanIgnoreTag)
+					.onChange(async (value) => {
+						this.plugin.settings.orphanIgnoreTag = value;
 						await this.plugin.saveSettings();
 					}),
 			);

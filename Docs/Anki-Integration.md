@@ -158,7 +158,9 @@ If markdown has a valid `anki-id` but Anki has no matching tag, the engine **re-
 
 The opposite case: Anki has an engine-managed note with `obsidian-id::<uuid>` (and the default engine tag), but **no vault card** in the current full-vault scan carries that UUID. These are **vault orphans** — the vault card was removed or the UUID no longer appears in sync-eligible files.
 
-On a **full-vault** sync (not single-file), the engine can detect orphans via `findNotes` + `notesInfo` ([`orphanDetect.ts`](../src/anki/orphanDetect.ts)). The Obsidian plugin prompts each live sync (**Ask each sync** setting) to **Cancel**, **Suspend**, or **Delete** before Anki is modified ([`orphanHandler.ts`](../src/anki/orphanHandler.ts)). Dry-run reports orphans in the results modal without changing Anki. Set **Orphan handling** to **Off** in plugin settings to skip detection.
+On a **full-vault** sync (not single-file), the engine can detect orphans via `findNotes` + `notesInfo` + `cardsInfo` ([`orphanDetect.ts`](../src/anki/orphanDetect.ts)). Notes already tagged with the configured ignore tag (default `obsidian-sync-ignore`) are skipped. The Obsidian plugin prompts each live sync (**Ask each sync** setting) with **Cancel** (remind later), **Ignore** (add ignore tag; card stays active in Anki), or **Delete** before Anki is modified ([`orphanHandler.ts`](../src/anki/orphanHandler.ts)). **Suspend** is optional in plugin settings (off by default). Dry-run reports orphans in the results modal without changing Anki. Set **Orphan handling** to **Off** in plugin settings to skip detection.
+
+Search ignored orphans in Anki: `tag:obsidian-sync-ignore`.
 
 Do not confuse vault orphans with **Orphan UUID** above (vault has id, Anki missing → re-add).
 

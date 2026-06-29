@@ -159,6 +159,10 @@ function createParagraph(text: string, position?: Paragraph["position"]): Paragr
   };
 }
 
-export function isObsidianEmbed(node: { type: string }): node is ObsidianEmbed {
-  return node.type === "obsidianEmbed";
+export function isObsidianEmbed(node: unknown): node is ObsidianEmbed {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    (node as { type: string }).type === "obsidianEmbed"
+  );
 }

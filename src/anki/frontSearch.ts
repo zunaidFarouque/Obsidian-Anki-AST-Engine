@@ -55,7 +55,9 @@ const SEARCH_STOPWORDS = new Set([
 ]);
 
 export function stripHtmlForSearch(html: string): string {
-  return html
+  return decodeHtmlEntities(html)
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();

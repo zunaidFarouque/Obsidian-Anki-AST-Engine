@@ -74,7 +74,7 @@ Do in parallel with Phase 1–2 or immediately after.
 
 - **Auto-sync on save** (debounced) — needs conflict handling if user edits during sync
 - **Progress UI** — **Done** — file-level sync progress via `onProgress` + Obsidian Notice
-- **Orphan handling** — **Done** — full-vault detection + confirmation modal (suspend/delete); see `Anki-Integration.md` **Vault orphans**
+- **Orphan handling** — **Done** — full-vault detection + confirmation modal (ignore tag / delete; optional suspend); see `Anki-Integration.md` **Vault orphans**
 - **Cloze / custom note types** — engine is `Basic` only today
 - **Community plugin release** — README, screenshots, `versions.json`, GitHub releases
 

@@ -14,6 +14,7 @@ export const ConfigSchema = z.object({
   noteModelType: z.enum(["basic"]).default("basic"),
   autoCreateDecks: z.boolean().default(true),
   syncTagPrefix: z.string().min(1).default("obsidian-id"),
+  orphanIgnoreTag: z.string().min(1).default("obsidian-sync-ignore"),
   linkFormat: z.enum(["shortest", "relative", "absolute"]).default("shortest"),
   attachmentFolder: z.string().optional(),
   defaultCardDeclarationHeadingLevel: z

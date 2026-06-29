@@ -12,6 +12,9 @@ import { openVaultCard } from '../navigation/openVaultCard';
 import {
 	basename,
 	duplicateWarningLabel,
+	formatOrphanDeckMeta,
+	formatOrphanFrontPreview,
+	formatOrphanUuidHint,
 	truncate,
 } from './syncDisplayUtils';
 
@@ -24,7 +27,8 @@ export type SyncResultsPayload = {
 	skippedDuplicateFrontCount?: number;
 	orphans?: VaultOrphan[];
 	orphanActions?: OrphanAction[];
-	orphanChoice?: 'cancel' | 'suspend' | 'delete';
+	orphanChoice?: 'cancel' | 'ignore' | 'delete' | 'suspend';
+	orphanIgnoreTag?: string;
 };
 
 type DuplicateWarningEntry = {
@@ -237,10 +241,13 @@ export class SyncResultsModal extends Modal {
 			text: 'Orphaned notes',
 		});
 
-		const { dryRun, orphanChoice, orphanActions } = this.payload;
+		const { dryRun, orphanChoice, orphanActions, orphanIgnoreTag } = this.payload;
+		const ignoreTag = orphanIgnoreTag ?? 'obsidian-sync-ignore';
 		let summary: string;
 		if (dryRun) {
 			summary = `${orphans.length} orphaned Anki note(s) would be reported on a live sync.`;
+		} else if (orphanChoice === 'ignore') {
+			summary = `Tagged ${orphanActions?.length ?? orphans.length} orphaned note(s) with ${ignoreTag}; they will not be prompted again.`;
 		} else if (orphanChoice === 'suspend') {
 			summary = `Suspended ${orphanActions?.length ?? orphans.length} orphaned note(s).`;
 		} else if (orphanChoice === 'delete') {
@@ -259,7 +266,15 @@ export class SyncResultsModal extends Modal {
 			const item = list.createEl('li');
 			item.createEl('span', {
 				cls: 'anki-ast-sync-duplicate-item-front',
-				text: `Note ${orphan.ankiNoteId} · ${orphan.uuid}`,
+				text: formatOrphanFrontPreview(orphan),
+			});
+			item.createEl('span', {
+				cls: 'anki-ast-sync-duplicate-item-meta',
+				text: formatOrphanDeckMeta(orphan),
+			});
+			item.createEl('span', {
+				cls: 'anki-ast-sync-duplicate-item-hint',
+				text: formatOrphanUuidHint(orphan),
 			});
 		}
 	}

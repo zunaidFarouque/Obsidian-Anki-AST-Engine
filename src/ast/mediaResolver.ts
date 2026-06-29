@@ -1,6 +1,6 @@
 import { resolve as resolvePath } from "node:path";
 import type { Content, Image, Link, Paragraph, Root } from "mdast";
-import { isObsidianEmbed } from "./obsidianLinks";
+import { isObsidianEmbed, type ObsidianEmbed } from "./obsidianLinks";
 import { formatWikilink, parseLinktext, type ParsedLinktext } from "../obsidian/linkResolver";
 import {
   getMediaKind,
@@ -23,6 +23,8 @@ import {
   isSoundMediaParagraph,
   soundFileNameFromParagraph,
 } from "./vaultMediaNodes";
+
+type AstNode = Content | ObsidianEmbed;
 
 export type MediaUploadTransport = "path" | "base64" | "url";
 
@@ -119,7 +121,7 @@ export function collectResolvedMediaPaths(
     }
   };
 
-  const walk = (nodes: Content[]) => {
+  const walk = (nodes: AstNode[]) => {
     for (const node of nodes) {
       if (node.type === "image") {
         if (isRemoteMediaUrl(node.url)) {
@@ -141,7 +143,7 @@ export function collectResolvedMediaPaths(
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as Content[]);
+        walk(node.children as AstNode[]);
       }
     }
   };
@@ -244,7 +246,7 @@ function visitResolvableMedia(
     ) => void;
   },
 ): void {
-  const walk = (nodes: Content[]) => {
+  const walk = (nodes: AstNode[]) => {
     for (const node of nodes) {
       if (node.type === "image") {
         if (isRemoteMediaUrl(node.url)) {
@@ -292,7 +294,7 @@ function visitResolvableMedia(
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as Content[]);
+        walk(node.children as AstNode[]);
       }
     }
   };
@@ -311,7 +313,7 @@ function visitResolvableMedia(
 }
 
 function rewriteRemainingMediaEmbeds(
-  children: Content[],
+  children: AstNode[],
   context: MediaResolveContext,
 ): void {
   for (let index = 0; index < children.length; index += 1) {
@@ -338,7 +340,7 @@ function rewriteRemainingMediaEmbeds(
     }
 
     if ("children" in child && Array.isArray(child.children)) {
-      rewriteRemainingMediaEmbeds(child.children as Content[], context);
+      rewriteRemainingMediaEmbeds(child.children as AstNode[], context);
     }
   }
 }
@@ -474,7 +476,7 @@ function addUrlPlan(
 export function collectMediaNodes(ast: Root) {
   const nodes: Array<{ kind: "wikiEmbed" | "image"; fileName: string }> = [];
 
-  const walk = (items: Content[]) => {
+  const walk = (items: AstNode[]) => {
     for (const node of items) {
       if (node.type === "image") {
         nodes.push({ kind: "image", fileName: node.url });
@@ -487,7 +489,7 @@ export function collectMediaNodes(ast: Root) {
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as Content[]);
+        walk(node.children as AstNode[]);
       }
     }
   };

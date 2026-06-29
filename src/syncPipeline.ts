@@ -19,7 +19,14 @@ import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
 import { AnkiConnectError, AnkiConnectClient } from "./anki/client";
-import { syncFileCards, createSyncRunContext, type CardSyncPayload } from "./anki/syncEngine";
+import {
+  syncFileCards,
+  createSyncRunContext,
+  buildAnkiTags,
+  buildObsidianIdTag,
+  type CardSyncPayload,
+} from "./anki/syncEngine";
+import { normalizeSyncFieldHtml } from "./anki/frontSearch";
 import {
   cardExclusionKey,
   detectVaultFrontCollisions,
@@ -192,6 +199,71 @@ function trackVaultBoundUuid(
   }
 }
 
+function dryRunTagsChanged(currentTags: string[], nextTags: string[]): boolean {
+  const current = [...currentTags].sort();
+  const next = [...nextTags].sort();
+  if (current.length !== next.length) {
+    return true;
+  }
+  return current.some((tag, index) => tag !== next[index]);
+}
+
+function dryRunFieldsChanged(
+  noteFields: Record<string, { value: string; order: number }>,
+  frontHtml: string,
+  backHtml: string,
+): boolean {
+  const currentFront = normalizeSyncFieldHtml(noteFields.Front?.value ?? "");
+  const currentBack = normalizeSyncFieldHtml(noteFields.Back?.value ?? "");
+  const nextFront = normalizeSyncFieldHtml(frontHtml);
+  const nextBack = normalizeSyncFieldHtml(backHtml);
+  return currentFront !== nextFront || currentBack !== nextBack;
+}
+
+async function applyDryRunParity(
+  client: AnkiConnectClient,
+  config: Config,
+  entries: Array<{ payload: CardSyncPayload; action: SyncAction }>,
+): Promise<void> {
+  const syncTagPrefix = config.syncTagPrefix ?? "obsidian-id";
+  const engineTag = config.defaultEngineTag ?? "Obsidian-Anki-AST";
+
+  for (const entry of entries) {
+    const uuid = entry.payload.ankiId ?? entry.payload.wouldInjectId;
+    if (!uuid) {
+      continue;
+    }
+
+    const tags = buildAnkiTags({
+      engineTag,
+      fileTags: entry.payload.fileAnkiTags ?? [],
+      headingTag: entry.payload.tag,
+      syncTagPrefix,
+      uuid,
+    });
+    const noteIds = await client.findNotes(
+      `tag:"${buildObsidianIdTag(syncTagPrefix, uuid)}"`,
+    );
+    if (noteIds.length !== 1) {
+      continue;
+    }
+
+    const [noteInfo] = await client.notesInfo([noteIds[0]!]);
+    if (!noteInfo) {
+      continue;
+    }
+
+    entry.action.ankiNoteId = noteInfo.noteId;
+    entry.action.action = dryRunFieldsChanged(
+      noteInfo.fields,
+      entry.payload.frontHtml,
+      entry.payload.backHtml,
+    ) || dryRunTagsChanged(noteInfo.tags, tags)
+      ? "update"
+      : "skip";
+  }
+}
+
 export async function runSync(
   config: Config,
   options: SyncOptions,
@@ -233,14 +305,15 @@ export async function runSync(
     });
   }
 
-  let client = options.dryRun
-    ? undefined
-    : options.ankiClient ??
+  const client = options.ankiClient ??
+    (options.dryRun
+      ? undefined
+      :
       new AnkiConnectClient({
         url: config.ankiConnectUrl,
         apiKey: config.ankiConnectApiKey,
         fetchImpl: options.fetchImpl,
-      });
+      }));
   let syncContext: ReturnType<typeof createSyncRunContext> | undefined;
 
   if (!options.dryRun && client) {
@@ -331,6 +404,7 @@ export async function runSync(
     const syncItems: Array<{
       payload: CardSyncPayload;
       injectionOffset?: number;
+      action: SyncAction;
     }> = [];
 
     for (const card of cards) {
@@ -357,7 +431,7 @@ export async function runSync(
           ? "update"
           : "add";
 
-      fileActions.push({
+      const fileAction: SyncAction = {
         action: plannedAction,
         file: actionFile,
         deck,
@@ -375,7 +449,8 @@ export async function runSync(
           unresolvedEmbeds.length > 0 ? [...unresolvedEmbeds] : undefined,
         transclusionResolved: unresolvedEmbeds.length === 0,
         skipReason: isExcluded ? "vault_duplicate_front" : undefined,
-      });
+      };
+      fileActions.push(fileAction);
 
       collisionSources.push({
         file: actionFile,
@@ -402,10 +477,26 @@ export async function runSync(
           sourceFile: actionFile,
         },
         injectionOffset: injectionPlan?.offset,
+        action: fileAction,
       });
     }
 
-    if (options.dryRun || fileActions.length === 0) {
+    if (options.dryRun) {
+      if (client && syncItems.length > 0) {
+        try {
+          await applyDryRunParity(client, config, syncItems);
+        } catch (error) {
+          console.warn(
+            "[Anki AST Sync] Dry-run parity fallback to planned actions:",
+            error,
+          );
+        }
+      }
+      actions.push(...fileActions);
+      continue;
+    }
+
+    if (fileActions.length === 0) {
       actions.push(...fileActions);
       continue;
     }

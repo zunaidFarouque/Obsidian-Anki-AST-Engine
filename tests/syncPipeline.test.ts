@@ -149,6 +149,73 @@ describe("syncPipeline", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  test("dry-run parity reports skip when existing card is unchanged", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-dryrun-parity-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const uuid = "550e8400-e29b-41d4-a716-446655440001";
+    const notePath = join(notesDir, "unchanged.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Laws",
+      "",
+      "F = ma",
+      "",
+      ":::",
+      "",
+      "Newton's second law",
+      `<!--anki-id: ${uuid}-->`,
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query === `tag:"obsidian-id::${uuid}"`) {
+          return [9001];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 9001,
+          tags: [
+            "Obsidian-Anki-AST",
+            "Science::Laws",
+            `obsidian-id::${uuid}`,
+          ],
+          fields: {
+            Front: { value: "<p>F = ma</p>", order: 0 },
+            Back: { value: "<p>Newton's second law</p>", order: 1 },
+          },
+        },
+      ],
+    });
+
+    const { actions } = await runSync(config, { dryRun: true, ankiClient: client });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("skip");
+    expect(actions[0]?.ankiId).toBe(uuid);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
   test("skips files when AnkiSync is off", async () => {
     const root = await mkdtemp(join(tmpdir(), "anki-off-"));
     const vaultPath = join(root, "vault");
@@ -464,6 +531,78 @@ describe("syncPipeline", () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]?.file.replace(/\\/g, "/")).toContain("Notes/note-a.md");
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("single-file dry-run parity reports skip for unchanged existing card", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-dryrun-single-file-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const uuid = "550e8400-e29b-41d4-a716-446655440002";
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Card",
+      "",
+      "Question text",
+      "",
+      ":::",
+      "",
+      "Answer A.",
+      `<!--anki-id: ${uuid}-->`,
+    ].join("\n");
+
+    await writeFile(join(notesDir, "note-a.md"), noteContent, "utf8");
+    await writeFile(join(notesDir, "note-b.md"), `${noteContent}\n`, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science::Physics",
+      ...baseConfig,
+    };
+
+    const client = createMockClient({
+      findNotes: async (query) => {
+        if (query === `tag:"obsidian-id::${uuid}"`) {
+          return [9002];
+        }
+        return [];
+      },
+      notesInfo: async () => [
+        {
+          noteId: 9002,
+          tags: [
+            "Obsidian-Anki-AST",
+            "Science::Card",
+            `obsidian-id::${uuid}`,
+          ],
+          fields: {
+            Front: { value: "<p>Question text</p>", order: 0 },
+            Back: { value: "<p>Answer A.</p>", order: 1 },
+          },
+        },
+      ],
+    });
+
+    const { actions } = await runSync(config, {
+      dryRun: true,
+      files: ["Notes/note-a.md"],
+      ankiClient: client,
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.file.replace(/\\/g, "/")).toContain("Notes/note-a.md");
+    expect(actions[0]?.action).toBe("skip");
 
     await rm(root, { recursive: true, force: true });
   });

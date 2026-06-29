@@ -46,8 +46,11 @@ export async function graftTransclusions(
 async function resolveEmbedsInChildren(
   parent: Parent,
   context: Required<
-    Pick<GraftContext, "vaultPath" | "sourcePath" | "vaultIndex" | "attachmentFolder">
+    Pick<GraftContext, "vaultPath" | "sourcePath" | "vaultIndex">
   > & {
+    vault?: VaultAdapter;
+    attachmentFolder?: string;
+    linkFormat?: "shortest" | "relative" | "absolute";
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },

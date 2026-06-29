@@ -105,7 +105,8 @@ function showSyncResults(
 		mediaWarnings: MediaBasenameWarning[];
 		orphans: VaultOrphan[];
 		orphanActions?: OrphanAction[];
-		orphanChoice?: 'cancel' | 'suspend' | 'delete';
+		orphanChoice?: 'cancel' | 'ignore' | 'delete' | 'suspend';
+		orphanIgnoreTag?: string;
 		skippedDuplicateFrontCount?: number;
 	},
 ): void {
@@ -118,6 +119,7 @@ function showSyncResults(
 		orphans: payload.orphans,
 		orphanActions: payload.orphanActions,
 		orphanChoice: payload.orphanChoice,
+		orphanIgnoreTag: payload.orphanIgnoreTag,
 		skippedDuplicateFrontCount: payload.skippedDuplicateFrontCount,
 	});
 }
@@ -216,17 +218,33 @@ export async function runSyncFlow(
 		);
 
 		let orphanActions: OrphanAction[] | undefined;
-		let orphanChoice: 'cancel' | 'suspend' | 'delete' | undefined;
+		let orphanChoice: 'cancel' | 'ignore' | 'delete' | 'suspend' | undefined;
 		if (detectOrphans && orphans.length > 0) {
 			notice.hide();
-			orphanChoice = await VaultOrphanModal.open(app, orphans, client);
-			if (orphanChoice === 'suspend' || orphanChoice === 'delete') {
-				notice.setMessage(
-					orphanChoice === 'suspend'
-						? 'Suspending orphaned Anki notes…'
-						: 'Deleting orphaned Anki notes…',
-				);
-				orphanActions = await applyOrphanAction(client, orphans, orphanChoice);
+			orphanChoice = await VaultOrphanModal.open(
+				app,
+				orphans,
+				{
+					allowSuspend: settings.orphanAllowSuspend,
+					ignoreTag: settings.orphanIgnoreTag,
+				},
+				client,
+			);
+			if (
+				orphanChoice === 'ignore' ||
+				orphanChoice === 'suspend' ||
+				orphanChoice === 'delete'
+			) {
+				const progressMessage =
+					orphanChoice === 'ignore'
+						? 'Tagging orphaned Anki notes to ignore…'
+						: orphanChoice === 'suspend'
+							? 'Suspending orphaned Anki notes…'
+							: 'Deleting orphaned Anki notes…';
+				notice.setMessage(progressMessage);
+				orphanActions = await applyOrphanAction(client, orphans, orphanChoice, {
+					ignoreTag: settings.orphanIgnoreTag,
+				});
 			}
 		}
 
@@ -239,6 +257,7 @@ export async function runSyncFlow(
 			orphans,
 			orphanActions,
 			orphanChoice,
+			orphanIgnoreTag: settings.orphanIgnoreTag,
 			skippedDuplicateFrontCount: syncedDespiteConflicts
 				? actions.filter(
 						(action) => action.skipReason === 'vault_duplicate_front',

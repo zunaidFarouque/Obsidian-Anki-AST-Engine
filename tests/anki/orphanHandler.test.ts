@@ -32,19 +32,60 @@ describe("applyOrphanAction", () => {
   });
 
   test("suspend finds cards per note then suspends them", async () => {
-    const invokeMulti = mock(async () => [[11, 12], [21]]);
-    const suspendCards = mock(async (cardIds: number[]) => {
+    const findCards = mock(async (query: string) => {
+      if (query === "nid:201") {
+        return [11, 12];
+      }
+      if (query === "nid:202") {
+        return [21];
+      }
+      return [];
+    });
+    const suspend = mock(async (cardIds: number[]) => {
       expect(cardIds).toEqual([11, 12, 21]);
     });
 
     const client = {
-      invokeMulti,
-      suspendCards,
+      findCards,
+      suspend,
     } as unknown as AnkiConnectClient;
 
     const actions = await applyOrphanAction(client, orphans, "suspend");
     expect(actions).toHaveLength(2);
-    expect(invokeMulti).toHaveBeenCalledTimes(1);
-    expect(suspendCards).toHaveBeenCalledTimes(1);
+    expect(findCards).toHaveBeenCalledTimes(2);
+    expect(suspend).toHaveBeenCalledTimes(1);
+  });
+
+  test("ignore adds orphan ignore tag via updateNoteTags", async () => {
+    const updateNoteTags = mock(
+      async (noteId: number, tags: string[]) => {
+        if (noteId === 201) {
+          expect(tags).toEqual([
+            "obsidian-id::orphan-a",
+            "obsidian-sync-ignore",
+          ]);
+          return;
+        }
+        if (noteId === 202) {
+          expect(tags).toEqual([
+            "obsidian-id::orphan-b",
+            "obsidian-sync-ignore",
+          ]);
+        }
+      },
+    );
+
+    const client = {
+      updateNoteTags,
+    } as unknown as AnkiConnectClient;
+
+    const actions = await applyOrphanAction(client, orphans, "ignore", {
+      ignoreTag: "obsidian-sync-ignore",
+    });
+    expect(actions).toEqual([
+      { ankiNoteId: 201, uuid: "orphan-a", action: "ignore" },
+      { ankiNoteId: 202, uuid: "orphan-b", action: "ignore" },
+    ]);
+    expect(updateNoteTags).toHaveBeenCalledTimes(2);
   });
 });

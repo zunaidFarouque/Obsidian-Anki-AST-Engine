@@ -15,6 +15,14 @@ describe("frontSearch", () => {
     );
   });
 
+  test("stripHtmlForSearch removes style blocks from rendered card html", () => {
+    const rendered = [
+      "<style>.card { font-family: arial; font-size: 20px; }</style>",
+      "<div class='card'>What is a visa?</div>",
+    ].join("");
+    expect(stripHtmlForSearch(rendered)).toBe("What is a visa?");
+  });
+
   test("buildFrontDuplicateSearchQuery scopes to deck and front field", () => {
     expect(
       buildFrontDuplicateSearchQuery(
