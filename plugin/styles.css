@@ -225,7 +225,54 @@
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-delimiter-guide {
 	--anki-delimiter-guide-y: calc(0.5lh + 0.11em);
+	--anki-delimiter-guide-color: color-mix(
+		in srgb,
+		var(--text-muted) 55%,
+		var(--background-modifier-border)
+	);
+	--anki-delimiter-garnish-cut: 0.62em;
+	--anki-delimiter-garnish-arm: 0.45em;
 	position: relative;
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--sync.anki-card-preview-delimiter-guide {
+	--anki-delimiter-guide-color: color-mix(
+		in srgb,
+		var(--text-muted) 62%,
+		var(--background-modifier-border)
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn.anki-card-preview-delimiter-guide {
+	--anki-delimiter-guide-color: color-mix(
+		in srgb,
+		var(--color-yellow, #d29922) 78%,
+		var(--text-normal) 22%
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip.anki-card-preview-delimiter-guide {
+	--anki-delimiter-guide-color: color-mix(
+		in srgb,
+		var(--text-muted) 82%,
+		var(--text-normal) 18%
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error.anki-card-preview-delimiter-guide {
+	--anki-delimiter-guide-color: color-mix(
+		in srgb,
+		var(--color-red, #f85149) 72%,
+		var(--text-normal) 28%
+	);
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-delimiter-guide::before {
@@ -240,36 +287,96 @@
 	background-image: linear-gradient(
 		to right,
 		transparent 0%,
-		var(--background-modifier-border) 18%,
+		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color) 90%,
 		transparent 100%
 	);
 }
 
 .markdown-source-view.is-live-preview
 	.cm-content
-	.cm-line.anki-card-preview-delimiter-guide--info::after {
-	content: 'ℹ';
+	.cm-line.anki-card-preview-delimiter-guide--info,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--typed {
+	--anki-delimiter-garnish-cut: 0.62em;
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--reversible {
+	--anki-delimiter-garnish-cut: 0.95em;
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--info::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--typed::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--reversible::before {
+	background-image: linear-gradient(
+		to right,
+		transparent 0%,
+		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color)
+			calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
+		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
+		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
+		var(--anki-delimiter-guide-color)
+			calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
+		var(--anki-delimiter-guide-color) 90%,
+		transparent 100%
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--info::after,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--typed::after,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--reversible::after {
 	position: absolute;
 	left: 50%;
 	top: var(--anki-delimiter-guide-y);
 	transform: translate(-50%, -50%);
 	font-size: 0.82em;
-	opacity: 0.82;
-	background: none;
 	line-height: 1;
+	opacity: 0.9;
+	background: none;
+	color: color-mix(in srgb, var(--anki-delimiter-guide-color) 70%, var(--text-normal) 30%);
+	z-index: 1;
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--info::after {
+	content: 'ℹ';
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--typed::after {
+	content: '⌨';
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-delimiter-guide--reversible::after {
+	content: '↑↓';
+	font-size: 0.72em;
+	letter-spacing: -0.04em;
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-delimiter-extra {
 	margin-left: 0.6em;
 	font-size: 0.78em;
 	opacity: 0.62;
-}
-
-.markdown-source-view.is-live-preview .cm-content .anki-card-preview-delimiter-garnish {
-	margin-left: 0.15em;
-	font-size: 0.82em;
-	opacity: 0.8;
-	background: none;
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-token {

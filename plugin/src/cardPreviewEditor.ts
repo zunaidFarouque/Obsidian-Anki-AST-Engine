@@ -31,9 +31,22 @@ const CARD_BLOCK_CLASS = 'anki-card-preview-cardblock';
 const BADGE_CLASS = 'anki-card-preview-badge';
 const DELIMITER_GUIDE_CLASS = 'anki-card-preview-delimiter-guide';
 const DELIMITER_GUIDE_INFO_CLASS = 'anki-card-preview-delimiter-guide--info';
+const DELIMITER_GUIDE_TYPED_CLASS = 'anki-card-preview-delimiter-guide--typed';
+const DELIMITER_GUIDE_REVERSIBLE_CLASS = 'anki-card-preview-delimiter-guide--reversible';
 const DELIMITER_EXTRA_CLASS = 'anki-card-preview-delimiter-extra';
-const DELIMITER_GARNISH_CLASS = 'anki-card-preview-delimiter-garnish';
 const CLOZE_TOKEN_CLASS = 'anki-card-preview-cloze-token';
+
+function buildDelimiterGuideClasses(garnishText?: string): string {
+	const classes = [DELIMITER_GUIDE_CLASS];
+	if (garnishText === 'ℹ') {
+		classes.push(DELIMITER_GUIDE_INFO_CLASS);
+	} else if (garnishText === '⌨') {
+		classes.push(DELIMITER_GUIDE_TYPED_CLASS);
+	} else if (garnishText === '↑↓') {
+		classes.push(DELIMITER_GUIDE_REVERSIBLE_CLASS);
+	}
+	return classes.join(' ');
+}
 
 interface PendingDecoration {
 	from: number;
@@ -325,27 +338,14 @@ export function buildCardPreviewDecorations(
 				continue;
 			}
 			if (delimiterModel.isPrimary) {
-				const guideClasses =
-					delimiterModel.garnishText === 'ℹ'
-						? `${DELIMITER_GUIDE_CLASS} ${DELIMITER_GUIDE_INFO_CLASS}`
-						: DELIMITER_GUIDE_CLASS;
 				pending.push({
 					from: lineRange.from,
 					to: lineRange.from,
-					decoration: Decoration.line({ class: guideClasses }),
+					decoration: Decoration.line({
+						class: buildDelimiterGuideClasses(delimiterModel.garnishText),
+					}),
 					startSide: 0,
 				});
-				if (delimiterModel.garnishText && delimiterModel.garnishText !== 'ℹ') {
-					pending.push({
-						from: lineRange.to,
-						to: lineRange.to,
-						decoration: Decoration.widget({
-							widget: new InlineTextWidget(delimiterModel.garnishText, DELIMITER_GARNISH_CLASS),
-							side: 1,
-						}),
-						startSide: 1,
-					});
-				}
 				continue;
 			}
 

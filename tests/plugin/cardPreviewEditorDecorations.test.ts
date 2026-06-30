@@ -411,6 +411,107 @@ describe('card preview editor decorations (Live Preview)', () => {
 		expect(garnishWidgetEntry).toBeUndefined();
 	});
 
+	test('uses centered guide modifier classes for typed and reversible garnishes', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const infoField = StateField.define<{ file: { path: string } | null } | undefined>({
+			create: () => ({ file: { path: 'Notes/typed.md' } }),
+			update: (value) => value,
+		});
+		const typedDoc = ['#### Typed Card', '', 'Question?', '', ':::t', '', 'answer'].join('\n');
+		const typedDelimiterStart = typedDoc.indexOf(':::t');
+		const typedState = EditorState.create({ doc: typedDoc, extensions: [livePreviewField, infoField] });
+		const typedDecorations = buildCardPreviewDecorations(
+			{ state: typedState } as unknown as EditorView,
+			{
+				getSettings: () => ({ enableCardPreview: true } as any),
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [
+							makeCard({
+								range: { start: 0, end: 12 },
+								resolvedType: builtinCardType('typed'),
+								regions: {
+									delimiters: [
+										{
+											kind: ':::t',
+											range: { start: typedDelimiterStart, end: typedDelimiterStart + 4 },
+										},
+									],
+								},
+							}),
+						],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+				editorInfoField: infoField as any,
+			},
+		);
+		const typedEntries = collectDecorations(typedDecorations, typedState.doc.length);
+		expect(
+			typedEntries.some((entry) =>
+				String(entry.value.spec?.class ?? '').includes('anki-card-preview-delimiter-guide--typed'),
+			),
+		).toBe(true);
+		expect(
+			typedEntries.some((entry) =>
+				String(entry.value.spec?.widget?.className ?? '').includes('anki-card-preview-delimiter-garnish'),
+			),
+		).toBe(false);
+
+		const reversibleDoc = ['#### Reversible Card', '', 'Q', '', ':::r', '', 'A'].join('\n');
+		const reversibleDelimiterStart = reversibleDoc.indexOf(':::r');
+		const reversibleState = EditorState.create({
+			doc: reversibleDoc,
+			extensions: [livePreviewField, infoField],
+		});
+		const reversibleDecorations = buildCardPreviewDecorations(
+			{ state: reversibleState } as unknown as EditorView,
+			{
+				getSettings: () => ({ enableCardPreview: true } as any),
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [
+							makeCard({
+								range: { start: 0, end: 12 },
+								resolvedType: builtinCardType('reversible'),
+								regions: {
+									delimiters: [
+										{
+											kind: ':::r',
+											range: {
+												start: reversibleDelimiterStart,
+												end: reversibleDelimiterStart + 4,
+											},
+										},
+									],
+								},
+							}),
+						],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+				editorInfoField: infoField as any,
+			},
+		);
+		const reversibleEntries = collectDecorations(reversibleDecorations, reversibleState.doc.length);
+		expect(
+			reversibleEntries.some((entry) =>
+				String(entry.value.spec?.class ?? '').includes(
+					'anki-card-preview-delimiter-guide--reversible',
+				),
+			),
+		).toBe(true);
+	});
+
 	test('keeps a visual gap between adjacent card blocks when trailing lines are outside card range', () => {
 		const livePreviewField = StateField.define<boolean>({
 			create: () => true,
