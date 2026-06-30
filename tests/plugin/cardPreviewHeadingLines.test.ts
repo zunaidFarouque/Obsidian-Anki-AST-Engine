@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
 	findCardHeadingLinePositions,
+	findLineRangeForOffset,
 	type DocumentLine,
 } from '../../plugin/src/cardPreviewUtils';
 
@@ -43,5 +44,15 @@ describe('findCardHeadingLinePositions', () => {
 	test('returns empty when no headings match the configured level', () => {
 		const lines = [line(0, '### Only h3 headings')];
 		expect(findCardHeadingLinePositions(lines, 4, 0)).toEqual([]);
+	});
+
+	test('findLineRangeForOffset maps delimiter offset to its source line bounds', () => {
+		const lines = [
+			line(0, '#### Card'),
+			line(10, 'Front'),
+			line(16, ':::r'),
+			line(21, 'Back'),
+		];
+		expect(findLineRangeForOffset(lines, 17)).toEqual({ from: 16, to: 20 });
 	});
 });

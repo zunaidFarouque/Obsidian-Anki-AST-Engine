@@ -76,7 +76,7 @@ describe("card-syntax-orphan-custom.md integration", () => {
 
     expect(result.syncEligible).toBe(true);
     expect(result.fileDefaults.builtInDefault).toBeUndefined();
-    expect(result.fileDefaults.customModelDefault).toBeUndefined();
+    expect(result.fileDefaults.customNoteTypeDefault).toBeUndefined();
     expect(result.cards).toHaveLength(2);
 
     for (const expectation of expectations) {

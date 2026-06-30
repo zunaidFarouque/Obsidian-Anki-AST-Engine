@@ -34,9 +34,9 @@ Use **noteType** language in UI/docs (matches Anki’s editor wording):
 - Built-ins: `basic`, `cloze`, `reversible`, `typed`
 - Custom: `#anki/noteType/<Name>` in preview help text and chip guidance
 
-Settings/cache naming should prefer `anki_noteTypeMap` (not `modelMap`) in user-facing copy.
+Settings/cache naming should prefer `anki_noteTypeMap` in user-facing copy.
 
-Legacy `#anki/model/*` is accepted as a deprecated alias of `#anki/noteType/*` (`#anki_card_*` and `#anki/CustomCards/...` also supported).
+`#anki_card_*` and `#anki/CustomCards/...` are also supported as legacy note type tag forms.
 
 ---
 
@@ -86,6 +86,15 @@ Format examples:
 - `basic ❌`
 
 Warn overrides sync visually (`sync with warning` is shown as warn).
+
+### 5.2.1 Card block background continuity (explicit rule)
+
+Subtle outcome tint applies to the **entire card block**, not just the declaration heading line.
+
+- Card block span: declaration heading line through the last body line before the next card declaration heading.
+- The card block tint must render as a visually continuous block (no alternating stripes/gaps between body lines).
+- Heading line keeps a stronger left accent/chip context, but body lines inherit the same card outcome tint family.
+- If outcome is `sync`, keep tint very faint; `skip`/`warn`/`error` remain progressively more visible per §5.2.
 
 ### 5.3 Sync marker options
 

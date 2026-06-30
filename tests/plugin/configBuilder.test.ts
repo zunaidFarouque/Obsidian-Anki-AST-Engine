@@ -17,6 +17,13 @@ const baseSettings: AnkiAstSyncSettings = {
 	autoCreateDecks: true,
 	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
+	orphanHandling: 'ask',
+	orphanIgnoreTag: 'obsidian-sync-ignore',
+	orphanAllowSuspend: false,
+	enableCardPreview: false,
+	cardPreviewStyle: 'subtle',
+	cardPreviewSyncMarker: 'none',
+	inferClozeFromManualSyntaxOnBasic: false,
 };
 
 describe('configBuilder', () => {

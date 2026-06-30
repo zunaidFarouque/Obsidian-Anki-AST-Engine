@@ -111,16 +111,16 @@ export function effectiveBuiltInDefaultFm04(
 }
 
 /**
- * FM-04 + RES-04 — ancestor model beats file custom default;
- * custom default applies only with `::: FieldName` blocks and no inherited model.
+ * FM-04 + RES-04 — ancestor note type beats file custom default;
+ * custom default applies only with `::: FieldName` blocks and no inherited note type.
  */
-export function effectiveCustomModelFm04(
-  ancestorOrCardModel: string | null,
+export function effectiveCustomNoteTypeFm04(
+  ancestorOrCardNoteType: string | null,
   hasFieldBlocks: boolean,
   fileDefaults: FileDefaults,
 ): string | null {
-  if (ancestorOrCardModel !== null) {
-    return ancestorOrCardModel;
+  if (ancestorOrCardNoteType !== null) {
+    return ancestorOrCardNoteType;
   }
 
   return customDefaultAppliesRes04(
@@ -133,11 +133,11 @@ export function effectiveCustomModelFm04(
 /** RES-04 — custom default is layout-triggered. */
 export function customDefaultAppliesRes04(
   hasFieldBlocks: boolean,
-  modelResolvedFromInheritance: boolean,
+  noteTypeResolvedFromInheritance: boolean,
   fileDefaults: FileDefaults,
 ): string | null {
   if (
-    modelResolvedFromInheritance ||
+    noteTypeResolvedFromInheritance ||
     !hasFieldBlocks ||
     fileDefaults.custom === null
   ) {

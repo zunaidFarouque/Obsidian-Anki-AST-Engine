@@ -1,6 +1,7 @@
 import { Notice, Plugin } from 'obsidian';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import { registerCardPreview, type CardPreviewManager } from './cardPreview';
+import { formatNoteTypeCacheNotice } from './cardPreviewUtils';
 import { buildPluginConfig } from './configBuilder';
 import { createObsidianFetch } from './obsidianFetch';
 import {
@@ -62,9 +63,19 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: 'refresh-note-type-map',
+			name: 'Refresh note type cache for preview',
+			callback: () => {
+				void this.refreshNoteTypeMap();
+			},
+		});
+
 		this.addSettingTab(new AnkiAstSyncSettingTab(this.app, this));
 
-		this.cardPreview = registerCardPreview(this, () => this.settings);
+		this.cardPreview = registerCardPreview(this, () => this.settings, () =>
+			this.fetchNoteTypeFieldMap(),
+		);
 	}
 
 	onunload() {
@@ -132,5 +143,32 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			() => this.createAnkiClient(),
 			{ dryRun: false },
 		);
+	}
+
+	async refreshNoteTypeMap(): Promise<void> {
+		const result =
+			(await this.cardPreview?.refreshNoteTypeMap()) ?? {
+				ok: false,
+				error: 'Card preview is not available.',
+			};
+		const message = formatNoteTypeCacheNotice(result);
+		new Notice(message, result.ok ? undefined : 12_000);
+	}
+
+	private async fetchNoteTypeFieldMap(): Promise<Record<string, string[]>> {
+		const client = this.createAnkiClient();
+		const modelNames = await client.modelNames();
+		const map: Record<string, string[]> = {};
+		for (const modelName of modelNames) {
+			try {
+				const fields = await client.invoke<string[]>('modelFieldNames', {
+					modelName,
+				});
+				map[modelName] = fields;
+			} catch (error) {
+				console.warn(`Unable to fetch fields for note type "${modelName}"`, error);
+			}
+		}
+		return map;
 	}
 }

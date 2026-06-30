@@ -37,6 +37,13 @@ function backHasMultipleNonemptyLines(back?: string): boolean {
   return lines.length > 1;
 }
 
+function hasExtraStructuralDelimiterInBack(back?: string): boolean {
+	if (!back) {
+		return false;
+	}
+	return /(^|\n)\s*:::(?:r|t|\s|$)/.test(back);
+}
+
 /**
  * Section 11 companion CX-* rule IDs for layout outcomes (spec matrix).
  */
@@ -105,6 +112,10 @@ export function deriveCrossCuttingRuleIds(
       rules.push("CX-08");
     }
   }
+
+	if (regions.hasPlainSplit && hasExtraStructuralDelimiterInBack(regions.backRegion)) {
+		rules.push('DEL-08');
+	}
 
   if (hasRule(layoutRuleIds, "CLZ-01")) {
     rules.push("CX-05");
@@ -178,6 +189,9 @@ export function crossCuttingMessages(
   existingRuleIds: Set<string>,
 ): CardMessage[] {
   const messages: CardMessage[] = [];
+	const ruleText: Partial<Record<string, string>> = {
+		'DEL-08': `Card "${context.cardTitle}": Extra delimiter ignored (still Back region)`,
+	};
 
   for (const ruleId of deriveCrossCuttingRuleIds(context)) {
     if (existingRuleIds.has(ruleId)) {
@@ -186,7 +200,7 @@ export function crossCuttingMessages(
     existingRuleIds.add(ruleId);
     messages.push({
       level: "info",
-      text: `Card "${context.cardTitle}": ${ruleId} applies`,
+      text: ruleText[ruleId] ?? `Card "${context.cardTitle}": ${ruleId} applies`,
       ruleId,
     });
   }

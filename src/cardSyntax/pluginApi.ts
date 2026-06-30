@@ -3,4 +3,10 @@
  */
 export * from './types';
 export { parseCardDocument } from './parseCardDocument';
-export { getBodyStartOffset } from '../io/frontmatterFilter';
+export {
+  getBodyStartOffset,
+  getCardDeclarationHeadingLevelFromFrontmatter,
+  getDelimiterFromFrontmatter,
+  getIncludeParentHeadersAsTagsFromFrontmatter,
+  parseFrontmatter,
+} from '../io/frontmatterFilter';

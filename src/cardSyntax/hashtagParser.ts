@@ -76,11 +76,6 @@ function classifyHashtag(tag: string): ParsedDirective | "user" {
     return parseNoteTypeSuffix(tag, "anki/noteType/");
   }
 
-  // Legacy alias — same semantics as #anki/noteType/*
-  if (tag.startsWith("anki/model/")) {
-    return parseNoteTypeSuffix(tag, "anki/model/");
-  }
-
   if (tag.startsWith("anki/")) {
     const noteTypePath = tag.slice("anki/".length);
     if (noteTypePath.length > 0 && !noteTypePath.startsWith("cardType/")) {
@@ -142,7 +137,7 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
     errors.push({
       ruleId: "TAG-02",
       message:
-        "A heading cannot carry both #anki/cardType/* and #anki/noteType/* (or legacy noteType tags)",
+        "A heading cannot carry both #anki/cardType/* and #anki/noteType/* (or #anki_card_* / #anki/... note type tags)",
     });
   }
 

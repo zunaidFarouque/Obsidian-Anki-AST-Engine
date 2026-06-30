@@ -142,11 +142,11 @@ describe("outlineTree", () => {
 
     const tags: Record<string, TypeDeclaration | undefined> = {
       "Untagged section": undefined,
-      "Tagged chapter": typeTag("model", "Vocab"),
+      "Tagged chapter": typeTag("noteType", "Vocab"),
     };
 
     expect(findNearestTypeDeclaration(ancestors, (h) => tags[h.text])).toEqual(
-      typeTag("model", "Vocab"),
+      typeTag("noteType", "Vocab"),
     );
   });
 

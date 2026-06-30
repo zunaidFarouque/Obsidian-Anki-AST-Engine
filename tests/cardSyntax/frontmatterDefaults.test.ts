@@ -4,7 +4,7 @@ import {
   BUILT_IN_CARD_TYPES,
   customDefaultAppliesRes04,
   effectiveBuiltInDefaultFm04,
-  effectiveCustomModelFm04,
+  effectiveCustomNoteTypeFm04,
   parseAnkiCardDefaultFromFrontmatter,
   parseAnkiCustomCardDefaultFromFrontmatter,
   parseBuiltInCardDefault,
@@ -50,7 +50,7 @@ describe("frontmatterDefaults", () => {
   });
 
   describe("FM-03 — anki_customCardDefault", () => {
-    test("parseCustomCardDefault trims and unquotes model id", () => {
+    test("parseCustomCardDefault trims and unquotes note type id", () => {
       expect(parseCustomCardDefault("Vocab")).toBe("Vocab");
       expect(parseCustomCardDefault('"My Vocab"')).toBe("My Vocab");
       expect(parseCustomCardDefault("  My_Model  ")).toBe("My_Model");
@@ -154,23 +154,23 @@ anki_customCardDefault: Vocab
       expect(effectiveBuiltInDefaultFm04(null, { builtIn: null, custom: null })).toBeNull();
     });
 
-    test("effectiveCustomModelFm04 prefers ancestor model over file custom default", () => {
+    test("effectiveCustomNoteTypeFm04 prefers ancestor note type over file custom default", () => {
       expect(
-        effectiveCustomModelFm04("Other", true, {
+        effectiveCustomNoteTypeFm04("Other", true, {
           builtIn: "basic",
           custom: "Vocab",
         }),
       ).toBe("Other");
     });
 
-    test("effectiveCustomModelFm04 uses file custom default only with field blocks (RES-04)", () => {
+    test("effectiveCustomNoteTypeFm04 uses file custom default only with field blocks (RES-04)", () => {
       const defaults: FileDefaults = { builtIn: "basic", custom: "Vocab" };
 
-      expect(effectiveCustomModelFm04(null, true, defaults)).toBe("Vocab");
-      expect(effectiveCustomModelFm04(null, false, defaults)).toBeNull();
+      expect(effectiveCustomNoteTypeFm04(null, true, defaults)).toBe("Vocab");
+      expect(effectiveCustomNoteTypeFm04(null, false, defaults)).toBeNull();
     });
 
-    test("customDefaultAppliesRes04 requires layout and no inherited model", () => {
+    test("customDefaultAppliesRes04 requires layout and no inherited note type", () => {
       const defaults: FileDefaults = { builtIn: null, custom: "Vocab" };
 
       expect(customDefaultAppliesRes04(true, false, defaults)).toBe("Vocab");

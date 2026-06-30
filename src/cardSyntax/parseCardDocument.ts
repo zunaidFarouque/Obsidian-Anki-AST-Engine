@@ -1,10 +1,14 @@
 import type { Content, Heading, Root } from "mdast";
 import { parseMarkdown } from "../ast/processor";
-import { parseFrontmatter, shouldSyncFile } from "../io/frontmatterFilter";
+import {
+  parseFrontmatter,
+  shouldSync,
+  type Frontmatter,
+} from "../io/frontmatterFilter";
 import { nodesToPreview, nodesToRawText } from "../utils/textPreview";
 import { processClozeDeletions } from "./clozeProcessor";
 import { crossCuttingMessages } from "./crossCuttingRules";
-import { resolveFileDefaultsFromRaw } from "./frontmatterDefaults";
+import { resolveFileDefaults } from "./frontmatterDefaults";
 import { parseHeadingHashtags, type HashtagParseResult } from "./hashtagParser";
 import {
   validateCardLayout,
@@ -52,12 +56,15 @@ export function parseCardDocument(
     ...options,
   };
 
-  const syncEligible = shouldSyncFile(rawText);
-  const fmDefaults = resolveFileDefaultsFromRaw(rawText);
-  const fileDefaults: FileDefaults = {
-    builtInDefault: fmDefaults.builtIn ?? undefined,
-    customModelDefault: fmDefaults.custom ?? undefined,
-  };
+  const inlineFrontmatter = parseFrontmatter(rawText);
+  const effectiveFrontmatter = resolveEffectiveFrontmatter(
+    inlineFrontmatter,
+    resolvedOptions.externalFrontmatter,
+  );
+  const syncEligible = effectiveFrontmatter
+    ? shouldSync(effectiveFrontmatter)
+    : false;
+  const fileDefaults = fileDefaultsFromFrontmatter(effectiveFrontmatter);
 
   if (!syncEligible) {
     return {
@@ -142,7 +149,7 @@ function resolveCard(
     hasTypedDelimiter: layoutRegions.hasTypedDelimiter,
     frontmatter: {
       anki_cardDefault: fileDefaults.builtInDefault,
-      anki_customCardDefault: fileDefaults.customModelDefault,
+      anki_customCardDefault: fileDefaults.customNoteTypeDefault,
     },
     inferClozeFromManualSyntaxOnBasic:
       options.inferClozeFromManualSyntaxOnBasic,
@@ -156,12 +163,12 @@ function resolveCard(
     ? "error"
     : "sync";
 
-  const layoutType = toLayoutResolvedType(resolved);
+  const layoutType = toLayoutResolvedType(resolved, options);
   const layoutResult = validateCardLayout(layoutType, layoutRegions, {
     cardTitle: title,
     inferClozeFromManualSyntaxOnBasic:
       options.inferClozeFromManualSyntaxOnBasic,
-    customModelAvailable: fileDefaults.customModelDefault !== undefined,
+    customNoteTypeDefaultAvailable: fileDefaults.customNoteTypeDefault !== undefined,
   });
 
   messages.push(...layoutMessagesToCardMessages(layoutResult.messages));
@@ -218,6 +225,43 @@ function resolveCard(
         level: "warn",
         text: `Card "${title}": ${warning} — warning`,
         ruleId: "CLZ-07",
+      });
+    }
+  }
+
+  if (
+    effectiveResolved.kind === "builtin" &&
+    effectiveResolved.type === "typed" &&
+    outcome === "sync"
+  ) {
+    const typedBackRaw = layoutRegions.backRegion ?? "";
+    const typedBackSource = extracted.regions.back
+      ? rawText.slice(extracted.regions.back.start, extracted.regions.back.end)
+      : typedBackRaw;
+    const typedBackLines = typedBackRaw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (typedBackLines.length > 1) {
+      messages.push({
+        level: "warn",
+        text: `Card "${title}": typed answer should be a single line — warning`,
+        ruleId: "TYP-04",
+      });
+    }
+
+    const hasTypedFormatting =
+      /`[^`]+`/.test(typedBackSource) ||
+      /\*\*[^*\n]+\*\*/.test(typedBackSource) ||
+      /__[^_\n]+__/.test(typedBackSource) ||
+      /\*[^*\n]+\*/.test(typedBackSource) ||
+      /_[^_\n]+_/.test(typedBackSource) ||
+      /\[[^\]]+\]\([^)]+\)/.test(typedBackSource);
+    if (hasTypedFormatting) {
+      messages.push({
+        level: "warn",
+        text: `Card "${title}": typed answer includes formatting; plain text is recommended — warning`,
+        ruleId: "TYP-05",
       });
     }
   }
@@ -417,12 +461,16 @@ function buildLayoutRegions(
 
 function toLayoutResolvedType(
   resolved: ReturnType<typeof resolveCardType>,
+  options: ParseCardDocumentOptions,
 ): LayoutResolvedCardType {
   if (resolved.kind === "custom") {
     return {
       kind: "custom",
       noteTypeId: resolved.noteTypeId,
-      fieldNames: NOTE_TYPE_FIELD_NAMES[resolved.noteTypeId] ?? [],
+      fieldNames:
+        options.noteTypeFieldNamesByNoteType[resolved.noteTypeId] ??
+        NOTE_TYPE_FIELD_NAMES[resolved.noteTypeId] ??
+        [],
     };
   }
 
@@ -512,4 +560,23 @@ function extractAnkiId(backNodes: Content[]): string | undefined {
   const backText = nodesToPreview(backNodes);
   const match = backText.match(ANKI_ID_REGEX);
   return match?.[1];
+}
+
+function resolveEffectiveFrontmatter(
+  inlineFrontmatter: Frontmatter | null,
+  externalFrontmatter: Frontmatter | null | undefined,
+): Frontmatter | null {
+  return inlineFrontmatter ?? externalFrontmatter ?? null;
+}
+
+function fileDefaultsFromFrontmatter(frontmatter: Frontmatter | null): FileDefaults {
+  if (!frontmatter) {
+    return {};
+  }
+
+  const resolved = resolveFileDefaults(frontmatter);
+  return {
+    builtInDefault: resolved.builtIn ?? undefined,
+    customNoteTypeDefault: resolved.custom ?? undefined,
+  };
 }

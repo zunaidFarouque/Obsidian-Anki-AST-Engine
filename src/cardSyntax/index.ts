@@ -32,7 +32,7 @@ export {
   parseAnkiCardDefaultFromFrontmatter,
   parseAnkiCustomCardDefaultFromFrontmatter,
   effectiveBuiltInDefaultFm04,
-  effectiveCustomModelFm04,
+  effectiveCustomNoteTypeFm04,
   customDefaultAppliesRes04,
   type FileDefaults as FrontmatterFileDefaults,
 } from "./frontmatterDefaults";

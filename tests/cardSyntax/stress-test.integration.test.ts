@@ -297,7 +297,7 @@ describe("card-syntax-stress-test.md integration", () => {
 
       expect(result.syncEligible).toBe(true);
       expect(result.fileDefaults.builtInDefault).toBe("basic");
-      expect(result.fileDefaults.customModelDefault).toBe("Vocab");
+      expect(result.fileDefaults.customNoteTypeDefault).toBe("Vocab");
       expect(result.cards.length).toBe(expectations.length);
 
       const failures: string[] = [];

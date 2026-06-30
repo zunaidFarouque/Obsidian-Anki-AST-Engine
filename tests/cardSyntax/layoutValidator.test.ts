@@ -182,14 +182,14 @@ describe("validateCardLayout — BAS-06 wrong layout for basic", () => {
     expect(messageText(result)).toContain(':::t conflicts with resolved type "basic"');
   });
 
-  test("errors on basic + ::: Field when custom model is available", () => {
+  test("errors on basic + ::: Field when custom note type default is available", () => {
     const result = validateCardLayout(
       basic,
       regions({
         textRegion: "",
         fieldBlocks: [{ fieldName: "Word", content: "entropy" }],
       }),
-      options({ customModelAvailable: true }),
+      options({ customNoteTypeDefaultAvailable: true }),
     );
 
     expect(result.outcome).toBe("error");
@@ -431,7 +431,7 @@ describe("validateCardLayout — CUS-01..05 custom", () => {
     expect(messageText(result)).toContain("Word, Definition, Example");
   });
 
-  test("skips orphan custom layout without resolved model (CUS-03)", () => {
+  test("skips orphan custom layout without resolved note type (CUS-03)", () => {
     const result = validateCardLayout(
       basic,
       regions({
@@ -442,7 +442,7 @@ describe("validateCardLayout — CUS-01..05 custom", () => {
 
     expect(result.outcome).toBe("skip");
     expect(result.messages.some((m) => m.ruleId === "CUS-03")).toBe(true);
-    expect(messageText(result)).toContain("custom field layout but no model resolved");
+    expect(messageText(result)).toContain("custom field layout but no note type resolved");
   });
 
   test("skips custom with only plain ::: (CUS-04)", () => {

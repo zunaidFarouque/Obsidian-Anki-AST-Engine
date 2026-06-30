@@ -1,5 +1,5 @@
 import { RangeSetBuilder } from '@codemirror/state';
-import type { Extension } from '@codemirror/state';
+import type { Extension, StateField } from '@codemirror/state';
 import {
 	Decoration,
 	DecorationSet,
@@ -9,22 +9,63 @@ import {
 	type ViewUpdate,
 	WidgetType,
 } from '@codemirror/view';
-import { editorInfoField, editorLivePreviewField } from 'obsidian';
+import type { TFile } from 'obsidian';
 import type { ParseCardDocumentResult, ResolvedCard } from 'obsidian-anki-ast-engine/cardSyntax';
 import { getBodyStartOffset } from 'obsidian-anki-ast-engine/cardSyntax';
 import type { AnkiAstSyncSettings } from './settings';
 import {
+	buildBackOnlyClozeWarningMeta,
+	buildClozeTokenDecorations,
+	buildDelimiterLineDecorations,
+	buildHeadingBadgeModel,
 	findCardHeadingLinePositions,
+	findLineRangeForOffset,
 	formatCardPreviewTooltip,
-	outcomeToBadgeClass,
-	zipCardsToHeadings,
+	shouldRebuildCardPreviewDecorations,
+	type CardHeadingLinePosition,
+	type DocumentLine,
 } from './cardPreviewUtils';
 
 const HEADING_OUTLINE_CLASS = 'anki-card-preview-heading';
+const CARD_BLOCK_CLASS = 'anki-card-preview-cardblock';
 const BADGE_CLASS = 'anki-card-preview-badge';
+const DELIMITER_GUIDE_CLASS = 'anki-card-preview-delimiter-guide';
+const DELIMITER_GUIDE_INFO_CLASS = 'anki-card-preview-delimiter-guide--info';
+const DELIMITER_EXTRA_CLASS = 'anki-card-preview-delimiter-extra';
+const DELIMITER_GARNISH_CLASS = 'anki-card-preview-delimiter-garnish';
+const CLOZE_TOKEN_CLASS = 'anki-card-preview-cloze-token';
+
+interface PendingDecoration {
+	from: number;
+	to: number;
+	decoration: Decoration;
+	startSide: number;
+}
+
+function buildSortedDecorationSet(entries: PendingDecoration[]): DecorationSet {
+	if (entries.length === 0) {
+		return Decoration.none;
+	}
+
+	entries.sort((a, b) => {
+		if (a.from !== b.from) {
+			return a.from - b.from;
+		}
+		return a.startSide - b.startSide;
+	});
+
+	const builder = new RangeSetBuilder<Decoration>();
+	for (const entry of entries) {
+		builder.add(entry.from, entry.to, entry.decoration);
+	}
+	return builder.finish();
+}
 
 class CardPreviewBadgeWidget extends WidgetType {
-	constructor(private readonly card: ResolvedCard) {
+	constructor(
+		private readonly card: ResolvedCard,
+		private readonly onMoreAction?: () => void,
+	) {
 		super();
 	}
 
@@ -37,21 +78,166 @@ class CardPreviewBadgeWidget extends WidgetType {
 	}
 
 	toDOM(): HTMLElement {
-		const outcomeClass = outcomeToBadgeClass(this.card.outcome);
-		const badge = document.createElement('span');
-		badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${outcomeClass}`;
-		badge.textContent = this.card.outcome;
-		const tooltip = formatCardPreviewTooltip(this.card);
-		badge.setAttribute('aria-label', tooltip);
-		badge.title = tooltip;
-		return badge;
+		return createCardPreviewBadgeElement(this.card, this.onMoreAction);
+	}
+}
+
+export function createCardPreviewBadgeElement(
+	card: ResolvedCard,
+	onMoreAction?: () => void,
+): HTMLElement {
+	const badgeModel = buildHeadingBadgeModel(card);
+	const badge = document.createElement('span');
+	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}`;
+	badge.textContent = badgeModel.label;
+	const tooltip = formatCardPreviewTooltip(card);
+	badge.setAttribute('aria-label', tooltip);
+	const tooltipElement = document.createElement('span');
+	tooltipElement.className = 'anki-card-preview-tooltip';
+	tooltipElement.setAttribute('role', 'tooltip');
+	tooltipElement.textContent = tooltip;
+	badge.appendChild(tooltipElement);
+	const backOnlyMeta = buildBackOnlyClozeWarningMeta(card);
+	if (backOnlyMeta.hasBackOnlyWarning) {
+		badge.dataset.backOnlyClozeWarning = backOnlyMeta.ruleId ?? 'true';
+	}
+	if (onMoreAction) {
+		const moreAction = document.createElement('button');
+		moreAction.type = 'button';
+		moreAction.className = `${BADGE_CLASS}-more`;
+		moreAction.textContent = 'More';
+		moreAction.setAttribute('aria-label', 'Open card preview details');
+		moreAction.addEventListener('click', (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			onMoreAction();
+		});
+		badge.appendChild(moreAction);
+	}
+	return badge;
+}
+
+class InlineTextWidget extends WidgetType {
+	constructor(private readonly text: string, private readonly className: string) {
+		super();
+	}
+
+	toDOM(): HTMLElement {
+		const element = document.createElement('span');
+		element.className = this.className;
+		element.textContent = this.text;
+		return element;
 	}
 }
 
 export interface CardPreviewEditorOptions {
 	getSettings: () => AnkiAstSyncSettings;
-	parseContent: (content: string) => ParseCardDocumentResult;
+	parseContent: (content: string, file?: TFile) => ParseCardDocumentResult;
+	getCardDeclarationHeadingLevel: (content: string, file?: TFile) => number;
 	getSettingsRevision: () => number;
+	openCardPreviewDetails?: (card: ResolvedCard, filePath: string) => void;
+	editorLivePreviewField?: StateField<boolean>;
+	editorInfoField?: StateField<{ file: TFile | null } | undefined>;
+}
+
+function isCardDeclarationHeadingLine(line: string, headingLevel: number): boolean {
+	const clampedLevel = Math.min(6, Math.max(1, headingLevel));
+	const markPrefix = '#'.repeat(clampedLevel);
+	const requiredPrefix = `${markPrefix} `;
+	if (!line.startsWith(requiredPrefix)) {
+		return false;
+	}
+	return !(line.length > requiredPrefix.length && line[requiredPrefix.length] === '#');
+}
+
+function mapCardsToHeadingLines(
+	cards: ResolvedCard[],
+	lines: DocumentLine[],
+	headingLevel: number,
+	fallbackHeadings: CardHeadingLinePosition[],
+): Array<{ card: ResolvedCard; heading: CardHeadingLinePosition }> {
+	const pairs: Array<{ card: ResolvedCard; heading: CardHeadingLinePosition }> = [];
+	const usedFallbackIndices = new Set<number>();
+
+	for (const card of cards) {
+		const declarationHeading = findLineRangeForOffset(lines, card.range.start);
+		if (declarationHeading) {
+			const declarationLineText =
+				lines.find((line) => line.from === declarationHeading.from)?.text ?? '';
+			if (isCardDeclarationHeadingLine(declarationLineText, headingLevel)) {
+				pairs.push({ card, heading: declarationHeading });
+				continue;
+			}
+		}
+
+		const fallbackIndex = fallbackHeadings.findIndex(
+			(heading, index) =>
+				!usedFallbackIndices.has(index) &&
+				heading.from >= card.range.start,
+		);
+		if (fallbackIndex >= 0) {
+			usedFallbackIndices.add(fallbackIndex);
+			pairs.push({ card, heading: fallbackHeadings[fallbackIndex]! });
+		}
+	}
+
+	return pairs;
+}
+
+function findCoveredLineStarts(
+	lines: DocumentLine[],
+	startOffset: number,
+	endOffsetExclusive: number,
+): number[] {
+	const starts: number[] = [];
+	for (const line of lines) {
+		if (line.from < startOffset) {
+			continue;
+		}
+		if (line.from >= endOffsetExclusive) {
+			break;
+		}
+		starts.push(line.from);
+	}
+	return starts;
+}
+
+function resolveCardBlockEndOffset(
+	lines: DocumentLine[],
+	card: ResolvedCard,
+	nextHeadingStart: number,
+): number {
+	const probeOffset = Math.max(card.range.start, card.range.end - 1);
+	const endLine = findLineRangeForOffset(lines, probeOffset);
+	if (!endLine) {
+		return nextHeadingStart;
+	}
+	return Math.min(nextHeadingStart, endLine.to + 1);
+}
+
+function resolveLivePreviewMode(
+	view: EditorView,
+	livePreviewField?: StateField<boolean>,
+): boolean {
+	if (livePreviewField) {
+		const fieldValue = view.state.field(livePreviewField, false);
+		if (typeof fieldValue === 'boolean') {
+			return fieldValue;
+		}
+	}
+
+	const sourceView = view.dom.closest('.markdown-source-view');
+	return sourceView?.classList.contains('is-live-preview') ?? false;
+}
+
+function resolveEditorFile(
+	view: EditorView,
+	infoField?: StateField<{ file: TFile | null } | undefined>,
+): TFile | undefined {
+	if (!infoField) {
+		return undefined;
+	}
+	return view.state.field(infoField, false)?.file ?? undefined;
 }
 
 export function buildCardPreviewDecorations(
@@ -62,22 +248,20 @@ export function buildCardPreviewDecorations(
 		return Decoration.none;
 	}
 
-	if (!view.state.field(editorLivePreviewField)) {
+	const isLivePreview = resolveLivePreviewMode(view, options.editorLivePreviewField);
+	if (!isLivePreview) {
 		return Decoration.none;
 	}
 
-	const editorInfo = view.state.field(editorInfoField);
-	if (!editorInfo?.file) {
-		return Decoration.none;
-	}
+	const file = resolveEditorFile(view, options.editorInfoField);
 
 	const content = view.state.doc.toString();
-	const result = options.parseContent(content);
+	const result = options.parseContent(content, file);
 	if (!result.syncEligible || result.cards.length === 0) {
 		return Decoration.none;
 	}
 
-	const headingLevel = options.getSettings().defaultCardDeclarationHeadingLevel;
+	const headingLevel = options.getCardDeclarationHeadingLevel(content, file);
 	const bodyStartOffset = getBodyStartOffset(content);
 	const lines = [];
 	const doc = view.state.doc;
@@ -92,34 +276,113 @@ export function buildCardPreviewDecorations(
 		headingLevel,
 		bodyStartOffset,
 	);
-	const pairs = zipCardsToHeadings(result.cards, headingPositions);
-	const builder = new RangeSetBuilder<Decoration>();
+	const pairs = mapCardsToHeadingLines(result.cards, lines, headingLevel, headingPositions);
+	const pending: PendingDecoration[] = [];
 
-	for (const { card, heading } of pairs) {
-		const outcomeClass = outcomeToBadgeClass(card.outcome);
-		builder.add(
-			heading.from,
-			heading.from,
-			Decoration.line({
-				class: `${HEADING_OUTLINE_CLASS} ${HEADING_OUTLINE_CLASS}--${outcomeClass}`,
+	for (let index = 0; index < pairs.length; index += 1) {
+		const { card, heading } = pairs[index]!;
+		const badgeModel = buildHeadingBadgeModel(card);
+		const nextHeadingStart = pairs[index + 1]?.heading.from ?? doc.length + 1;
+		const cardBlockEndOffset = resolveCardBlockEndOffset(lines, card, nextHeadingStart);
+		const coveredLineStarts = findCoveredLineStarts(lines, heading.from, cardBlockEndOffset);
+
+		for (const lineStart of coveredLineStarts) {
+			pending.push({
+				from: lineStart,
+				to: lineStart,
+				decoration: Decoration.line({
+					class: `${CARD_BLOCK_CLASS} ${CARD_BLOCK_CLASS}--${badgeModel.displayOutcome}`,
+				}),
+				startSide: 0,
+			});
+		}
+
+		pending.push({
+			from: heading.from,
+			to: heading.from,
+			decoration: Decoration.line({
+				class: `${HEADING_OUTLINE_CLASS} ${HEADING_OUTLINE_CLASS}--${badgeModel.displayOutcome}`,
 			}),
-		);
-		builder.add(
-			heading.to,
-			heading.to,
-			Decoration.widget({
-				widget: new CardPreviewBadgeWidget(card),
+			startSide: 0,
+		});
+		pending.push({
+			from: heading.to,
+			to: heading.to,
+			decoration: Decoration.widget({
+				widget: new CardPreviewBadgeWidget(card, () => {
+					if (file?.path) {
+						options.openCardPreviewDetails?.(card, file.path);
+					}
+				}),
 				side: 1,
 			}),
-		);
+			startSide: 1,
+		});
+
+		for (const delimiterModel of buildDelimiterLineDecorations(card)) {
+			const lineRange = findLineRangeForOffset(lines, delimiterModel.start);
+			if (!lineRange) {
+				continue;
+			}
+			if (delimiterModel.isPrimary) {
+				const guideClasses =
+					delimiterModel.garnishText === 'ℹ'
+						? `${DELIMITER_GUIDE_CLASS} ${DELIMITER_GUIDE_INFO_CLASS}`
+						: DELIMITER_GUIDE_CLASS;
+				pending.push({
+					from: lineRange.from,
+					to: lineRange.from,
+					decoration: Decoration.line({ class: guideClasses }),
+					startSide: 0,
+				});
+				if (delimiterModel.garnishText && delimiterModel.garnishText !== 'ℹ') {
+					pending.push({
+						from: lineRange.to,
+						to: lineRange.to,
+						decoration: Decoration.widget({
+							widget: new InlineTextWidget(delimiterModel.garnishText, DELIMITER_GARNISH_CLASS),
+							side: 1,
+						}),
+						startSide: 1,
+					});
+				}
+				continue;
+			}
+
+			pending.push({
+				from: lineRange.to,
+				to: lineRange.to,
+				decoration: Decoration.widget({
+					widget: new InlineTextWidget(
+						delimiterModel.discouragementText ?? '',
+						DELIMITER_EXTRA_CLASS,
+					),
+					side: 1,
+				}),
+				startSide: 1,
+			});
+		}
+
+		for (const token of buildClozeTokenDecorations(card, content)) {
+			pending.push({
+				from: token.start,
+				to: token.end,
+				decoration: Decoration.mark({
+					class: `${CLOZE_TOKEN_CLASS} ${token.paletteClass}`,
+				}),
+				startSide: 0,
+			});
+		}
 	}
 
-	return builder.finish();
+	return buildSortedDecorationSet(pending);
 }
 
 class CardPreviewEditorPlugin implements PluginValue {
 	decorations: DecorationSet;
 	private lastSettingsRevision = -1;
+	private lastLivePreview = false;
+	private lastEditorFilePath: string | undefined;
 
 	constructor(
 		private readonly view: EditorView,
@@ -127,19 +390,39 @@ class CardPreviewEditorPlugin implements PluginValue {
 	) {
 		this.decorations = buildCardPreviewDecorations(view, options);
 		this.lastSettingsRevision = options.getSettingsRevision();
+		this.lastLivePreview = resolveLivePreviewMode(view, options.editorLivePreviewField);
+		this.lastEditorFilePath = resolveEditorFile(view, options.editorInfoField)?.path;
 	}
 
 	update(update: ViewUpdate): void {
 		const settingsRevision = this.options.getSettingsRevision();
+		const currentLivePreview = resolveLivePreviewMode(
+			update.view,
+			this.options.editorLivePreviewField,
+		);
+		const currentEditorFilePath = resolveEditorFile(
+			update.view,
+			this.options.editorInfoField,
+		)?.path;
+		const livePreviewChanged = currentLivePreview !== this.lastLivePreview;
+		const editorFileChanged = currentEditorFilePath !== this.lastEditorFilePath;
+
 		if (
-			!update.docChanged &&
-			!update.viewportChanged &&
-			settingsRevision === this.lastSettingsRevision
+			!shouldRebuildCardPreviewDecorations({
+				docChanged: update.docChanged,
+				viewportChanged: update.viewportChanged,
+				settingsRevision,
+				lastSettingsRevision: this.lastSettingsRevision,
+				livePreviewChanged,
+				editorFileChanged,
+			})
 		) {
 			return;
 		}
 
 		this.lastSettingsRevision = settingsRevision;
+		this.lastLivePreview = currentLivePreview;
+		this.lastEditorFilePath = currentEditorFilePath;
 		this.decorations = buildCardPreviewDecorations(update.view, this.options);
 	}
 

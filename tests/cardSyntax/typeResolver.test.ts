@@ -45,7 +45,7 @@ describe("resolveCardType — RES-01 card heading wins", () => {
     });
   });
 
-  test("card heading model overrides section builtin", () => {
+  test("card heading note type overrides section builtin", () => {
     const result = resolveCardType(
       ctx({
         cardHeading: {
@@ -276,8 +276,8 @@ describe("resolveCardType — RES-07 final fallback", () => {
   });
 });
 
-describe("resolveCardType — RES-08 model tags inherit on sections", () => {
-  test("inherits custom model from ancestor section", () => {
+describe("resolveCardType — RES-08 note type tags inherit on sections", () => {
+  test("inherits custom note type from ancestor section", () => {
     const result = resolveCardType(
       ctx({
         ancestors: [

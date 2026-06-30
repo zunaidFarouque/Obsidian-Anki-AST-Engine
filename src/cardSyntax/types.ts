@@ -71,7 +71,7 @@ export interface ResolvedCard {
 
 export interface FileDefaults {
   builtInDefault?: BuiltInCardType;
-  customModelDefault?: string;
+  customNoteTypeDefault?: string;
 }
 
 export interface ParseCardDocumentOptions {
@@ -80,6 +80,9 @@ export interface ParseCardDocumentOptions {
   delimiter: string;
   includeParentHeadersAsTags: boolean;
   bodyStartOffset: number;
+  noteTypeFieldNamesByNoteType: Record<string, string[]>;
+  /** Obsidian Properties / metadata when the editor body omits the YAML block. */
+  externalFrontmatter?: import("../io/frontmatterFilter").Frontmatter | null;
 }
 
 export const DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS: ParseCardDocumentOptions = {
@@ -88,6 +91,7 @@ export const DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS: ParseCardDocumentOptions = {
   delimiter: ":::",
   includeParentHeadersAsTags: true,
   bodyStartOffset: 0,
+  noteTypeFieldNamesByNoteType: {},
 };
 
 export interface ParseCardDocumentResult {

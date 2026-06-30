@@ -36,6 +36,23 @@ describe("parseCardDocument — sync gate", () => {
     expect(result.syncEligible).toBe(true);
     expect(result.fileDefaults.builtInDefault).toBe("basic");
   });
+
+  test("uses externalFrontmatter when editor body omits YAML block", () => {
+    const body = "#### Card\n\nQ\n\n:::\n\nA";
+    const result = parseCardDocument(body, {
+      ...DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+      bodyStartOffset: 0,
+      externalFrontmatter: {
+        AnkiSync: "on",
+        anki_cardDefault: "basic",
+      },
+    });
+
+    expect(result.syncEligible).toBe(true);
+    expect(result.fileDefaults.builtInDefault).toBe("basic");
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0]!.title).toBe("Card");
+  });
 });
 
 describe("parseCardDocument — basic cards", () => {
@@ -137,7 +154,7 @@ describe("parseCardDocument — hashtag conflicts", () => {
     expect(card.messages.some((m) => m.ruleId === "CX-26")).toBe(true);
   });
 
-  test("errors when section heading mixes cardType and model (TAG-02, CX-02)", () => {
+  test("errors when section heading mixes cardType and noteType (TAG-02, CX-02)", () => {
     const result = parseDoc(
       "### Bad #anki/cardType/cloze #anki/noteType/Vocab\n\n#### Child\n\n::: Word\nw\n\n::: Definition\nd",
     );
@@ -170,6 +187,57 @@ The {{c1::mitochondria}} is important.
     expect(card.outcome).toBe("sync");
     expect(formatResolvedCardType(card.resolvedType)).toBe("cloze");
     expect(card.messages.some((m) => m.ruleId === "BAS-04")).toBe(false);
+  });
+});
+
+describe("parseCardDocument — custom field map and typed warnings", () => {
+  test("uses provided noteTypeFieldNamesByNoteType for CUS-02 validation", () => {
+    const raw = `---
+AnkiSync: on
+---
+
+#### Vocab Card #anki/noteType/Vocab
+
+::: Prompt
+entropy
+
+::: Response
+energy dispersal`;
+
+    const withoutMap = parseCardDocument(raw, {
+      ...DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+      bodyStartOffset: getBodyStartOffset(raw),
+    });
+    expect(withoutMap.cards[0]!.outcome).toBe("error");
+    expect(withoutMap.cards[0]!.messages.some((m) => m.ruleId === "CUS-02")).toBe(true);
+
+    const withMap = parseCardDocument(raw, {
+      ...DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+      bodyStartOffset: getBodyStartOffset(raw),
+      noteTypeFieldNamesByNoteType: {
+        Vocab: ["Prompt", "Response"],
+      },
+    });
+    expect(withMap.cards[0]!.outcome).toBe("sync");
+    expect(withMap.cards[0]!.messages.some((m) => m.ruleId === "CUS-02")).toBe(false);
+  });
+
+  test("warns when typed answer has multiple lines", () => {
+    const result = parseDoc(
+      "#### Typed #anki/cardType/typed\n\nCapital?\n\n:::t\n\nParis\nLyon",
+    );
+    const card = result.cards[0]!;
+    expect(card.messages.some((m) => m.ruleId === "TYP-04")).toBe(true);
+    expect(card.messages.some((m) => m.level === "warn")).toBe(true);
+  });
+
+  test("warns when typed answer includes formatting", () => {
+    const result = parseDoc(
+      "#### Typed #anki/cardType/typed\n\nCapital?\n\n:::t\n\n**Paris**",
+    );
+    const card = result.cards[0]!;
+    expect(card.messages.some((m) => m.ruleId === "TYP-05")).toBe(true);
+    expect(card.messages.some((m) => m.level === "warn")).toBe(true);
   });
 });
 

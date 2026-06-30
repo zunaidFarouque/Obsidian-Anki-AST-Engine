@@ -26,8 +26,8 @@ export interface CardLayoutRegions {
 export interface LayoutValidatorOptions {
   cardTitle?: string;
   inferClozeFromManualSyntaxOnBasic?: boolean;
-  /** True when a custom note type id is available but the card resolved to a builtin type. */
-  customModelAvailable?: boolean;
+  /** True when a custom note type default is set but the card resolved to a builtin type. */
+  customNoteTypeDefaultAvailable?: boolean;
 }
 
 export type LayoutOutcome = "sync" | "skip" | "error";
@@ -190,7 +190,7 @@ function validateBasicLayout(
 
   if (
     regions.fieldBlocks.length > 0 &&
-    options.customModelAvailable
+    options.customNoteTypeDefaultAvailable
   ) {
     pushMessage(
       messages,
@@ -415,7 +415,7 @@ export function validateCardLayout(
   if (
     regions.fieldBlocks.length > 0 &&
     resolvedType.kind !== "custom" &&
-    !options.customModelAvailable
+    !options.customNoteTypeDefaultAvailable
   ) {
     pushMessage(
       messages,

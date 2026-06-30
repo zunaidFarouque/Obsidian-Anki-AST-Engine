@@ -237,7 +237,6 @@ back
 **Legacy (equivalent semantics):**
 
 - `#anki_card_<NoteTypeId>`
-- `#anki/model/<NoteTypeId>` (deprecated alias of `#anki/noteType/<NoteTypeId>`)
 - `#anki/CustomCards/<id>` (or any `#anki/...` path that is not `cardType/` or `noteType/`)
 
 Users may choose their preferred form; the engine accepts all of the above. **Prefer `#anki/noteType/*` for new notes.**
@@ -258,7 +257,7 @@ Users may choose their preferred form; the engine accepts all of the above. **Pr
 
 ### TAG-02 — cardType and noteType are mutually exclusive
 
-**Rule:** A single heading cannot carry both `#anki/cardType/*` and `#anki/noteType/*` (or legacy noteType tags). → **error**
+**Rule:** A single heading cannot carry both `#anki/cardType/*` and `#anki/noteType/*` (or `#anki_card_*` / other note type tags). → **error**
 
 **Example — error:**
 

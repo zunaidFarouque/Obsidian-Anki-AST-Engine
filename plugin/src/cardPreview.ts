@@ -1,17 +1,31 @@
-import { TFile, type MarkdownPostProcessorContext, type Plugin } from 'obsidian';
+import {
+	TFile,
+	editorInfoField,
+	editorLivePreviewField,
+	type MarkdownPostProcessorContext,
+	type Plugin,
+} from 'obsidian';
 import {
 	getBodyStartOffset,
+	getCardDeclarationHeadingLevelFromFrontmatter,
+	getDelimiterFromFrontmatter,
+	getIncludeParentHeadersAsTagsFromFrontmatter,
 	parseCardDocument,
+	parseFrontmatter,
 	type ParseCardDocumentResult,
 } from 'obsidian-anki-ast-engine/cardSyntax';
+import { formatResolvedCardType } from '../../src/cardSyntax/types';
 import type { AnkiAstSyncSettings } from './settings';
 import { createCardPreviewEditorExtension } from './cardPreviewEditor';
 import {
 	CARD_PREVIEW_DEBOUNCE_MS,
 	cardDeclarationHeadingSelector,
+	buildLightweightTooltip,
+	computePreviewOutcomeClass,
 	computeContentCacheKey,
-	formatCardPreviewTooltip,
-	outcomeToBadgeClass,
+	frontmatterFromObsidianMetadata,
+	refreshNoteTypeMapFromHook,
+	type NoteTypeCacheRefreshResult,
 	zipCardsToHeadings,
 } from './cardPreviewUtils';
 
@@ -30,22 +44,28 @@ export class CardPreviewManager {
 	private readonly pendingContent = new Map<string, string>();
 	private readonly previewElements = new Map<string, WeakRef<HTMLElement>>();
 	private settingsRevision = 0;
+	private noteTypeFieldNamesByNoteType: Record<string, string[]> = {};
+	private noteTypeCacheRevision = 0;
 
 	constructor(
 		private readonly plugin: Plugin,
 		private readonly getSettings: () => AnkiAstSyncSettings,
+		private readonly refreshNoteTypeMapHook?: () => Promise<Record<string, string[]>>,
 	) {}
 
 	register(): void {
-		this.plugin.registerMarkdownPostProcessor((element, context) => {
-			void this.processPreview(element, context);
-		});
-
 		this.plugin.registerEditorExtension(
 			createCardPreviewEditorExtension({
 				getSettings: () => this.getSettings(),
-				parseContent: (content) => this.parseContent(content),
+				parseContent: (content, file) => this.parseContent(content, file),
+				getCardDeclarationHeadingLevel: (content, file) =>
+					this.getCardDeclarationHeadingLevel(content, file),
 				getSettingsRevision: () => this.settingsRevision,
+				openCardPreviewDetails: (card, filePath) => {
+					void this.openCardPreviewModal(filePath, card);
+				},
+				editorLivePreviewField,
+				editorInfoField,
 			}),
 		);
 	}
@@ -77,6 +97,17 @@ export class CardPreviewManager {
 		}
 	}
 
+	async refreshNoteTypeMap(): Promise<NoteTypeCacheRefreshResult> {
+		const result = await refreshNoteTypeMapFromHook(this.refreshNoteTypeMapHook);
+		if (!result.ok) {
+			return result;
+		}
+		this.noteTypeFieldNamesByNoteType = result.noteTypeFieldMap;
+		this.noteTypeCacheRevision += 1;
+		this.onSettingsChanged();
+		return result;
+	}
+
 	private async processPreview(
 		element: HTMLElement,
 		context: MarkdownPostProcessorContext,
@@ -98,11 +129,11 @@ export class CardPreviewManager {
 		this.previewElements.set(sourcePath, new WeakRef(element));
 
 		const content = await this.plugin.app.vault.cachedRead(file);
-		const cacheKey = computeContentCacheKey(sourcePath, content);
+		const cacheKey = computeContentCacheKey(sourcePath, content, this.noteTypeCacheRevision);
 		const cached = this.cache.get(sourcePath);
 
 		if (cached?.key === cacheKey) {
-			this.applyDecorations(element, cached.result);
+			this.applyDecorations(element, cached.result, sourcePath);
 			return;
 		}
 
@@ -117,12 +148,16 @@ export class CardPreviewManager {
 			const latestContent = this.pendingContent.get(sourcePath) ?? content;
 			this.pendingContent.delete(sourcePath);
 
-			const latestKey = computeContentCacheKey(sourcePath, latestContent);
+			const latestKey = computeContentCacheKey(
+				sourcePath,
+				latestContent,
+				this.noteTypeCacheRevision,
+			);
 			const latestCached = this.cache.get(sourcePath);
 			if (latestCached?.key === latestKey) {
 				const preview = this.previewElements.get(sourcePath)?.deref();
 				if (preview?.isConnected) {
-					this.applyDecorations(preview, latestCached.result);
+					this.applyDecorations(preview, latestCached.result, sourcePath);
 				}
 				return;
 			}
@@ -132,26 +167,60 @@ export class CardPreviewManager {
 
 			const preview = this.previewElements.get(sourcePath)?.deref();
 			if (preview?.isConnected) {
-				this.applyDecorations(preview, result);
+				this.applyDecorations(preview, result, sourcePath);
 			}
 		}, CARD_PREVIEW_DEBOUNCE_MS);
 
 		this.pendingTimers.set(sourcePath, timer);
 	}
 
-	parseContent(content: string): ParseCardDocumentResult {
-		return parseCardDocument(content, this.buildParseOptions(content));
+	parseContent(content: string, file?: TFile): ParseCardDocumentResult {
+		return parseCardDocument(content, this.buildParseOptions(content, file));
 	}
 
-	private buildParseOptions(content: string) {
+	getCardDeclarationHeadingLevel(content: string, file?: TFile): number {
 		const settings = this.getSettings();
+		const effectiveFrontmatter = this.resolveEffectiveFrontmatter(content, file);
+		return getCardDeclarationHeadingLevelFromFrontmatter(
+			effectiveFrontmatter,
+			settings.defaultCardDeclarationHeadingLevel,
+		);
+	}
+
+	private resolveEffectiveFrontmatter(content: string, file?: TFile) {
+		const inlineFrontmatter = parseFrontmatter(content);
+		if (inlineFrontmatter) {
+			return inlineFrontmatter;
+		}
+		if (!file) {
+			return null;
+		}
+		return frontmatterFromObsidianMetadata(
+			this.plugin.app.metadataCache.getFileCache(file)?.frontmatter,
+		);
+	}
+
+	private buildParseOptions(content: string, file?: TFile) {
+		const settings = this.getSettings();
+		const inlineFrontmatter = parseFrontmatter(content);
+		const effectiveFrontmatter = this.resolveEffectiveFrontmatter(content, file);
+		const frontmatterForOptions = effectiveFrontmatter;
+
 		return {
 			inferClozeFromManualSyntaxOnBasic:
 				settings.inferClozeFromManualSyntaxOnBasic,
-			cardDeclarationHeadingLevel: settings.defaultCardDeclarationHeadingLevel,
-			delimiter: settings.delimiter,
-			includeParentHeadersAsTags: settings.includeParentHeadersAsTags,
-			bodyStartOffset: getBodyStartOffset(content),
+			cardDeclarationHeadingLevel: getCardDeclarationHeadingLevelFromFrontmatter(
+				frontmatterForOptions,
+				settings.defaultCardDeclarationHeadingLevel,
+			),
+			delimiter: getDelimiterFromFrontmatter(frontmatterForOptions, settings.delimiter),
+			includeParentHeadersAsTags: getIncludeParentHeadersAsTagsFromFrontmatter(
+				frontmatterForOptions,
+				settings.includeParentHeadersAsTags,
+			),
+			bodyStartOffset: inlineFrontmatter ? getBodyStartOffset(content) : 0,
+			noteTypeFieldNamesByNoteType: this.noteTypeFieldNamesByNoteType,
+			externalFrontmatter: inlineFrontmatter ? undefined : effectiveFrontmatter,
 		};
 	}
 
@@ -180,6 +249,7 @@ export class CardPreviewManager {
 	private applyDecorations(
 		container: HTMLElement,
 		result: ParseCardDocumentResult,
+		sourcePath: string,
 	): void {
 		this.clearDecorations(container);
 
@@ -194,24 +264,53 @@ export class CardPreviewManager {
 		const pairs = zipCardsToHeadings(result.cards, headings);
 
 		for (const { card, heading } of pairs) {
-			const outcomeClass = outcomeToBadgeClass(card.outcome);
+			const outcomeClass = computePreviewOutcomeClass(
+				card,
+				this.getSettings().cardPreviewStyle ?? 'subtle',
+			);
 			heading.classList.add(HEADING_OUTLINE_CLASS, `${HEADING_OUTLINE_CLASS}--${outcomeClass}`);
 
 			const badge = document.createElement('span');
 			badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${outcomeClass}`;
-			badge.textContent = card.outcome;
-			badge.setAttribute('aria-label', formatCardPreviewTooltip(card));
-			badge.title = formatCardPreviewTooltip(card);
+			badge.textContent = formatResolvedCardType(card.resolvedType);
+			const tooltip = buildLightweightTooltip(card);
+			badge.setAttribute('aria-label', tooltip);
+			badge.title = tooltip;
+
+			const moreAction = document.createElement('button');
+			moreAction.type = 'button';
+			moreAction.textContent = 'More';
+			moreAction.className = `${BADGE_CLASS}-more`;
+			moreAction.setAttribute('aria-label', 'Open card preview details');
+			moreAction.addEventListener('click', (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				void this.openCardPreviewModal(sourcePath, card);
+			});
+			badge.appendChild(moreAction);
 			heading.appendChild(badge);
 		}
+	}
+
+	private async openCardPreviewModal(
+		sourcePath: string,
+		card: ParseCardDocumentResult['cards'][number],
+	): Promise<void> {
+		const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
+		if (!(file instanceof TFile)) {
+			return;
+		}
+		const { CardPreviewModal } = await import('./cardPreviewModal');
+		new CardPreviewModal(this.plugin.app, card, file, card.range.start).open();
 	}
 }
 
 export function registerCardPreview(
 	plugin: Plugin,
 	getSettings: () => AnkiAstSyncSettings,
+	refreshNoteTypeMapHook?: () => Promise<Record<string, string[]>>,
 ): CardPreviewManager {
-	const manager = new CardPreviewManager(plugin, getSettings);
+	const manager = new CardPreviewManager(plugin, getSettings, refreshNoteTypeMapHook);
 	manager.register();
 	return manager;
 }

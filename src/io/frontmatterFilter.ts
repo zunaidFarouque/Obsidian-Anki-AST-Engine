@@ -88,8 +88,19 @@ export function getCardDeclarationHeadingLevel(
   rawText: string,
   fallback = 4,
 ): number {
-  const frontmatter = parseFrontmatter(rawText);
-  const rawValue = frontmatter?.cardDeclarationHeadingLevel;
+  return getCardDeclarationHeadingLevelFromFrontmatter(
+    parseFrontmatter(rawText),
+    fallback,
+  );
+}
+
+export function getCardDeclarationHeadingLevelFromFrontmatter(
+  frontmatter: Frontmatter | null,
+  fallback = 4,
+): number {
+  const rawValue = frontmatter
+    ? getFrontmatterField(frontmatter, "carddeclarationheadinglevel")
+    : undefined;
   if (rawValue === undefined) {
     return fallback;
   }
@@ -103,8 +114,16 @@ export function getCardDeclarationHeadingLevel(
 }
 
 export function getDelimiter(rawText: string, fallback = ":::"): string {
-  const frontmatter = parseFrontmatter(rawText);
-  const rawValue = frontmatter?.delimiter?.trim();
+  return getDelimiterFromFrontmatter(parseFrontmatter(rawText), fallback);
+}
+
+export function getDelimiterFromFrontmatter(
+  frontmatter: Frontmatter | null,
+  fallback = ":::",
+): string {
+  const rawValue = frontmatter
+    ? getFrontmatterField(frontmatter, "delimiter")?.trim()
+    : undefined;
   if (!rawValue) {
     return fallback;
   }
@@ -116,8 +135,19 @@ export function getIncludeParentHeadersAsTags(
   rawText: string,
   fallback = true,
 ): boolean {
-  const frontmatter = parseFrontmatter(rawText);
-  const rawValue = getFrontmatterField(frontmatter ?? {}, "includeparentheadersastags");
+  return getIncludeParentHeadersAsTagsFromFrontmatter(
+    parseFrontmatter(rawText),
+    fallback,
+  );
+}
+
+export function getIncludeParentHeadersAsTagsFromFrontmatter(
+  frontmatter: Frontmatter | null,
+  fallback = true,
+): boolean {
+  const rawValue = frontmatter
+    ? getFrontmatterField(frontmatter, "includeparentheadersastags")
+    : undefined;
   if (rawValue === undefined) {
     return fallback;
   }

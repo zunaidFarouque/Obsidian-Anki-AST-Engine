@@ -30,12 +30,12 @@ Section B  Cloze inheritance (### #anki/cardType/cloze)
 Section C  Outline isolation
   C1  Sibling section not cloze            -> sync basic (RES-02, CX-23)
 
-Section D  Custom models
+Section D  Custom note types
   D1  #anki/noteType/Vocab explicit           -> sync (CUS-01)
   D2  Legacy #anki_card_Vocab              -> sync
   D3  YAML custom default only             -> sync (RES-04, FM-03)
-  D4  Custom SKIP model no fields          -> skip (CUS-01)
-  D5  Section inherited model              -> sync (RES-08)
+  D4  Custom SKIP noteType no fields          -> skip (CUS-01)
+  D5  Section inherited note type              -> sync (RES-08)
 
 Section E  Reversible + typed
   E1  :::r only                            -> sync (DEL-02, CX-14)
@@ -221,11 +221,11 @@ Water.
 
 ---
 
-## D — Custom models
+## D — Custom note types
 
 ### Vocabulary #anki/noteType/Vocab
 
-#### D1 Custom explicit model tag
+#### D1 Custom explicit note type tag
 
 ::: Word
 entropy
@@ -269,7 +269,7 @@ adiabatic
 ::: Definition
 A process with no heat transfer.
 
-<!-- expect: sync; rules: RES-08; model from ### Vocabulary -->
+<!-- expect: sync; rules: RES-08; note type from ### Vocabulary -->
 
 ---
 
@@ -302,7 +302,7 @@ Name the capital of France.
 :::t
 **Paris**
 
-<!-- expect: sync; rules: TYP-03; Back plain: Paris -->
+<!-- expect: sync + warn; rules: TYP-03,TYP-05; Back plain: Paris -->
 
 #### E4 Typed tag with plain split #anki/cardType/typed
 
@@ -322,7 +322,7 @@ Paris
 Lyon
 Marseille
 
-<!-- expect: sync; rules: TYP-04; Back plain: Paris (first non-empty line only) -->
+<!-- expect: sync + warn; rules: TYP-04; Back plain: Paris (first non-empty line only) -->
 
 ---
 
@@ -379,9 +379,9 @@ invalid
 isolated
 
 ::: Definition
-no per-card model hashtag
+no per-card note type hashtag
 
-<!-- expect: sync; rules: RES-04,FM-03; anki_customCardDefault supplies model for field blocks -->
+<!-- expect: sync; rules: RES-04,FM-03; anki_customCardDefault supplies note type for field blocks -->
 
 ##### F7 TAG conflict examples (heading-level documentation — not a card)
 
@@ -453,7 +453,7 @@ What is H₂O?
 
 Water.
 
-<!-- expect: skip; rules: TAG-04,CUS-04; resolved: custom noteType cloze; #anki/noteType/cloze is NOT #anki/cardType/cloze -->
+<!-- expect: skip; rules: CUS-04; resolved: custom noteType cloze; #anki/noteType/cloze is NOT #anki/cardType/cloze -->
 
 ---
 
@@ -622,7 +622,7 @@ Answer.
 
 ### I7 cardType plus noteType section #anki/cardType/cloze #anki/noteType/Vocab
 
-#### I7a Card under cardType model conflict
+#### I7a Card under cardType noteType conflict
 
 ::: Word
 entropy

@@ -19,6 +19,8 @@ export interface AnkiAstSyncSettings {
 	orphanIgnoreTag: string;
 	orphanAllowSuspend: boolean;
 	enableCardPreview: boolean;
+	cardPreviewStyle: 'subtle' | 'explicit';
+	cardPreviewSyncMarker: 'none' | 'card-emoji' | 'anki-icon';
 	inferClozeFromManualSyntaxOnBasic: boolean;
 }
 
@@ -40,6 +42,8 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	orphanIgnoreTag: 'obsidian-sync-ignore',
 	orphanAllowSuspend: false,
 	enableCardPreview: false,
+	cardPreviewStyle: 'subtle',
+	cardPreviewSyncMarker: 'none',
 	inferClozeFromManualSyntaxOnBasic: false,
 };
 
@@ -225,6 +229,48 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 						this.plugin.cardPreview?.onSettingsChanged();
 					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Card preview style')
+			.setDesc('Choose subtle or explicit preview emphasis.')
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('subtle', 'subtle')
+					.addOption('explicit', 'explicit')
+					.setValue(this.plugin.settings.cardPreviewStyle)
+					.onChange(async (value) => {
+						this.plugin.settings.cardPreviewStyle =
+							value as AnkiAstSyncSettings['cardPreviewStyle'];
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Card preview sync marker')
+			.setDesc('Choose optional visual marker for sync state.')
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('none', 'none')
+					.addOption('card-emoji', 'card-emoji')
+					.addOption('anki-icon', 'anki-icon')
+					.setValue(this.plugin.settings.cardPreviewSyncMarker)
+					.onChange(async (value) => {
+						this.plugin.settings.cardPreviewSyncMarker =
+							value as AnkiAstSyncSettings['cardPreviewSyncMarker'];
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Refresh note type cache')
+			.setDesc('Recache note type names/fields from AnkiConnect for preview validation.')
+			.addButton((button) =>
+				button.setButtonText('Refresh').onClick(async () => {
+					await this.plugin.refreshNoteTypeMap();
+				}),
 			);
 
 		new Setting(containerEl)

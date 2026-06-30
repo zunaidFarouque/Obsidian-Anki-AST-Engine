@@ -60,11 +60,14 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.2",
     "@types/node": "^20.10.6",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "bun-types": "^1.2.0",
     "eslint": "^8.56.0",
+    "obsidian": "latest",
     "prettier": "^3.1.1",
     "typescript": "^5.3.3"
   }

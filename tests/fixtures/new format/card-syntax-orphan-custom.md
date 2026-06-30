@@ -21,7 +21,7 @@ entropy
 ::: Definition
 Energy dispersal measure.
 
-<!-- expect: skip; rules: CUS-03,CX-22; message: no model resolved -->
+<!-- expect: skip; rules: CUS-03,CX-22; message: no note type resolved -->
 
 #### O2 Cloze inferred without defaults
 

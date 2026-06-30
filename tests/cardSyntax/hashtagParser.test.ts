@@ -47,14 +47,6 @@ describe("hashtagParser", () => {
     });
   });
 
-  test("legacy #anki/model/<id> alias maps to noteTypeId", () => {
-    expect(parseHeadingHashtags("Word #anki/model/My_Vocab")).toEqual({
-      userTags: [],
-      noteTypeId: "My_Vocab",
-      errors: [],
-    });
-  });
-
   test("extracts legacy #anki_card_<NoteTypeId>", () => {
     expect(parseHeadingHashtags("D2 Custom legacy tag #anki_card_Vocab")).toEqual({
       userTags: [],

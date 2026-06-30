@@ -46,7 +46,7 @@ describe("ResolvedCardType", () => {
     expect(isCustomCardType(type)).toBe(false);
   });
 
-  test("customCardType carries model id for CUS-01 custom models", () => {
+  test("customCardType carries note type id for CUS-01 custom note types", () => {
     const type: ResolvedCardType = customCardType("Vocab");
     expect(type).toEqual({ kind: "custom", noteTypeId: "Vocab" });
     expect(isCustomCardType(type)).toBe(true);
@@ -121,7 +121,6 @@ describe("engine hashtag namespace", () => {
   test("isEngineHashtag matches reserved #anki/ and #anki_card_ prefixes", () => {
     expect(isEngineHashtag("#anki/cardType/basic")).toBe(true);
     expect(isEngineHashtag("#anki/noteType/Vocab")).toBe(true);
-    expect(isEngineHashtag("#anki/model/Vocab")).toBe(true);
     expect(isEngineHashtag("#anki_card_Vocab")).toBe(true);
     expect(isEngineHashtag("#exam-prep")).toBe(false);
     expect(isEngineHashtag("#biology")).toBe(false);
@@ -217,6 +216,7 @@ describe("ParseCardDocumentOptions and ParseCardDocumentResult", () => {
       delimiter: ":::",
       includeParentHeadersAsTags: true,
       bodyStartOffset: 0,
+      noteTypeFieldNamesByNoteType: {},
     });
   });
 
@@ -225,7 +225,7 @@ describe("ParseCardDocumentOptions and ParseCardDocumentResult", () => {
       syncEligible: true,
       fileDefaults: {
         builtInDefault: "basic",
-        customModelDefault: "Vocab",
+        customNoteTypeDefault: "Vocab",
       },
       cards: [],
       messages: [],
@@ -233,6 +233,6 @@ describe("ParseCardDocumentOptions and ParseCardDocumentResult", () => {
 
     expect(result.syncEligible).toBe(true);
     expect(result.fileDefaults.builtInDefault).toBe("basic");
-    expect(result.fileDefaults.customModelDefault).toBe("Vocab");
+    expect(result.fileDefaults.customNoteTypeDefault).toBe("Vocab");
   });
 });
