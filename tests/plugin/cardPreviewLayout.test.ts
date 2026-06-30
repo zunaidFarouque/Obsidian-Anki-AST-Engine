@@ -199,6 +199,8 @@ describe('cardPreviewLayout', () => {
 			expect(rule).toMatch(/cursor:\s*pointer/);
 			expect(rule).toMatch(/appearance:\s*none/);
 			expect(rule).toMatch(/min-height:\s*unset/);
+			expect(rule).not.toMatch(/font:\s*inherit/);
+			expect(rule).toMatch(/font-size:\s*var\(--anki-card-preview-badge-font-size\)/);
 		});
 
 		test('badge size uses root css variables', () => {

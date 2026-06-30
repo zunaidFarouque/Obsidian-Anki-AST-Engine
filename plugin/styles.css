@@ -200,11 +200,11 @@
 	--anki-card-preview-section-top-extend: calc(0.5 * 1lh);
 	--anki-card-preview-block-bleed-x: 8px;
 	/* Card badge size — override in a snippet or here while tuning */
-	--anki-card-preview-badge-font-size: 0.2em;
+	--anki-card-preview-badge-font-size: 0.8em;
 	--anki-card-preview-badge-padding: 0.02em 0.28em;
 	--anki-card-preview-badge-gap: 0.25em;
 	--anki-card-preview-badge-border-radius: 0.3em;
-	--anki-card-preview-badge-line-height: 0.5;
+	--anki-card-preview-badge-line-height: 1.2;
 	--anki-card-preview-badge-font-weight: 400;
 }
 
@@ -291,7 +291,10 @@
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge--action {
 	appearance: none;
-	font: inherit;
+	font-family: inherit;
+	font-size: var(--anki-card-preview-badge-font-size);
+	font-weight: var(--anki-card-preview-badge-font-weight);
+	line-height: var(--anki-card-preview-badge-line-height);
 	cursor: pointer;
 	min-height: unset;
 	height: auto;
@@ -336,8 +339,8 @@
 	background-image: linear-gradient(
 		to right,
 		transparent 0%,
-		var(--anki-delimiter-guide-color) 10%,
-		var(--anki-delimiter-guide-color) 90%,
+		var(--anki-delimiter-guide-color) 20%,
+		var(--anki-delimiter-guide-color) 80%,
 		transparent 100%
 	);
 	background-size: 100% 1px;
@@ -392,18 +395,18 @@
 	.cm-content
 	.cm-line.anki-card-preview-delimiter-guide--typed {
 	--anki-delimiter-garnish-cut: 0.72em;
-	--anki-delimiter-garnish-y-offset: 0.2em;
+	--anki-delimiter-garnish-y-offset: 0.45em;
 	background-image: linear-gradient(
 		to right,
 		transparent 0%,
-		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color) 20%,
 		var(--anki-delimiter-guide-color)
 			calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
 		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
 		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
 		var(--anki-delimiter-guide-color)
 			calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
-		var(--anki-delimiter-guide-color) 90%,
+		var(--anki-delimiter-guide-color) 80%,
 		transparent 100%
 	);
 }
@@ -416,14 +419,14 @@
 	background-image: linear-gradient(
 		to right,
 		transparent 0%,
-		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color) 20%,
 		var(--anki-delimiter-guide-color)
 			calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
 		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
 		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
 		var(--anki-delimiter-guide-color)
 			calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
-		var(--anki-delimiter-guide-color) 90%,
+		var(--anki-delimiter-guide-color) 80%,
 		transparent 100%
 	);
 }
@@ -569,7 +572,10 @@
 
 .markdown-preview-view .anki-card-preview-badge--action {
 	appearance: none;
-	font: inherit;
+	font-family: inherit;
+	font-size: var(--anki-card-preview-badge-font-size);
+	font-weight: var(--anki-card-preview-badge-font-weight);
+	line-height: var(--anki-card-preview-badge-line-height);
 	cursor: pointer;
 	min-height: unset;
 	height: auto;
