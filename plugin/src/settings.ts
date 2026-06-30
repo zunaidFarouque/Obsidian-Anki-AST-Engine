@@ -21,6 +21,10 @@ export interface AnkiAstSyncSettings {
 	enableCardPreview: boolean;
 	cardPreviewStyle: 'subtle' | 'explicit';
 	cardPreviewSyncMarker: 'none' | 'card-emoji' | 'anki-icon';
+	/** Fraction of one line height (0–1) to extend card background above section-start headings. */
+	cardPreviewSectionTopExtend: number;
+	/** Untinted gap before a card that follows another card. CSS: --anki-card-preview-inter-card-gap. */
+	cardPreviewInterCardGapEm: number;
 	inferClozeFromManualSyntaxOnBasic: boolean;
 }
 
@@ -44,6 +48,8 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	enableCardPreview: false,
 	cardPreviewStyle: 'subtle',
 	cardPreviewSyncMarker: 'none',
+	cardPreviewSectionTopExtend: 0.5,
+	cardPreviewInterCardGapEm: 0.28,
 	inferClozeFromManualSyntaxOnBasic: false,
 };
 
@@ -259,6 +265,40 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.cardPreviewSyncMarker =
 							value as AnkiAstSyncSettings['cardPreviewSyncMarker'];
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Section top background extend')
+			.setDesc(
+				'Fraction of a line height (0–1) to extend the card tint upward when the card follows a shallower section heading (e.g. ### then ####). 0 disables. CSS: --anki-card-preview-section-top-extend.',
+			)
+			.addSlider((slider) =>
+				slider
+					.setLimits(0, 1, 0.05)
+					.setValue(this.plugin.settings.cardPreviewSectionTopExtend)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.cardPreviewSectionTopExtend = value;
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Gap between card blocks')
+			.setDesc(
+				'Untinted space before a card that follows another card (em). CSS override: --anki-card-preview-inter-card-gap in a snippet.',
+			)
+			.addSlider((slider) =>
+				slider
+					.setLimits(0, 0.8, 0.05)
+					.setValue(this.plugin.settings.cardPreviewInterCardGapEm)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.cardPreviewInterCardGapEm = value;
 						await this.plugin.saveSettings();
 						this.plugin.cardPreview?.onSettingsChanged();
 					}),

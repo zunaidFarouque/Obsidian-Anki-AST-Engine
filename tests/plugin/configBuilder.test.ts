@@ -23,6 +23,8 @@ const baseSettings: AnkiAstSyncSettings = {
 	enableCardPreview: false,
 	cardPreviewStyle: 'subtle',
 	cardPreviewSyncMarker: 'none',
+	cardPreviewSectionTopExtend: 0.5,
+	cardPreviewInterCardGapEm: 0.28,
 	inferClozeFromManualSyntaxOnBasic: false,
 };
 

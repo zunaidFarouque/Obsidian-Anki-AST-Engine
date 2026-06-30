@@ -512,6 +512,78 @@ describe('card preview editor decorations (Live Preview)', () => {
 		).toBe(true);
 	});
 
+	test('extends section-start card tint and inter-card gap decorations', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const infoField = StateField.define<{ file: { path: string } | null } | undefined>({
+			create: () => ({ file: { path: 'Notes/section.md' } }),
+			update: (value) => value,
+		});
+		const doc = ['### Subsection A0', '', '#### Card A', 'Front A', '', '#### Card B', 'Front B'].join(
+			'\n',
+		);
+		const state = EditorState.create({ doc, extensions: [livePreviewField, infoField] });
+		const cardAStart = doc.indexOf('#### Card A');
+		const cardBStart = doc.indexOf('#### Card B');
+		const blankBeforeCardA = state.doc.lineAt(cardAStart).number - 1;
+		const blankBeforeCardB = state.doc.lineAt(cardBStart).number - 1;
+
+		const decorations = buildCardPreviewDecorations(
+			{ state } as unknown as EditorView,
+			{
+				getSettings: () =>
+					({
+						enableCardPreview: true,
+						cardPreviewSectionTopExtend: 0.5,
+						cardPreviewInterCardGapEm: 0.28,
+					}) as any,
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [
+							makeCard({ title: 'Card A', range: { start: cardAStart, end: cardAStart + 8 } }),
+							makeCard({ title: 'Card B', range: { start: cardBStart, end: cardBStart + 8 } }),
+						],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+				editorInfoField: infoField as any,
+			},
+		);
+
+		const entries = collectDecorations(decorations, state.doc.length);
+		const blockLineStarts = new Set(
+			entries
+				.filter((entry) =>
+					String(entry.value.spec?.class ?? '').includes('anki-card-preview-cardblock'),
+				)
+				.map((entry) => entry.from),
+		);
+		const gapLineStarts = new Set(
+			entries
+				.filter((entry) =>
+					String(entry.value.spec?.class ?? '').includes('anki-card-preview-inter-card-gap'),
+				)
+				.map((entry) => entry.from),
+		);
+		const headingClasses = String(
+			entries.find(
+				(entry) =>
+					entry.from === cardAStart &&
+					String(entry.value.spec?.class ?? '').includes('anki-card-preview-heading'),
+			)?.value.spec?.class ?? '',
+		);
+
+		expect(blockLineStarts.has(state.doc.line(blankBeforeCardA).from)).toBe(false);
+		expect(blockLineStarts.has(state.doc.line(blankBeforeCardB).from)).toBe(false);
+		expect(gapLineStarts.has(state.doc.line(blankBeforeCardB).from)).toBe(true);
+		expect(headingClasses).toContain('anki-card-preview-heading--section-start');
+	});
+
 	test('keeps a visual gap between adjacent card blocks when trailing lines are outside card range', () => {
 		const livePreviewField = StateField.define<boolean>({
 			create: () => true,

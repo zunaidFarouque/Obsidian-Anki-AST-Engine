@@ -17,6 +17,7 @@ import {
 import { formatResolvedCardType } from '../../src/cardSyntax/types';
 import type { AnkiAstSyncSettings } from './settings';
 import { createCardPreviewEditorExtension } from './cardPreviewEditor';
+import { applyCardPreviewLayoutCssVariables } from './cardPreviewLayout';
 import {
 	CARD_PREVIEW_DEBOUNCE_MS,
 	cardDeclarationHeadingSelector,
@@ -54,6 +55,7 @@ export class CardPreviewManager {
 	) {}
 
 	register(): void {
+		applyCardPreviewLayoutCssVariables(this.getSettings());
 		this.plugin.registerEditorExtension(
 			createCardPreviewEditorExtension({
 				getSettings: () => this.getSettings(),
@@ -82,6 +84,7 @@ export class CardPreviewManager {
 
 	onSettingsChanged(): void {
 		this.settingsRevision += 1;
+		applyCardPreviewLayoutCssVariables(this.getSettings());
 		const activePath = this.plugin.app.workspace.getActiveFile()?.path;
 		if (!activePath) {
 			return;

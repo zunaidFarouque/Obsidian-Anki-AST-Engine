@@ -25,8 +25,15 @@ import {
 	type CardHeadingLinePosition,
 	type DocumentLine,
 } from './cardPreviewUtils';
+import {
+	cardFollowsSectionHeading,
+	findInterCardGapLineStart,
+} from './cardPreviewLayout';
 
 const HEADING_OUTLINE_CLASS = 'anki-card-preview-heading';
+const HEADING_SECTION_START_CLASS = 'anki-card-preview-heading--section-start';
+const HEADING_FOLLOWS_CARD_CLASS = 'anki-card-preview-heading--follows-card';
+const INTER_CARD_GAP_CLASS = 'anki-card-preview-inter-card-gap';
 const CARD_BLOCK_CLASS = 'anki-card-preview-cardblock';
 const BADGE_CLASS = 'anki-card-preview-badge';
 const DELIMITER_GUIDE_CLASS = 'anki-card-preview-delimiter-guide';
@@ -291,6 +298,8 @@ export function buildCardPreviewDecorations(
 	);
 	const pairs = mapCardsToHeadingLines(result.cards, lines, headingLevel, headingPositions);
 	const pending: PendingDecoration[] = [];
+	const previewSettings = options.getSettings();
+	const sectionTopExtend = previewSettings.cardPreviewSectionTopExtend ?? 0;
 
 	for (let index = 0; index < pairs.length; index += 1) {
 		const { card, heading } = pairs[index]!;
@@ -298,6 +307,19 @@ export function buildCardPreviewDecorations(
 		const nextHeadingStart = pairs[index + 1]?.heading.from ?? doc.length + 1;
 		const cardBlockEndOffset = resolveCardBlockEndOffset(lines, card, nextHeadingStart);
 		const coveredLineStarts = findCoveredLineStarts(lines, heading.from, cardBlockEndOffset);
+		const sectionStart =
+			sectionTopExtend > 0 &&
+			cardFollowsSectionHeading(lines, heading.from, headingLevel);
+		const interCardGapLine = findInterCardGapLineStart(lines, heading.from, headingLevel);
+
+		if (interCardGapLine !== undefined) {
+			pending.push({
+				from: interCardGapLine,
+				to: interCardGapLine,
+				decoration: Decoration.line({ class: INTER_CARD_GAP_CLASS }),
+				startSide: 0,
+			});
+		}
 
 		for (const lineStart of coveredLineStarts) {
 			pending.push({
@@ -314,7 +336,14 @@ export function buildCardPreviewDecorations(
 			from: heading.from,
 			to: heading.from,
 			decoration: Decoration.line({
-				class: `${HEADING_OUTLINE_CLASS} ${HEADING_OUTLINE_CLASS}--${badgeModel.displayOutcome}`,
+				class: [
+					HEADING_OUTLINE_CLASS,
+					`${HEADING_OUTLINE_CLASS}--${badgeModel.displayOutcome}`,
+					sectionStart ? HEADING_SECTION_START_CLASS : '',
+					index > 0 ? HEADING_FOLLOWS_CARD_CLASS : '',
+				]
+					.filter(Boolean)
+					.join(' '),
 			}),
 			startSide: 0,
 		});
