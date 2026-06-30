@@ -14,14 +14,12 @@ import {
 	parseFrontmatter,
 	type ParseCardDocumentResult,
 } from 'obsidian-anki-ast-engine/cardSyntax';
-import { formatResolvedCardType } from '../../src/cardSyntax/types';
 import type { AnkiAstSyncSettings } from './settings';
-import { createCardPreviewEditorExtension } from './cardPreviewEditor';
+import { createCardPreviewEditorExtension, createCardPreviewBadgeElement } from './cardPreviewEditor';
 import { applyCardPreviewLayoutCssVariables } from './cardPreviewLayout';
 import {
 	CARD_PREVIEW_DEBOUNCE_MS,
 	cardDeclarationHeadingSelector,
-	buildLightweightTooltip,
 	computePreviewOutcomeClass,
 	computeContentCacheKey,
 	frontmatterFromObsidianMetadata,
@@ -56,20 +54,19 @@ export class CardPreviewManager {
 
 	register(): void {
 		applyCardPreviewLayoutCssVariables(this.getSettings());
-		this.plugin.registerEditorExtension(
-			createCardPreviewEditorExtension({
-				getSettings: () => this.getSettings(),
-				parseContent: (content, file) => this.parseContent(content, file),
-				getCardDeclarationHeadingLevel: (content, file) =>
-					this.getCardDeclarationHeadingLevel(content, file),
-				getSettingsRevision: () => this.settingsRevision,
-				openCardPreviewDetails: (card, filePath) => {
-					void this.openCardPreviewModal(filePath, card);
-				},
-				editorLivePreviewField,
-				editorInfoField,
-			}),
-		);
+		const editorOptions = {
+			getSettings: () => this.getSettings(),
+			parseContent: (content: string, file?: TFile) => this.parseContent(content, file),
+			getCardDeclarationHeadingLevel: (content: string, file?: TFile) =>
+				this.getCardDeclarationHeadingLevel(content, file),
+			getSettingsRevision: () => this.settingsRevision,
+			openCardPreviewDetails: (card: ParseCardDocumentResult['cards'][number], filePath: string) => {
+				void this.openCardPreviewModal(filePath, card);
+			},
+			editorLivePreviewField,
+			editorInfoField,
+		};
+		this.plugin.registerEditorExtension(createCardPreviewEditorExtension(editorOptions));
 	}
 
 	destroy(): void {
@@ -240,6 +237,7 @@ export class CardPreviewManager {
 	}
 
 	private clearDecorations(container: HTMLElement): void {
+		container.querySelectorAll('.anki-card-preview-badge-slot').forEach((node) => node.remove());
 		container.querySelectorAll(`.${BADGE_CLASS}`).forEach((node) => node.remove());
 		container.querySelectorAll(`.${HEADING_OUTLINE_CLASS}`).forEach((node) => {
 			node.classList.remove(HEADING_OUTLINE_CLASS);
@@ -273,25 +271,10 @@ export class CardPreviewManager {
 			);
 			heading.classList.add(HEADING_OUTLINE_CLASS, `${HEADING_OUTLINE_CLASS}--${outcomeClass}`);
 
-			const badge = document.createElement('span');
-			badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${outcomeClass}`;
-			badge.textContent = formatResolvedCardType(card.resolvedType);
-			const tooltip = buildLightweightTooltip(card);
-			badge.setAttribute('aria-label', tooltip);
-			badge.title = tooltip;
-
-			const moreAction = document.createElement('button');
-			moreAction.type = 'button';
-			moreAction.textContent = 'More';
-			moreAction.className = `${BADGE_CLASS}-more`;
-			moreAction.setAttribute('aria-label', 'Open card preview details');
-			moreAction.addEventListener('click', (event) => {
-				event.preventDefault();
-				event.stopPropagation();
+			const badgeSlot = createCardPreviewBadgeElement(card, () => {
 				void this.openCardPreviewModal(sourcePath, card);
 			});
-			badge.appendChild(moreAction);
-			heading.appendChild(badge);
+			heading.appendChild(badgeSlot);
 		}
 	}
 

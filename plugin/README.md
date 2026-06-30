@@ -46,6 +46,8 @@ The plugin calls AnkiConnect from the browser. Add your Obsidian origin to `webC
 
 - **Check AnkiConnect connection** — verifies Anki is reachable.
 - **Sync vault to Anki** — live sync via the AST engine (base64 media, ID injection).
+- **Reload CSS** — re-read `styles.css` from disk without restarting Obsidian (use after CSS-only changes).
+- **Reload plugin** — disable and re-enable this plugin to pick up a new `main.js` build.
 
 Planned features (dry-run, sync current file, results modal, etc.): [Docs/Plugin-Roadmap.md](../Docs/Plugin-Roadmap.md).
 
@@ -56,4 +58,9 @@ cd plugin
 bun run dev
 ```
 
-Rebuilds `main.js` on source changes. Reload the plugin in Obsidian after each build.
+Rebuilds `main.js` on source changes. After copying updated files into your vault (`bun run deploy:plugin` from repo root):
+
+- **CSS-only changes** — Ctrl+P → **Reload CSS**
+- **`main.js` / TypeScript changes** — Ctrl+P → **Reload plugin**
+
+The first time you deploy these reload commands, toggle the plugin once in Settings (or restart Obsidian) so the new palette entries appear.

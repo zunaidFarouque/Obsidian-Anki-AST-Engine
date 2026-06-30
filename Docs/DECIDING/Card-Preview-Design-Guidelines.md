@@ -96,6 +96,19 @@ Subtle outcome tint applies to the **entire card block**, not just the declarati
 - Heading line keeps a stronger left accent/chip context, but body lines inherit the same card outcome tint family.
 - If outcome is `sync`, keep tint very faint; `skip`/`warn`/`error` remain progressively more visible per §5.2.
 
+### 5.2.2 Card block envelope (overlay-only)
+
+Layout spacing is **overlay-only**: pseudo-elements on decorated `cm-line` nodes, never `padding-top` / `margin` on lines and never separate gap-line decorations on blank lines between cards.
+
+| Concern | Decoration | CSS |
+|---------|------------|-----|
+| Section-start extend | When the card follows a shallower section heading (e.g. `###` then `####`), heading gets `anki-card-preview-heading--section-start` | `::before` on that heading line extends tint upward by `cardPreviewSectionTopExtend` × one line height (`0`–`1`; `0` disables). Var: `--anki-card-preview-section-top-extend` (`calc(ratio * 1lh)` or `0px`). |
+| Inter-card gap | When another card follows, the last covered line of the block gets `anki-card-preview-cardblock--tail` | `::after` on that line masks the trailing tint with untinted background over `cardPreviewInterCardGapEm` (`0`–`0.8` em; `0` disables). Var: `--anki-card-preview-inter-card-gap`. |
+
+Settings sync to `:root` via `plugin/src/cardPreviewLayout.ts` (`applyCardPreviewLayoutCssVariables`). Snippets may override the CSS variables directly.
+
+**Sync content boundary:** Preview tint follows `ResolvedCard.range`, which ends at learner-facing content only. Trailing authoring lines (`%% … %%`, `<!-- … -->` except binding metadata) are outside the envelope — see [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
+
 ### 5.3 Sync marker options
 
 Default is none. Optional marker in subtle mode:
@@ -334,6 +347,8 @@ Delimiter setting (`settings.delimiter` ≠ `:::`) is **deferred** — v1 assume
 | `enableCardPreview` | `false` | master toggle |
 | `cardPreviewStyle` | `subtle` | `subtle` or `explicit` |
 | `cardPreviewSyncMarker` | `none` | `none`, `card-emoji`, `anki-icon` |
+| `cardPreviewSectionTopExtend` | `0.5` | fraction of line height (`0`–`1`, step `0.05`) to extend tint above section-start cards; `0` disables. CSS: `--anki-card-preview-section-top-extend` |
+| `cardPreviewInterCardGapEm` | `0.28` | untinted em gap before a card that follows another (`0`–`0.8`, step `0.05`); tail mask only (§5.2.2). CSS: `--anki-card-preview-inter-card-gap` |
 | `defaultCardDeclarationHeadingLevel` | `4` | card heading level |
 | `inferClozeFromManualSyntaxOnBasic` | `false` | BAS-04 / CX-27 behavior |
 | `refreshNoteTypeMap` action | n/a | manual recache of noteType names + field lists from AnkiConnect |
@@ -358,6 +373,7 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 - Do not rely on color alone — combine tint, emoji (non-sync outcomes), and tooltip text
 - Cloze groups: fixed palette with wraparound; hatched/check pattern shared across groups
 - CSS prefix: `anki-card-preview-*`; prefer Obsidian vars (`--text-muted`, `--color-red`, `--color-yellow`, `--background-modifier-border`)
+- Layout envelope vars (§5.2.2): `--anki-card-preview-section-top-extend`, `--anki-card-preview-inter-card-gap`
 
 ---
 
@@ -406,3 +422,5 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 | 2026-06-30 | Initial subtle-mode guidelines |
 | 2026-06-30 | Locked chip interaction, noteType wording, cloze visuals, typed warnings, delimiter markers, template insertion rules |
 | 2026-06-30 | Verification pass: per-type structure text, conflict matrix, BAS-04/CLZ back rules, heading vs line indicators, DEL-08 vs first-delimiter guides, file-level states, accessibility |
+| 2026-06-30 | §5.2.2 overlay-only envelope: section-top extend + inter-card tail mask; settings `cardPreviewSectionTopExtend`, `cardPreviewInterCardGapEm` |
+| 2026-06-30 | Sync content boundary: authoring `%%` / `<!-- -->` lines excluded from envelope tint |

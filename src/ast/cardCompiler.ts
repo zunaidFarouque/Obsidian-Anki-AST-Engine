@@ -14,6 +14,7 @@ import type { ObsidianCallout } from "./remarkObsidianCallout";
 import { remarkObsidianHighlight } from "./remarkObsidianHighlight";
 import { remarkPreviewHeading } from "./remarkPreviewHeading";
 import { remarkObsidianComment, stripObsidianCommentsFromNodes } from "./remarkObsidianComment";
+import { stripAuthoringHtmlFromNodes } from "./stripAuthoringContent";
 
 const compiler = unified()
   .use(remarkObsidianComment)
@@ -175,7 +176,9 @@ export function compileCardField(nodes: Content[]): string {
   return compileRoot({
     type: "root",
     children: hoistSingleChildMediaParagraphs(
-      stripMathHastAliases(stripObsidianCommentsFromNodes(nodes)),
+      stripMathHastAliases(
+        stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(nodes)),
+      ),
     ),
   });
 }
@@ -190,10 +193,14 @@ export function compileCardFields(
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
   const strippedFront = hoistSingleChildMediaParagraphs(
-    stripMathHastAliases(stripObsidianCommentsFromNodes(frontNodes)),
+    stripMathHastAliases(
+      stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(frontNodes)),
+    ),
   );
   const strippedBack = hoistSingleChildMediaParagraphs(
-    stripMathHastAliases(stripObsidianCommentsFromNodes(backNodes)),
+    stripMathHastAliases(
+      stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(backNodes)),
+    ),
   );
   const context = buildFootnoteEmbedContext(strippedFront, strippedBack, {
     inheritedDefs: options.inheritedFootnoteDefs,

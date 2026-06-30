@@ -210,6 +210,8 @@ entropy
 
 **Rule:** Each synced card may contain an HTML comment `<!--anki-id: <uuid>-->` for vault↔Anki binding. Unchanged from current engine behavior.
 
+**Authoring-only HTML:** Other `<!-- … -->` lines (e.g. `<!-- expect: … -->` in fixtures) are not card content — stripped before Anki compile and excluded from preview envelope. See [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
+
 **Example:**
 
 ```markdown

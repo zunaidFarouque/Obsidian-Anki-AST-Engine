@@ -69,7 +69,7 @@ Answer paragraph.
 | `inlineMath` / `math` | `\(...\)` / `\[...\]` in span/div (Anki MathJax renders) |
 | `image` | `<img>` |
 | `link` | `<a href="…">` |
-| `html` | passed through (e.g. `<!--anki-id-->` stripped before compile) |
+| `html` | Authoring `<!-- … -->` stripped before compile; `<!--anki-id: uuid-->` kept for binding only (not in Anki field HTML) |
 
 ## Obsidian comments (`%% … %%`)
 
@@ -100,6 +100,21 @@ Published answer only.
 ```
 
 Compiles to Anki as if the `%%` regions were never written.
+
+## HTML authoring comments (`<!-- … -->`)
+
+Non-binding HTML comments are **authoring-only** — they stay in the vault but are removed before Anki HTML is compiled and excluded from the Live Preview card envelope.
+
+| Syntax | Vault | Anki field | Live Preview envelope |
+|--------|-------|------------|------------------------|
+| `<!-- expect: … -->` (test metadata) | Visible while editing | Stripped | Not tinted |
+| `<!-- note to self -->` | Visible while editing | Stripped | Not tinted |
+| `<!--anki-id: uuid-->` | Visible; used for binding | Not in field HTML | Not tinted (binding metadata) |
+| `<!--` inside fenced code | Literal text | Preserved | Follows card content rules |
+
+Trailing whole-line comments at the bottom of a card (including `%%` blocks and `<!-- … -->` lines) are dropped from sync content and from `ResolvedCard.range` used for preview tinting.
+
+Implementation: [`stripAuthoringContent.ts`](../src/ast/stripAuthoringContent.ts) (trailing strip + HTML filter) and [`remarkObsidianComment.ts`](../src/ast/remarkObsidianComment.ts) (`%%`).
 
 ## Paragraph and line-break rules
 

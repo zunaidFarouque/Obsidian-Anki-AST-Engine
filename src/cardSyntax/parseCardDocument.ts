@@ -1,5 +1,6 @@
 import type { Content, Heading, Root } from "mdast";
 import { parseMarkdown } from "../ast/processor";
+import { contentEndOffsetFromNodes } from "../ast/stripAuthoringContent";
 import {
   parseFrontmatter,
   shouldSync,
@@ -540,17 +541,10 @@ function cardRange(
   fileLength: number,
 ): ReturnType<typeof createSourceRange> {
   const start = cardHeading.node.position?.start?.offset ?? 0;
-  let end = cardHeading.node.position?.end?.offset ?? start;
-
-  for (const node of bodyNodes) {
-    const nodeEnd = node.position?.end?.offset;
-    if (nodeEnd !== undefined && nodeEnd > end) {
-      end = nodeEnd;
-    }
-  }
+  const end = contentEndOffsetFromNodes(bodyNodes, start);
 
   if (end === start) {
-    end = Math.min(fileLength, start + 1);
+    return createSourceRange(start, Math.min(fileLength, start + 1));
   }
 
   return createSourceRange(start, end);

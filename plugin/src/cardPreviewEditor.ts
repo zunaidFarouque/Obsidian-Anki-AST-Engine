@@ -27,15 +27,15 @@ import {
 } from './cardPreviewUtils';
 import {
 	cardFollowsSectionHeading,
-	findInterCardGapLineStart,
+	shouldPaintInterCardTail,
 } from './cardPreviewLayout';
 
 const HEADING_OUTLINE_CLASS = 'anki-card-preview-heading';
 const HEADING_SECTION_START_CLASS = 'anki-card-preview-heading--section-start';
-const HEADING_FOLLOWS_CARD_CLASS = 'anki-card-preview-heading--follows-card';
-const INTER_CARD_GAP_CLASS = 'anki-card-preview-inter-card-gap';
 const CARD_BLOCK_CLASS = 'anki-card-preview-cardblock';
+const CARD_BLOCK_TAIL_CLASS = 'anki-card-preview-cardblock--tail';
 const BADGE_CLASS = 'anki-card-preview-badge';
+export const BADGE_SLOT_CLASS = 'anki-card-preview-badge-slot';
 const DELIMITER_GUIDE_CLASS = 'anki-card-preview-delimiter-guide';
 const DELIMITER_GUIDE_INFO_CLASS = 'anki-card-preview-delimiter-guide--info';
 const DELIMITER_GUIDE_TYPED_CLASS = 'anki-card-preview-delimiter-guide--typed';
@@ -106,6 +106,9 @@ export function createCardPreviewBadgeElement(
 	card: ResolvedCard,
 	onMoreAction?: () => void,
 ): HTMLElement {
+	const slot = document.createElement('span');
+	slot.className = BADGE_SLOT_CLASS;
+
 	const badgeModel = buildHeadingBadgeModel(card);
 	const badge = document.createElement('span');
 	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}`;
@@ -134,20 +137,8 @@ export function createCardPreviewBadgeElement(
 		});
 		badge.appendChild(moreAction);
 	}
-	return badge;
-}
-
-class InlineTextWidget extends WidgetType {
-	constructor(private readonly text: string, private readonly className: string) {
-		super();
-	}
-
-	toDOM(): HTMLElement {
-		const element = document.createElement('span');
-		element.className = this.className;
-		element.textContent = this.text;
-		return element;
-	}
+	slot.appendChild(badge);
+	return slot;
 }
 
 export interface CardPreviewEditorOptions {
@@ -300,6 +291,7 @@ export function buildCardPreviewDecorations(
 	const pending: PendingDecoration[] = [];
 	const previewSettings = options.getSettings();
 	const sectionTopExtend = previewSettings.cardPreviewSectionTopExtend ?? 0;
+	const interCardGapEm = previewSettings.cardPreviewInterCardGapEm ?? 0;
 
 	for (let index = 0; index < pairs.length; index += 1) {
 		const { card, heading } = pairs[index]!;
@@ -310,23 +302,21 @@ export function buildCardPreviewDecorations(
 		const sectionStart =
 			sectionTopExtend > 0 &&
 			cardFollowsSectionHeading(lines, heading.from, headingLevel);
-		const interCardGapLine = findInterCardGapLineStart(lines, heading.from, headingLevel);
-
-		if (interCardGapLine !== undefined) {
-			pending.push({
-				from: interCardGapLine,
-				to: interCardGapLine,
-				decoration: Decoration.line({ class: INTER_CARD_GAP_CLASS }),
-				startSide: 0,
-			});
-		}
+		const paintTail = shouldPaintInterCardTail(index < pairs.length - 1, interCardGapEm);
+		const lastCoveredLineStart = coveredLineStarts[coveredLineStarts.length - 1];
 
 		for (const lineStart of coveredLineStarts) {
+			const isTail = paintTail && lineStart === lastCoveredLineStart;
 			pending.push({
 				from: lineStart,
 				to: lineStart,
 				decoration: Decoration.line({
-					class: `${CARD_BLOCK_CLASS} ${CARD_BLOCK_CLASS}--${badgeModel.displayOutcome}`,
+					class: [
+						`${CARD_BLOCK_CLASS} ${CARD_BLOCK_CLASS}--${badgeModel.displayOutcome}`,
+						isTail ? CARD_BLOCK_TAIL_CLASS : '',
+					]
+						.filter(Boolean)
+						.join(' '),
 				}),
 				startSide: 0,
 			});
@@ -340,7 +330,6 @@ export function buildCardPreviewDecorations(
 					HEADING_OUTLINE_CLASS,
 					`${HEADING_OUTLINE_CLASS}--${badgeModel.displayOutcome}`,
 					sectionStart ? HEADING_SECTION_START_CLASS : '',
-					index > 0 ? HEADING_FOLLOWS_CARD_CLASS : '',
 				]
 					.filter(Boolean)
 					.join(' '),
@@ -379,16 +368,15 @@ export function buildCardPreviewDecorations(
 			}
 
 			pending.push({
-				from: lineRange.to,
-				to: lineRange.to,
-				decoration: Decoration.widget({
-					widget: new InlineTextWidget(
-						delimiterModel.discouragementText ?? '',
-						DELIMITER_EXTRA_CLASS,
-					),
-					side: 1,
+				from: lineRange.from,
+				to: lineRange.from,
+				decoration: Decoration.line({
+					class: DELIMITER_EXTRA_CLASS,
+					attributes: {
+						'data-delimiter-extra': delimiterModel.discouragementText ?? '',
+					},
 				}),
-				startSide: 1,
+				startSide: 0,
 			});
 		}
 

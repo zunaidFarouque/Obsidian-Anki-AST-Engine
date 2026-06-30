@@ -77,6 +77,28 @@ describe("parseCardDocument — basic cards", () => {
     expect(card.outcome).toBe("skip");
     expect(card.messages.some((m) => m.ruleId === "BAS-01")).toBe(true);
   });
+
+  test("range ends before trailing expect html comment", () => {
+    const body = [
+      "#### A1 Basic OK",
+      "",
+      "What is the speed of light in vacuum?",
+      "",
+      ":::",
+      "",
+      "Approximately $3 \\times 10^8$ m/s.",
+      "",
+      "<!-- expect: sync; rules: BAS-01,BAS-02,FM-02; resolved: basic -->",
+    ].join("\n");
+    const raw = SYNC_HEADER + body;
+    const result = parseDoc(body);
+    const card = result.cards[0]!;
+    const expectStart = raw.indexOf("<!-- expect:");
+    const answerEnd = raw.indexOf("m/s.") + "m/s.".length;
+
+    expect(card.range.end).toBeLessThan(expectStart);
+    expect(card.range.end).toBeGreaterThanOrEqual(answerEnd);
+  });
 });
 
 describe("parseCardDocument — cloze cards", () => {

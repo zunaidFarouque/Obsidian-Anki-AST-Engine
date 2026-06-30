@@ -6,6 +6,7 @@ import {
   isStructuralDelimiter,
 } from "./delimiterCheck";
 import { stripTrailingSectionSeparators } from "./stripTrailingSectionSeparators";
+import { stripTrailingAuthoringNodes } from "../ast/stripAuthoringContent";
 
 export type ExtractedCard = {
   tag: string;
@@ -313,8 +314,12 @@ function buildCard(
   ordinal: number,
   delimiterEndOffset?: number,
 ): ExtractedCard {
-  const trimmedFront = stripTrailingSectionSeparators(frontNodes);
-  const trimmedBack = stripTrailingSectionSeparators(backNodes);
+  const trimmedFront = stripTrailingAuthoringNodes(
+    stripTrailingSectionSeparators(frontNodes),
+  );
+  const trimmedBack = stripTrailingAuthoringNodes(
+    stripTrailingSectionSeparators(backNodes),
+  );
   const ankiId = extractAnkiId(trimmedBack);
   let injectionOffset = ankiId ? undefined : getInjectionOffset(trimmedBack);
   if (injectionOffset === undefined && !ankiId && delimiterEndOffset !== undefined) {

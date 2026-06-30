@@ -1,5 +1,4 @@
 import type { AnkiAstSyncSettings } from './settings';
-import type { DocumentLine } from './cardPreviewUtils';
 
 export const CARD_PREVIEW_INTER_CARD_GAP_VAR = '--anki-card-preview-inter-card-gap';
 export const CARD_PREVIEW_SECTION_TOP_EXTEND_VAR = '--anki-card-preview-section-top-extend';
@@ -9,7 +8,10 @@ export function parseMarkdownHeadingLevel(line: string): number | null {
 	return match ? match[1]!.length : null;
 }
 
-function priorNonBlankLine(lines: DocumentLine[], headingIndex: number): DocumentLine | undefined {
+function priorNonBlankLine(
+	lines: { from: number; text: string }[],
+	headingIndex: number,
+): { from: number; text: string } | undefined {
 	for (let index = headingIndex - 1; index >= 0; index -= 1) {
 		if (lines[index]!.text.trim() !== '') {
 			return lines[index];
@@ -19,7 +21,7 @@ function priorNonBlankLine(lines: DocumentLine[], headingIndex: number): Documen
 }
 
 export function cardFollowsSectionHeading(
-	lines: DocumentLine[],
+	lines: { from: number; text: string }[],
 	headingFrom: number,
 	cardDeclarationHeadingLevel: number,
 ): boolean {
@@ -37,36 +39,11 @@ export function cardFollowsSectionHeading(
 	return priorHeadingLevel !== null && priorHeadingLevel < cardDeclarationHeadingLevel;
 }
 
-export function findInterCardGapLineStart(
-	lines: DocumentLine[],
-	headingFrom: number,
-	cardDeclarationHeadingLevel: number,
-): number | undefined {
-	if (cardFollowsSectionHeading(lines, headingFrom, cardDeclarationHeadingLevel)) {
-		return undefined;
-	}
-
-	const headingIndex = lines.findIndex((line) => line.from === headingFrom);
-	if (headingIndex <= 0) {
-		return undefined;
-	}
-
-	const lineAbove = lines[headingIndex - 1];
-	if (!lineAbove || lineAbove.text.trim() !== '') {
-		return undefined;
-	}
-
-	const priorLine = priorNonBlankLine(lines, headingIndex);
-	if (!priorLine) {
-		return undefined;
-	}
-
-	const priorHeadingLevel = parseMarkdownHeadingLevel(priorLine.text);
-	if (priorHeadingLevel !== null && priorHeadingLevel < cardDeclarationHeadingLevel) {
-		return undefined;
-	}
-
-	return lineAbove.from;
+export function shouldPaintInterCardTail(
+	hasFollowingCard: boolean,
+	interCardGapEm: number,
+): boolean {
+	return hasFollowingCard && Number.isFinite(interCardGapEm) && interCardGapEm > 0;
 }
 
 export function formatCardPreviewInterCardGap(settings: AnkiAstSyncSettings): string {

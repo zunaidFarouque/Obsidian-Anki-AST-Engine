@@ -9,6 +9,7 @@ import {
 	DEFAULT_SETTINGS,
 	type AnkiAstSyncSettings,
 } from './settings';
+import { reloadPlugin, reloadPluginCss } from './devReload';
 import { runSyncFlow, runSyncFlowForActiveFile } from './syncOrchestrator';
 
 export default class AnkiAstSyncPlugin extends Plugin {
@@ -68,6 +69,22 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Refresh note type cache for preview',
 			callback: () => {
 				void this.refreshNoteTypeMap();
+			},
+		});
+
+		this.addCommand({
+			id: 'reload-css',
+			name: 'Reload CSS',
+			callback: () => {
+				void this.reloadCss();
+			},
+		});
+
+		this.addCommand({
+			id: 'reload-plugin',
+			name: 'Reload plugin',
+			callback: () => {
+				void this.reloadSelf();
 			},
 		});
 
@@ -143,6 +160,16 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			() => this.createAnkiClient(),
 			{ dryRun: false },
 		);
+	}
+
+	private async reloadCss(): Promise<void> {
+		const result = await reloadPluginCss(this);
+		new Notice(result.message, result.ok ? undefined : 12_000);
+	}
+
+	private async reloadSelf(): Promise<void> {
+		const result = await reloadPlugin(this);
+		new Notice(result.message, result.ok ? undefined : 12_000);
 	}
 
 	async refreshNoteTypeMap(): Promise<void> {
