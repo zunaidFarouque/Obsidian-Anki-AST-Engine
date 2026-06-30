@@ -63,13 +63,31 @@ describe('cardPreviewLayout', () => {
 		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
 		const css = () => readFileSync(cssPath, 'utf8');
 
-		test('cardblock cm-line carries tokens only without per-line paint', () => {
+		test('cardblock cm-line uses overlay paint without layout shift', () => {
 			const rule = css().match(/\.cm-line\.anki-card-preview-cardblock\s*\{[^}]+\}/s)?.[0];
 			expect(rule).toBeDefined();
 			expect(rule).not.toMatch(/padding/);
 			expect(rule).not.toMatch(/border-left/);
+			expect(rule).not.toMatch(/margin/);
 			expect(rule).not.toMatch(/background:/);
-			expect(rule).not.toMatch(/box-shadow:/);
+		});
+
+		test('cardblock horizontal bleed uses one shared pixel token for paint and border', () => {
+			const stylesheet = css();
+			expect(stylesheet).toContain('--anki-card-preview-block-bleed-x: 8px');
+			expect(stylesheet).not.toMatch(/--anki-card-preview-block-bleed-x:\s*[\d.]+em/);
+			const paintBefore = stylesheet.match(
+				/\.anki-card-preview-cardblock::before\s*\{[^}]+\}/s,
+			)?.[0];
+			expect(paintBefore).toBeDefined();
+			expect(paintBefore).toMatch(/left:\s*calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/);
+			expect(paintBefore).toMatch(/right:\s*calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/);
+			expect(paintBefore).toMatch(/top:\s*0/);
+			expect(paintBefore).toMatch(/bottom:\s*0/);
+			expect(paintBefore).toMatch(/border-left:\s*2px solid var\(--anki-cardblock-border-color\)/);
+			expect(stylesheet).not.toMatch(
+				/\.anki-card-preview-cardblock\.anki-card-preview-delimiter-guide\s*\{[^}]*linear-gradient\(var\(--anki-cardblock-paint\)/s,
+			);
 		});
 
 		test('heading cm-line has no padding or flow-root', () => {
@@ -106,14 +124,15 @@ describe('cardPreviewLayout', () => {
 			expect(rule).not.toMatch(/padding/);
 		});
 
-		test('cardblock ::before underlay bleeds outward without layout shift', () => {
+		test('cardblock tail mask and section-start extend share horizontal bleed', () => {
 			const stylesheet = css();
-			expect(stylesheet).toContain('--anki-card-preview-block-bleed: 0.5em');
+			expect(stylesheet).toMatch(/\.anki-card-preview-cardblock--tail[\s\S]*::after/);
 			expect(stylesheet).toMatch(
-				/\.anki-card-preview-cardblock:not\(\.anki-card-preview-delimiter-guide\)::before/,
+				/\.anki-card-preview-cardblock--tail[\s\S]*left:\s*calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/,
 			);
-			expect(stylesheet).toMatch(/border-left:\s*2px solid var\(--anki-cardblock-border-color\)/);
-			expect(stylesheet).toMatch(/\.anki-card-preview-cardblock--tail[\s\S]*::before/);
+			expect(stylesheet).toMatch(
+				/\.anki-card-preview-heading--section-start[\s\S]*left:\s*calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/,
+			);
 			expect(stylesheet).not.toMatch(/\.anki-card-preview-envelope/);
 		});
 	});

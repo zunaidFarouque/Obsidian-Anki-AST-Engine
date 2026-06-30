@@ -119,24 +119,17 @@
 
 .markdown-source-view.is-live-preview
 	.cm-content
-	.cm-line.anki-card-preview-cardblock:not(.anki-card-preview-delimiter-guide)::before {
+	.cm-line.anki-card-preview-cardblock::before {
 	content: '';
 	position: absolute;
 	z-index: 0;
 	pointer-events: none;
-	left: calc(-1 * var(--anki-card-preview-block-bleed));
-	right: calc(-1 * var(--anki-card-preview-block-bleed));
-	top: calc(-1 * var(--anki-card-preview-block-bleed));
-	bottom: calc(-1 * var(--anki-card-preview-block-bleed));
+	left: calc(-1 * var(--anki-card-preview-block-bleed-x));
+	right: calc(-1 * var(--anki-card-preview-block-bleed-x));
+	top: 0;
+	bottom: 0;
 	background: var(--anki-cardblock-paint);
 	border-left: 2px solid var(--anki-cardblock-border-color);
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-delimiter-guide {
-	background: var(--anki-cardblock-paint);
-	box-shadow: inset 2px 0 0 0 var(--anki-cardblock-border-color);
 }
 
 .markdown-source-view.is-live-preview
@@ -147,16 +140,22 @@
 
 .markdown-source-view.is-live-preview
 	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading--section-start:not(
-		.anki-card-preview-delimiter-guide
-	)::before {
-	top: calc(-1 * (var(--anki-card-preview-section-top-extend) + var(--anki-card-preview-block-bleed)));
+	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading--section-start::before {
+	top: calc(-1 * var(--anki-card-preview-section-top-extend));
 }
 
 .markdown-source-view.is-live-preview
 	.cm-content
-	.cm-line.anki-card-preview-cardblock--tail:not(.anki-card-preview-delimiter-guide)::before {
-	bottom: calc(var(--anki-card-preview-inter-card-gap) + var(--anki-card-preview-block-bleed));
+	.cm-line.anki-card-preview-cardblock--tail::after {
+	content: '';
+	position: absolute;
+	z-index: 1;
+	pointer-events: none;
+	left: calc(-1 * var(--anki-card-preview-block-bleed-x));
+	right: calc(-1 * var(--anki-card-preview-block-bleed-x));
+	bottom: calc(-1 * var(--anki-card-preview-inter-card-gap));
+	height: var(--anki-card-preview-inter-card-gap);
+	background: var(--background-primary);
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--sync {
@@ -194,7 +193,7 @@
 :root {
 	--anki-card-preview-inter-card-gap: 0.28em;
 	--anki-card-preview-section-top-extend: calc(0.5 * 1lh);
-	--anki-card-preview-block-bleed: 0.5em;
+	--anki-card-preview-block-bleed-x: 8px;
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-heading {
@@ -305,6 +304,16 @@
 	--anki-delimiter-garnish-cut: 0.72em;
 	--anki-delimiter-garnish-arm: 0.42em;
 	position: relative;
+	background-image: linear-gradient(
+		to right,
+		transparent 0%,
+		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color) 90%,
+		transparent 100%
+	);
+	background-size: 100% 1px;
+	background-position: 0 var(--anki-delimiter-guide-y);
+	background-repeat: no-repeat;
 }
 
 .markdown-source-view.is-live-preview
@@ -347,37 +356,6 @@
 	);
 }
 
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-delimiter-guide::before {
-	content: '';
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: var(--anki-delimiter-guide-y);
-	height: 1px;
-	max-height: 1px;
-	transform: translateY(-50%);
-	pointer-events: none;
-	background-color: var(--anki-delimiter-guide-color);
-	-webkit-mask-image: linear-gradient(
-		to right,
-		transparent 0%,
-		#000 10%,
-		#000 90%,
-		transparent 100%
-	);
-	mask-image: linear-gradient(
-		to right,
-		transparent 0%,
-		#000 10%,
-		#000 90%,
-		transparent 100%
-	);
-	-webkit-mask-repeat: no-repeat;
-	mask-repeat: no-repeat;
-	-webkit-mask-size: 100% 100%;
-	mask-size: 100% 100%;
-}
-
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-delimiter-guide--info,
@@ -386,6 +364,19 @@
 	.cm-line.anki-card-preview-delimiter-guide--typed {
 	--anki-delimiter-garnish-cut: 0.72em;
 	--anki-delimiter-garnish-y-offset: 0.2em;
+	background-image: linear-gradient(
+		to right,
+		transparent 0%,
+		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color)
+			calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
+		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
+		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
+		var(--anki-delimiter-guide-color)
+			calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
+		var(--anki-delimiter-guide-color) 90%,
+		transparent 100%
+	);
 }
 
 .markdown-source-view.is-live-preview
@@ -393,37 +384,17 @@
 	.cm-line.anki-card-preview-delimiter-guide--reversible {
 	--anki-delimiter-garnish-cut: 1.05em;
 	--anki-delimiter-garnish-y-offset: 0.07em;
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-delimiter-guide--info::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-delimiter-guide--typed::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-delimiter-guide--reversible::before {
-	-webkit-mask-image: linear-gradient(
+	background-image: linear-gradient(
 		to right,
 		transparent 0%,
-		#000 10%,
-		#000 calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
+		var(--anki-delimiter-guide-color) 10%,
+		var(--anki-delimiter-guide-color)
+			calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
 		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
 		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
-		#000 calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
-		#000 90%,
-		transparent 100%
-	);
-	mask-image: linear-gradient(
-		to right,
-		transparent 0%,
-		#000 10%,
-		#000 calc(50% - var(--anki-delimiter-garnish-cut) - var(--anki-delimiter-garnish-arm)),
-		transparent calc(50% - var(--anki-delimiter-garnish-cut)),
-		transparent calc(50% + var(--anki-delimiter-garnish-cut)),
-		#000 calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
-		#000 90%,
+		var(--anki-delimiter-guide-color)
+			calc(50% + var(--anki-delimiter-garnish-cut) + var(--anki-delimiter-garnish-arm)),
+		var(--anki-delimiter-guide-color) 90%,
 		transparent 100%
 	);
 }
