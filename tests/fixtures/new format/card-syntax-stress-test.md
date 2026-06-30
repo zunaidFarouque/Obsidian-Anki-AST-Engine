@@ -45,7 +45,7 @@ Section E  Reversible + typed
   E5  :::t multi-line back first line only  -> sync Back=Paris (TYP-04)
 
 Section F  Conflicts
-  F1  basic + :::r                         -> error (CX-09)
+  F1  :::r with file default basic          -> sync reversible (DEL-02, RES-05)
   F2  cloze tag + :::t                     -> error (CX-11)
   F3  basic tag + :::r                     -> error (CX-17)
   F4  custom + :::r                        -> error (CX-21)
@@ -70,8 +70,21 @@ Section H  Additional matrix
   H7  Section overrides file default       -> sync (FM-04)
   H8  Cloze under override section         -> sync (STR-02)
   H9  Sibling cloze section not inherited   -> sync basic (RES-02, CX-23)
-  H10 Nearest ancestor RES-03              -> sync cloze (RES-03) (separate file without anki_customCardDefault):
-  ::: Word / ::: Definition only -> skip (CUS-03, CX-22)
+  H10 Nearest ancestor RES-03              -> sync cloze (RES-03)
+
+Section I  Coverage gaps (audit)
+  I1  basic + ::: Field                    -> error (BAS-06, CX-10)
+  I2  inherited cloze + :::r               -> error (CLZ-10, REV-05, CX-30)
+  I3  custom + plain ::: only               -> skip (CUS-04, CX-20)
+  I4  STR-03 H5 tag ignored, cloze sync     -> sync (STR-03, STR-02)
+  I5  STR-03 descendant not H5 basic        -> sync cloze (STR-03, RES-03)
+  I6a dual cardType on ### section          -> error (TAG-01, CX-01, CX-26)
+  I7a cardType + model on ### section       -> error (TAG-02, CX-02)
+  I8  second ::: stays in Back              -> sync (DEL-08)
+
+Orphan mini-fixture (no anki_* defaults): tests/fixtures/new format/card-syntax-orphan-custom.md
+  O1  orphan ::: Field only                 -> skip (CUS-03, CX-22)
+  O2  RES-06 positive cloze inference       -> sync (RES-06)
 -->
 
 # Card Syntax Stress Test
@@ -118,7 +131,7 @@ The {{c1::mitochondria}} is mentioned in the question.
 
 It is an organelle.
 
-<!-- expect: sync + warn; rules: BAS-04,CX-27,RES-06; resolved: basic from anki_cardDefault; {{c1::mitochondria}} literal in Front unless inferClozeFromManualSyntaxOnBasic -->
+<!-- expect: sync + warn; rules: BAS-04,CX-27; resolved: basic from anki_cardDefault; {{c1::mitochondria}} literal in Front unless inferClozeFromManualSyntaxOnBasic -->
 
 #### A5 cN only in Back
 
@@ -324,7 +337,7 @@ A basic card that incorrectly uses the reversible token.
 :::r
 Wrong split for basic.
 
-<!-- expect: error; rules: BAS-06,REV-04,CX-09; resolved: basic from anki_cardDefault -->
+<!-- expect: sync; rules: DEL-02,RES-05,CX-14; resolved: reversible -->
 
 #### F2 Cloze type plus typed delimiter #anki/cardType/cloze
 
@@ -368,9 +381,9 @@ isolated
 ::: Definition
 no per-card model hashtag
 
-<!-- expect: sync; rules: RES-04,FM-03,CX-22 counterexample WITH yaml default -->
+<!-- expect: sync; rules: RES-04,FM-03; anki_customCardDefault supplies model for field blocks -->
 
-#### F7 TAG conflict examples (heading-level documentation)
+##### F7 TAG conflict examples (heading-level documentation — not a card)
 
 <!--
 ERROR AT HEADING PARSE (not valid #### cards):
@@ -409,14 +422,14 @@ Content for field literally named "r".
 
 <!-- expect: sync; rules: DEL-06; NOT reversible -->
 
-#### G2b Reversible reserved token
+#### G2b Reversible reserved token #anki/cardType/reversible
 
 Symbol for gold?
 
 :::r
 Au
 
-<!-- expect: sync; rules: DEL-02,DEL-06 -->
+<!-- expect: sync; rules: DEL-02,DEL-06; resolved: reversible -->
 
 #### G3 Empty cloze deletion
 
@@ -528,3 +541,93 @@ typo
 Literal braces in custom field.
 
 <!-- expect: sync; rules: CLZ-12 -->
+
+#### I8 Second delimiter stays in back
+
+Front text before first split.
+
+:::
+
+Line before inner delimiter.
+
+:::
+
+This line should remain Back content with the inner ::: marker.
+
+<!-- expect: sync; rules: DEL-08,BAS-01; resolved: basic; back_contains: inner ::: marker -->
+
+---
+
+## I — Coverage gap scenarios
+
+### Cloze gallery #anki/cardType/cloze
+
+#### I1 Basic resolved plus custom field #anki/cardType/basic
+
+Plain front text.
+
+::: Word
+invalid field on basic card
+
+<!-- expect: error; rules: BAS-06,CX-10 -->
+
+#### I2 Inherited cloze plus reversible delimiter
+
+Inherited cloze {{token}} in Text.
+
+:::r
+Should conflict with cloze resolution.
+
+<!-- expect: error; rules: CLZ-10,REV-05,CX-30 -->
+
+### Vocabulary inherited #anki/model/Vocab
+
+#### I3 Custom plain split only
+
+Front question under custom model section.
+
+:::
+
+Back answer without ::: Field blocks.
+
+<!-- expect: skip; rules: CUS-04,CX-20 -->
+
+### STR-03 H5 ignored #anki/cardType/cloze
+
+#### I4 Inherits cloze not H5 basic
+
+{{mitochondria}} is the powerhouse.
+
+<!-- expect: sync; rules: STR-02; resolved: cloze -->
+
+##### H5 basic tag ignored #anki/cardType/basic
+
+#### I5 Still inherits section cloze after H5
+
+{{ATP}} carries chemical energy.
+
+<!-- expect: sync; rules: RES-03; resolved: cloze; NOT basic from ignored ##### -->
+
+### I6 Dual cardType section #anki/cardType/cloze #anki/cardType/basic
+
+#### I6a Card under dual cardType section
+
+Question under conflicting section?
+
+:::
+
+Answer.
+
+<!-- expect: error; rules: TAG-01,CX-01,CX-26 -->
+
+### I7 cardType plus model section #anki/cardType/cloze #anki/model/Vocab
+
+#### I7a Card under cardType model conflict
+
+::: Word
+entropy
+
+::: Definition
+Energy dispersal.
+
+<!-- expect: error; rules: TAG-02,CX-02 -->

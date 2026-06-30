@@ -18,6 +18,8 @@ export interface AnkiAstSyncSettings {
 	orphanHandling: 'off' | 'ask';
 	orphanIgnoreTag: string;
 	orphanAllowSuspend: boolean;
+	enableCardPreview: boolean;
+	inferClozeFromManualSyntaxOnBasic: boolean;
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -37,6 +39,8 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	orphanHandling: 'ask',
 	orphanIgnoreTag: 'obsidian-sync-ignore',
 	orphanAllowSuspend: false,
+	enableCardPreview: false,
+	inferClozeFromManualSyntaxOnBasic: false,
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {
@@ -131,6 +135,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.delimiter = value;
 						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
 					}),
 			);
 
@@ -173,6 +178,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.defaultCardDeclarationHeadingLevel = value;
 						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
 					}),
 			);
 
@@ -185,6 +191,39 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.includeParentHeadersAsTags = value;
 						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		containerEl.createEl('h3', { text: 'Live preview' });
+
+		new Setting(containerEl)
+			.setName('Card syntax preview')
+			.setDesc(
+				'Show sync outcome badges on card headings in Live Preview for the active note only. Parsing is debounced and cached so editing stays responsive.',
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableCardPreview)
+					.onChange(async (value) => {
+						this.plugin.settings.enableCardPreview = value;
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Infer cloze from {{cN::...}} on basic cards')
+			.setDesc(
+				'When enabled, manual cloze syntax in the Text region reclassifies basic-resolved cards as cloze in preview (matches sync resolver BAS-04).',
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.inferClozeFromManualSyntaxOnBasic)
+					.onChange(async (value) => {
+						this.plugin.settings.inferClozeFromManualSyntaxOnBasic = value;
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
 					}),
 			);
 

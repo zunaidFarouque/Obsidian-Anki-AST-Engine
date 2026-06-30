@@ -1,5 +1,6 @@
 import { Notice, Plugin } from 'obsidian';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
+import { registerCardPreview, type CardPreviewManager } from './cardPreview';
 import { buildPluginConfig } from './configBuilder';
 import { createObsidianFetch } from './obsidianFetch';
 import {
@@ -11,6 +12,7 @@ import { runSyncFlow, runSyncFlowForActiveFile } from './syncOrchestrator';
 
 export default class AnkiAstSyncPlugin extends Plugin {
 	settings!: AnkiAstSyncSettings;
+	cardPreview?: CardPreviewManager;
 	private readonly ankiFetch = createObsidianFetch();
 
 	async onload() {
@@ -61,9 +63,13 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		});
 
 		this.addSettingTab(new AnkiAstSyncSettingTab(this.app, this));
+
+		this.cardPreview = registerCardPreview(this, () => this.settings);
 	}
 
-	onunload() {}
+	onunload() {
+		this.cardPreview?.destroy();
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(

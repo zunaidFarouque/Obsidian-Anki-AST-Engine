@@ -1,7 +1,7 @@
 import type { Content } from "mdast";
 import { visit } from "unist-util-visit";
 
-export function nodesToPreview(nodes: Content[]): string {
+export function nodesToRawText(nodes: Content[]): string {
   const parts: string[] = [];
 
   for (const node of nodes) {
@@ -12,5 +12,9 @@ export function nodesToPreview(nodes: Content[]): string {
     });
   }
 
-  return parts.join("").replace(/\s+/g, " ").trim();
+  return parts.join("");
+}
+
+export function nodesToPreview(nodes: Content[]): string {
+  return nodesToRawText(nodes).replace(/\s+/g, " ").trim();
 }

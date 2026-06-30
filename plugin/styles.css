@@ -102,3 +102,56 @@
 	margin: 0 0 0.75em;
 	opacity: 0.9;
 }
+
+.anki-card-preview-heading {
+	border-left: 3px solid var(--background-modifier-border);
+	padding-left: 0.45em;
+}
+
+.anki-card-preview-heading--sync {
+	border-left-color: var(--color-green, #2ea043);
+}
+
+.anki-card-preview-heading--warn {
+	border-left-color: var(--color-yellow, #d29922);
+}
+
+.anki-card-preview-heading--skip {
+	border-left-color: var(--text-muted);
+}
+
+.anki-card-preview-heading--error {
+	border-left-color: var(--color-red, #f85149);
+}
+
+.anki-card-preview-badge {
+	display: inline-block;
+	margin-left: 0.45em;
+	padding: 0.05em 0.45em;
+	border-radius: 0.35em;
+	font-size: 0.72em;
+	font-weight: 600;
+	line-height: 1.35;
+	vertical-align: middle;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--text-on-accent);
+	background: var(--background-modifier-border);
+}
+
+.anki-card-preview-badge--sync {
+	background: var(--color-green, #2ea043);
+}
+
+.anki-card-preview-badge--warn {
+	background: var(--color-yellow, #d29922);
+	color: var(--text-normal);
+}
+
+.anki-card-preview-badge--skip {
+	background: var(--text-muted);
+}
+
+.anki-card-preview-badge--error {
+	background: var(--color-red, #f85149);
+}
