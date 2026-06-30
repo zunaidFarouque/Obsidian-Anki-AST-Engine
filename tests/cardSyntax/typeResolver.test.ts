@@ -51,7 +51,7 @@ describe("resolveCardType — RES-01 card heading wins", () => {
         cardHeading: {
           headingLevel: 4,
           headingTitle: "Term",
-          modelId: "Vocab",
+          noteTypeId: "Vocab",
         },
         ancestors: [
           {
@@ -67,8 +67,8 @@ describe("resolveCardType — RES-01 card heading wins", () => {
 
     expect(result).toEqual({
       kind: "custom",
-      modelId: "Vocab",
-      resolvedFrom: "card heading #anki/model/Vocab",
+      noteTypeId: "Vocab",
+      resolvedFrom: "card heading #anki/noteType/Vocab",
     });
   });
 });
@@ -136,7 +136,7 @@ describe("resolveCardType — RES-04 custom default is layout-triggered", () => 
 
     expect(result).toEqual({
       kind: "custom",
-      modelId: "Vocab",
+      noteTypeId: "Vocab",
       resolvedFrom: "anki_customCardDefault: Vocab",
     });
   });
@@ -284,7 +284,7 @@ describe("resolveCardType — RES-08 model tags inherit on sections", () => {
           {
             headingLevel: 3,
             headingTitle: "Vocabulary",
-            modelId: "Vocab",
+            noteTypeId: "Vocab",
           },
         ],
         hasFieldBlocks: true,
@@ -293,7 +293,7 @@ describe("resolveCardType — RES-08 model tags inherit on sections", () => {
 
     expect(result).toEqual({
       kind: "custom",
-      modelId: "Vocab",
+      noteTypeId: "Vocab",
       resolvedFrom: "inherited from ### Vocabulary",
     });
   });

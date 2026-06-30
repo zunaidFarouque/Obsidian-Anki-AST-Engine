@@ -42,7 +42,7 @@ export interface CardRegions {
 
 export type ResolvedCardType =
   | { kind: "builtin"; type: BuiltInCardType }
-  | { kind: "custom"; modelId: string };
+  | { kind: "custom"; noteTypeId: string };
 
 export interface CardHashtags {
   user: string[];
@@ -107,13 +107,13 @@ export function builtinCardType(type: BuiltInCardType): ResolvedCardType {
   return { kind: "builtin", type };
 }
 
-export function customCardType(modelId: string): ResolvedCardType {
-  return { kind: "custom", modelId };
+export function customCardType(noteTypeId: string): ResolvedCardType {
+  return { kind: "custom", noteTypeId };
 }
 
 export function isCustomCardType(
   type: ResolvedCardType,
-): type is { kind: "custom"; modelId: string } {
+): type is { kind: "custom"; noteTypeId: string } {
   return type.kind === "custom";
 }
 
@@ -121,7 +121,7 @@ export function formatResolvedCardType(type: ResolvedCardType): string {
   if (type.kind === "builtin") {
     return type.type;
   }
-  return `custom:${type.modelId}`;
+  return type.noteTypeId;
 }
 
 export function formatResolvedFrom(resolvedFrom: string): string {

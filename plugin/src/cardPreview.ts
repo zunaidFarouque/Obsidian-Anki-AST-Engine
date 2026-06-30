@@ -1,8 +1,11 @@
 import { TFile, type MarkdownPostProcessorContext, type Plugin } from 'obsidian';
-import { getBodyStartOffset } from '../../src/io/frontmatterFilter';
-import { parseCardDocument } from '../../src/cardSyntax/parseCardDocument';
-import type { ParseCardDocumentResult } from '../../src/cardSyntax/types';
+import {
+	getBodyStartOffset,
+	parseCardDocument,
+	type ParseCardDocumentResult,
+} from 'obsidian-anki-ast-engine/cardSyntax';
 import type { AnkiAstSyncSettings } from './settings';
+import { createCardPreviewEditorExtension } from './cardPreviewEditor';
 import {
 	CARD_PREVIEW_DEBOUNCE_MS,
 	cardDeclarationHeadingSelector,
@@ -26,6 +29,7 @@ export class CardPreviewManager {
 	private readonly pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private readonly pendingContent = new Map<string, string>();
 	private readonly previewElements = new Map<string, WeakRef<HTMLElement>>();
+	private settingsRevision = 0;
 
 	constructor(
 		private readonly plugin: Plugin,
@@ -36,6 +40,14 @@ export class CardPreviewManager {
 		this.plugin.registerMarkdownPostProcessor((element, context) => {
 			void this.processPreview(element, context);
 		});
+
+		this.plugin.registerEditorExtension(
+			createCardPreviewEditorExtension({
+				getSettings: () => this.getSettings(),
+				parseContent: (content) => this.parseContent(content),
+				getSettingsRevision: () => this.settingsRevision,
+			}),
+		);
 	}
 
 	destroy(): void {
@@ -49,6 +61,7 @@ export class CardPreviewManager {
 	}
 
 	onSettingsChanged(): void {
+		this.settingsRevision += 1;
 		const activePath = this.plugin.app.workspace.getActiveFile()?.path;
 		if (!activePath) {
 			return;
@@ -74,11 +87,6 @@ export class CardPreviewManager {
 
 		const sourcePath = context.sourcePath;
 		if (!sourcePath) {
-			return;
-		}
-
-		const activeFile = this.plugin.app.workspace.getActiveFile();
-		if (!activeFile || activeFile.path !== sourcePath) {
 			return;
 		}
 
@@ -119,7 +127,7 @@ export class CardPreviewManager {
 				return;
 			}
 
-			const result = parseCardDocument(latestContent, this.buildParseOptions(latestContent));
+			const result = this.parseContent(latestContent);
 			this.setCache(sourcePath, latestKey, result);
 
 			const preview = this.previewElements.get(sourcePath)?.deref();
@@ -129,6 +137,10 @@ export class CardPreviewManager {
 		}, CARD_PREVIEW_DEBOUNCE_MS);
 
 		this.pendingTimers.set(sourcePath, timer);
+	}
+
+	parseContent(content: string): ParseCardDocumentResult {
+		return parseCardDocument(content, this.buildParseOptions(content));
 	}
 
 	private buildParseOptions(content: string) {
@@ -178,7 +190,7 @@ export class CardPreviewManager {
 		const selector = cardDeclarationHeadingSelector(
 			this.getSettings().defaultCardDeclarationHeadingLevel,
 		);
-		const headings = [...container.querySelectorAll<HTMLElement>(selector)];
+		const headings = Array.from(container.querySelectorAll<HTMLElement>(selector));
 		const pairs = zipCardsToHeadings(result.cards, headings);
 
 		for (const { card, heading } of pairs) {

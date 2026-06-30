@@ -139,7 +139,7 @@ describe("parseCardDocument — hashtag conflicts", () => {
 
   test("errors when section heading mixes cardType and model (TAG-02, CX-02)", () => {
     const result = parseDoc(
-      "### Bad #anki/cardType/cloze #anki/model/Vocab\n\n#### Child\n\n::: Word\nw\n\n::: Definition\nd",
+      "### Bad #anki/cardType/cloze #anki/noteType/Vocab\n\n#### Child\n\n::: Word\nw\n\n::: Definition\nd",
     );
 
     const card = result.cards[0]!;

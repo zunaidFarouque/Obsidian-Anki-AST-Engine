@@ -1,7 +1,7 @@
 import type { Content, Heading, Root } from "mdast";
 
 export type TypeDeclaration = {
-  kind: "cardType" | "model";
+  kind: "cardType" | "noteType";
   value: string;
 };
 

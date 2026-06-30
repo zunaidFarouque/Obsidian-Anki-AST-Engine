@@ -4,7 +4,7 @@ export type BuiltInCardType = "basic" | "cloze" | "reversible" | "typed";
 
 export type ResolvedCardType =
   | { kind: "builtin"; type: BuiltInCardType }
-  | { kind: "custom"; modelId: string; fieldNames: string[] };
+  | { kind: "custom"; noteTypeId: string; fieldNames: string[] };
 
 export interface CardFieldBlock {
   fieldName: string;
@@ -26,7 +26,7 @@ export interface CardLayoutRegions {
 export interface LayoutValidatorOptions {
   cardTitle?: string;
   inferClozeFromManualSyntaxOnBasic?: boolean;
-  /** True when a custom model id is available but the card resolved to a builtin type. */
+  /** True when a custom note type id is available but the card resolved to a builtin type. */
   customModelAvailable?: boolean;
 }
 
@@ -356,7 +356,7 @@ function validateCustomLayout(
       messages,
       "error",
       "CUS-05",
-      `Card "${title}": ${delimiter} conflicts with resolved custom model "${resolvedType.modelId}" — error`,
+      `Card "${title}": ${delimiter} conflicts with resolved custom note type "${resolvedType.noteTypeId}" — error`,
     );
     return { outcome: "error", messages };
   }
@@ -366,7 +366,7 @@ function validateCustomLayout(
       messages,
       "error",
       "CUS-04",
-      `Card "${title}": custom model requires ::: Field blocks, not plain ::: — skipped`,
+      `Card "${title}": custom note type requires ::: Field blocks, not plain ::: — skipped`,
     );
     return { outcome: "skip", messages };
   }
@@ -376,7 +376,7 @@ function validateCustomLayout(
       messages,
       "error",
       "CUS-01",
-      `Card "${title}": custom model "${resolvedType.modelId}" missing field blocks — skipped`,
+      `Card "${title}": custom note type "${resolvedType.noteTypeId}" missing field blocks — skipped`,
     );
     return { outcome: "skip", messages };
   }
@@ -395,7 +395,7 @@ function validateCustomLayout(
         messages,
         "error",
         "CUS-02",
-        `Card "${title}": unknown field "${block.fieldName}"; model "${resolvedType.modelId}" has: ${resolvedType.fieldNames.join(", ")}`,
+        `Card "${title}": unknown field "${block.fieldName}"; note type "${resolvedType.noteTypeId}" has: ${resolvedType.fieldNames.join(", ")}`,
       );
       return { outcome: "error", messages };
     }
@@ -421,7 +421,7 @@ export function validateCardLayout(
       messages,
       "error",
       "CUS-03",
-      `Card "${title}": custom field layout but no model resolved — skipped`,
+      `Card "${title}": custom field layout but no note type resolved — skipped`,
     );
     return { outcome: "skip", messages };
   }

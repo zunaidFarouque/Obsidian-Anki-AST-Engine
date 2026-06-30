@@ -36,7 +36,7 @@ const reversible: ResolvedCardType = { kind: "builtin", type: "reversible" };
 const typed: ResolvedCardType = { kind: "builtin", type: "typed" };
 const customVocab: ResolvedCardType = {
   kind: "custom",
-  modelId: "Vocab",
+  noteTypeId: "Vocab",
   fieldNames: ["Word", "Definition", "Example"],
 };
 

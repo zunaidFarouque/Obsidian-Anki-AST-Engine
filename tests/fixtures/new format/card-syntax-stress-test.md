@@ -31,7 +31,7 @@ Section C  Outline isolation
   C1  Sibling section not cloze            -> sync basic (RES-02, CX-23)
 
 Section D  Custom models
-  D1  #anki/model/Vocab explicit           -> sync (CUS-01)
+  D1  #anki/noteType/Vocab explicit           -> sync (CUS-01)
   D2  Legacy #anki_card_Vocab              -> sync
   D3  YAML custom default only             -> sync (RES-04, FM-03)
   D4  Custom SKIP model no fields          -> skip (CUS-01)
@@ -58,7 +58,7 @@ Section G  Edge cases
   G2a ::: r custom field vs G2b :::r       -> sync (DEL-06)
   G3  Empty {{}}                            -> skip (CLZ-09)
   G4  Section user/engine tags             -> sync (STR-04, CX-29)
-  G5  #anki/noteType/cloze rejected        -> not cloze (TAG-04)
+  G5  #anki/noteType/cloze is custom not builtin  -> skip (TAG-04,CUS-04)
 
 Section H  Additional matrix
   H1  Manual/auto merge                    -> sync (CLZ-07)
@@ -79,7 +79,7 @@ Section I  Coverage gaps (audit)
   I4  STR-03 H5 tag ignored, cloze sync     -> sync (STR-03, STR-02)
   I5  STR-03 descendant not H5 basic        -> sync cloze (STR-03, RES-03)
   I6a dual cardType on ### section          -> error (TAG-01, CX-01, CX-26)
-  I7a cardType + model on ### section       -> error (TAG-02, CX-02)
+  I7a cardType + noteType on ### section       -> error (TAG-02, CX-02)
   I8  second ::: stays in Back              -> sync (DEL-08)
 
 Orphan mini-fixture (no anki_* defaults): tests/fixtures/new format/card-syntax-orphan-custom.md
@@ -223,7 +223,7 @@ Water.
 
 ## D — Custom models
 
-### Vocabulary #anki/model/Vocab
+### Vocabulary #anki/noteType/Vocab
 
 #### D1 Custom explicit model tag
 
@@ -255,7 +255,7 @@ Organelle that produces ATP.
 
 <!-- expect: sync; rules: RES-04,FM-03; anki_customCardDefault: Vocab -->
 
-#### D4 Custom SKIP model section no fields
+#### D4 Custom SKIP noteType section no fields
 
 This card is under ### Vocabulary but has no ::: Field blocks.
 
@@ -357,7 +357,7 @@ Back answer.
 
 <!-- expect: error; rules: CX-17 -->
 
-#### F4 Custom fields plus reversible delimiter #anki/model/Vocab
+#### F4 Custom fields plus reversible delimiter #anki/noteType/Vocab
 
 ::: Word
 test
@@ -391,7 +391,7 @@ ERROR AT HEADING PARSE (not valid #### cards):
 ### Bad dual cardType #anki/cardType/cloze #anki/cardType/basic
 -> error TAG-01, CX-01
 
-### Bad cardType + model #anki/cardType/cloze #anki/model/Vocab
+### Bad cardType + noteType #anki/cardType/cloze #anki/noteType/Vocab
 -> error TAG-02, CX-02
 -->
 
@@ -415,7 +415,7 @@ Back extra after the real split.
 
 <!-- expect: sync; rules: DEL-07,CLZ-02 -->
 
-#### G2a Custom field named r #anki/model/Edge
+#### G2a Custom field named r #anki/noteType/Edge
 
 ::: r
 Content for field literally named "r".
@@ -443,9 +443,9 @@ Something {{}} empty here.
 
 <!-- expect: sync; rules: STR-04,CX-29; #biology on ### Thermodynamics syncs; #anki/cardType/cloze stripped -->
 
-### Invalid noteType tag #anki/noteType/cloze
+### Built-in name on noteType #anki/noteType/cloze
 
-#### G5 noteType tag does not declare cloze
+#### G5 noteType cloze is custom not builtin
 
 What is H₂O?
 
@@ -453,7 +453,7 @@ What is H₂O?
 
 Water.
 
-<!-- expect: sync; rules: TAG-04; resolved: basic (anki_cardDefault); #anki/noteType/cloze does NOT declare cloze -->
+<!-- expect: skip; rules: TAG-04,CUS-04; resolved: custom noteType cloze; #anki/noteType/cloze is NOT #anki/cardType/cloze -->
 
 ---
 
@@ -525,14 +525,14 @@ What is 1+1?
 
 <!-- expect: skip; rules: TYP-02 -->
 
-#### H4 Custom unknown field #anki/model/Vocab
+#### H4 Custom unknown field #anki/noteType/Vocab
 
 ::: Definiton
 typo
 
 <!-- expect: error; rules: CUS-02 -->
 
-#### H5 Custom literal braces #anki/model/Vocab
+#### H5 Custom literal braces #anki/noteType/Vocab
 
 ::: Word
 {{not a cloze}}
@@ -580,11 +580,11 @@ Should conflict with cloze resolution.
 
 <!-- expect: error; rules: CLZ-10,REV-05,CX-30 -->
 
-### Vocabulary inherited #anki/model/Vocab
+### Vocabulary inherited #anki/noteType/Vocab
 
 #### I3 Custom plain split only
 
-Front question under custom model section.
+Front question under custom noteType section.
 
 :::
 
@@ -620,7 +620,7 @@ Answer.
 
 <!-- expect: error; rules: TAG-01,CX-01,CX-26 -->
 
-### I7 cardType plus model section #anki/cardType/cloze #anki/model/Vocab
+### I7 cardType plus noteType section #anki/cardType/cloze #anki/noteType/Vocab
 
 #### I7a Card under cardType model conflict
 

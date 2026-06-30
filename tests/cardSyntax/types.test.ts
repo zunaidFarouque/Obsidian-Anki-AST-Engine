@@ -48,16 +48,14 @@ describe("ResolvedCardType", () => {
 
   test("customCardType carries model id for CUS-01 custom models", () => {
     const type: ResolvedCardType = customCardType("Vocab");
-    expect(type).toEqual({ kind: "custom", modelId: "Vocab" });
+    expect(type).toEqual({ kind: "custom", noteTypeId: "Vocab" });
     expect(isCustomCardType(type)).toBe(true);
     expect(isBuiltInCardType(type.kind)).toBe(false);
   });
 
   test("formatResolvedCardType renders builtin and custom labels", () => {
     expect(formatResolvedCardType(builtinCardType("basic"))).toBe("basic");
-    expect(formatResolvedCardType(customCardType("Vocab"))).toBe(
-      "custom:Vocab",
-    );
+    expect(formatResolvedCardType(customCardType("Vocab"))).toBe("Vocab");
   });
 });
 
@@ -122,6 +120,7 @@ describe("SyncOutcome", () => {
 describe("engine hashtag namespace", () => {
   test("isEngineHashtag matches reserved #anki/ and #anki_card_ prefixes", () => {
     expect(isEngineHashtag("#anki/cardType/basic")).toBe(true);
+    expect(isEngineHashtag("#anki/noteType/Vocab")).toBe(true);
     expect(isEngineHashtag("#anki/model/Vocab")).toBe(true);
     expect(isEngineHashtag("#anki_card_Vocab")).toBe(true);
     expect(isEngineHashtag("#exam-prep")).toBe(false);

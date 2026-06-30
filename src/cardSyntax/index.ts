@@ -71,6 +71,7 @@ export {
 export { crossCuttingMessages, deriveCrossCuttingRuleIds } from "./crossCuttingRules";
 
 export { parseCardDocument } from "./parseCardDocument";
+export { getBodyStartOffset } from "../io/frontmatterFilter";
 export {
   loadCardSyntaxStressTest,
   stressTestFixturePath,

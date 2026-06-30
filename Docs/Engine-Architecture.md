@@ -2,7 +2,7 @@
 
 Authoritative reference for **engine-specific** behavior (not Obsidian-native). For wikilink/embed/block resolution rules, see [Obsidian-Parity.md](Obsidian-Parity.md).
 
-**Card type grammar (v1, pre-implementation):** [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md) — stress-test fixture: [`tests/fixtures/new format/card-syntax-stress-test.md`](../tests/fixtures/new%20format/card-syntax-stress-test.md).
+**Card type grammar (v1):** [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md) — stress-test fixture: [`tests/fixtures/new format/card-syntax-stress-test.md`](../tests/fixtures/new%20format/card-syntax-stress-test.md). **Editor preview UX:** [DECIDING/Card-Preview-Design-Guidelines.md](DECIDING/Card-Preview-Design-Guidelines.md).
 
 ## Pipeline overview
 

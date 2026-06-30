@@ -1,8 +1,5 @@
 /**
  * Hashtag parsing for card-syntax v1 (Section 3 — TAG-01..04).
- *
- * NOTE for Agent 1: `types.ts` is not present yet. These types should move to
- * `src/cardSyntax/types.ts` when that module is created.
  */
 
 export type BuiltinCardType = "basic" | "cloze" | "reversible" | "typed";
@@ -24,13 +21,13 @@ export interface HashtagParseError {
 export interface HashtagParseResult {
   userTags: string[];
   cardType?: BuiltinCardType;
-  model?: string;
+  noteTypeId?: string;
   errors: HashtagParseError[];
 }
 
 const HASHTAG_PATTERN = /#([^\s#,;!.?()[\]{}]+)/g;
 
-type DirectiveKind = "cardType" | "model";
+type DirectiveKind = "cardType" | "noteType";
 
 interface ParsedDirective {
   kind: DirectiveKind;
@@ -48,6 +45,14 @@ function extractHashtags(text: string): string[] {
   }
 
   return tags;
+}
+
+function parseNoteTypeSuffix(tag: string, prefix: string): ParsedDirective | "user" {
+  const noteTypeId = tag.slice(prefix.length);
+  if (noteTypeId.length > 0) {
+    return { kind: "noteType", value: noteTypeId, raw: tag };
+  }
+  return "user";
 }
 
 function classifyHashtag(tag: string): ParsedDirective | "user" {
@@ -68,29 +73,26 @@ function classifyHashtag(tag: string): ParsedDirective | "user" {
   }
 
   if (tag.startsWith("anki/noteType/")) {
-    return "user";
+    return parseNoteTypeSuffix(tag, "anki/noteType/");
   }
 
+  // Legacy alias — same semantics as #anki/noteType/*
   if (tag.startsWith("anki/model/")) {
-    const modelId = tag.slice("anki/model/".length);
-    if (modelId.length > 0) {
-      return { kind: "model", value: modelId, raw: tag };
-    }
-    return "user";
+    return parseNoteTypeSuffix(tag, "anki/model/");
   }
 
   if (tag.startsWith("anki/")) {
-    const modelPath = tag.slice("anki/".length);
-    if (modelPath.length > 0) {
-      return { kind: "model", value: modelPath, raw: tag };
+    const noteTypePath = tag.slice("anki/".length);
+    if (noteTypePath.length > 0 && !noteTypePath.startsWith("cardType/")) {
+      return { kind: "noteType", value: noteTypePath, raw: tag };
     }
     return "user";
   }
 
   if (tag.startsWith("anki_card_")) {
-    const modelId = tag.slice("anki_card_".length);
-    if (modelId.length > 0) {
-      return { kind: "model", value: modelId, raw: tag };
+    const noteTypeId = tag.slice("anki_card_".length);
+    if (noteTypeId.length > 0) {
+      return { kind: "noteType", value: noteTypeId, raw: tag };
     }
     return "user";
   }
@@ -106,7 +108,7 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
   const rawTags = extractHashtags(text);
   const userTags: string[] = [];
   const cardTypeTags: string[] = [];
-  const modelTags: string[] = [];
+  const noteTypeTags: string[] = [];
 
   for (const tag of rawTags) {
     const classified = classifyHashtag(tag);
@@ -120,7 +122,7 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
       continue;
     }
 
-    modelTags.push(classified.value);
+    noteTypeTags.push(classified.value);
   }
 
   const errors: HashtagParseError[] = [];
@@ -134,13 +136,13 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
   }
 
   const hasCardType = cardTypeTags.length > 0;
-  const hasModel = modelTags.length > 0;
+  const hasNoteType = noteTypeTags.length > 0;
 
-  if (hasCardType && hasModel) {
+  if (hasCardType && hasNoteType) {
     errors.push({
       ruleId: "TAG-02",
       message:
-        "A heading cannot carry both #anki/cardType/* and a model declaration (#anki/model/* or legacy model tags)",
+        "A heading cannot carry both #anki/cardType/* and #anki/noteType/* (or legacy noteType tags)",
     });
   }
 
@@ -157,8 +159,8 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
     }
   }
 
-  if (modelTags.length === 1) {
-    result.model = modelTags[0];
+  if (noteTypeTags.length === 1) {
+    result.noteTypeId = noteTypeTags[0];
   }
 
   return result;

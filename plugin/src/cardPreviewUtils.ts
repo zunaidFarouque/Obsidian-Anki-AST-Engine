@@ -51,10 +51,10 @@ export function formatCardPreviewTooltip(card: {
 	return message ? `${typeLabel} — ${message}` : typeLabel;
 }
 
-export function zipCardsToHeadings(
+export function zipCardsToHeadings<T>(
 	cards: ResolvedCard[],
-	headings: HTMLElement[],
-): Array<{ card: ResolvedCard; heading: HTMLElement }> {
+	headings: T[],
+): Array<{ card: ResolvedCard; heading: T }> {
 	const count = Math.min(cards.length, headings.length);
 	return Array.from({ length: count }, (_, index) => ({
 		card: cards[index]!,
@@ -65,4 +65,44 @@ export function zipCardsToHeadings(
 export function cardDeclarationHeadingSelector(level: number): string {
 	const clamped = Math.min(6, Math.max(1, level));
 	return `h${clamped}`;
+}
+
+export interface DocumentLine {
+	from: number;
+	to: number;
+	text: string;
+}
+
+export interface CardHeadingLinePosition {
+	from: number;
+	to: number;
+}
+
+export function findCardHeadingLinePositions(
+	lines: DocumentLine[],
+	headingLevel: number,
+	bodyStartOffset: number,
+): CardHeadingLinePosition[] {
+	const clampedLevel = Math.min(6, Math.max(1, headingLevel));
+	const markPrefix = '#'.repeat(clampedLevel);
+	const requiredPrefix = `${markPrefix} `;
+	const positions: CardHeadingLinePosition[] = [];
+
+	for (const line of lines) {
+		if (line.from < bodyStartOffset) {
+			continue;
+		}
+
+		if (!line.text.startsWith(requiredPrefix)) {
+			continue;
+		}
+
+		if (line.text.length > requiredPrefix.length && line.text[requiredPrefix.length] === '#') {
+			continue;
+		}
+
+		positions.push({ from: line.from, to: line.to });
+	}
+
+	return positions;
 }

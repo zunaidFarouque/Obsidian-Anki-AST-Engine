@@ -12,7 +12,7 @@ This document defines how Obsidian markdown maps to Anki note types, fields, and
 
 ### Built-in card types (internal ids)
 
-| Internal id | Anki model (configurable) | Primary fields |
+| Internal id | Anki note type (configurable) | Primary fields |
 |-------------|---------------------------|----------------|
 | `basic` | Basic | Front, Back |
 | `cloze` | Cloze | Text, Back Extra (optional) |
@@ -21,7 +21,7 @@ This document defines how Obsidian markdown maps to Anki note types, fields, and
 
 ### Custom card type
 
-A user-defined Anki note type identified by a **model id** (e.g. `Vocab`). The model id maps to the Anki model display name via naming convention, settings `anki_modelMap`, and AnkiConnect validation at sync.
+A user-defined Anki note type identified by a **note type id** (e.g. `Vocab`). The note type id maps to the Anki note type display name via naming convention, settings `anki_noteTypeMap`, and AnkiConnect validation at sync.
 
 ### Card declaration level
 
@@ -33,9 +33,9 @@ Any hashtag matching `#anki/` or `#anki_card_` is an **engine directive**. These
 
 ### Terminology
 
-- **`cardType`** — built-in type (`basic`, `cloze`, `reversible`, `typed`)
-- **`model`** — custom Anki note type
-- Use **`#anki/cardType/*`** only; `#anki/noteType/*` is **invalid** (see **TAG-04**)
+- **`cardType`** — built-in type (`basic`, `cloze`, `reversible`, `typed`); declared with `#anki/cardType/*`
+- **`noteType`** — custom Anki note type; declared with `#anki/noteType/*`
+- Do not use `#anki/noteType/*` to declare built-in types — use `#anki/cardType/*` (see **TAG-04**)
 
 ### Advanced settings (plugin)
 
@@ -94,7 +94,7 @@ anki_cardDefault: basic
 
 ### FM-03 — `anki_customCardDefault`
 
-**Rule:** Optional frontmatter key. Names a **custom model id**. Applies **only** when a card body contains at least one `::: FieldName` block **and** no model was resolved from card/ancestor hashtags (steps 1–2 of resolution).
+**Rule:** Optional frontmatter key. Names a **custom note type id**. Applies **only** when a card body contains at least one `::: FieldName` block **and** no note type was resolved from card/ancestor hashtags (steps 1–2 of resolution).
 
 **Example:**
 
@@ -106,7 +106,7 @@ anki_customCardDefault: Vocab
 ---
 ```
 
-**Effect:** A card with `::: Word` / `::: Definition` blocks and no `#anki/model/*` in the inheritance chain resolves to custom model `Vocab`. Setting both `anki_cardDefault` and `anki_customCardDefault` is **not** a file-level conflict; per-card layout determines which applies.
+**Effect:** A card with `::: Word` / `::: Definition` blocks and no `#anki/noteType/*` in the inheritance chain resolves to custom note type `Vocab`. Setting both `anki_cardDefault` and `anki_customCardDefault` is **not** a file-level conflict; per-card layout determines which applies.
 
 ---
 
@@ -155,7 +155,7 @@ Two cards: `Card A` and `Card B`.
 
 ### STR-02 — Section type on organizational headings
 
-**Rule:** Headings **shallower** than the card declaration level may carry `#anki/cardType/*` or `#anki/model/*`. All descendant cards inherit that type unless overridden.
+**Rule:** Headings **shallower** than the card declaration level may carry `#anki/cardType/*` or `#anki/noteType/*`. All descendant cards inherit that type unless overridden.
 
 **Example:**
 
@@ -232,14 +232,15 @@ back
 - `#anki/cardType/cloze`
 - `#anki/cardType/reversible`
 - `#anki/cardType/typed`
-- `#anki/model/<ModelId>`
+- `#anki/noteType/<NoteTypeId>`
 
 **Legacy (equivalent semantics):**
 
-- `#anki_card_<ModelId>`
-- `#anki/CustomCards/<id>` (or any `#anki/...` path that is not `cardType/`)
+- `#anki_card_<NoteTypeId>`
+- `#anki/model/<NoteTypeId>` (deprecated alias of `#anki/noteType/<NoteTypeId>`)
+- `#anki/CustomCards/<id>` (or any `#anki/...` path that is not `cardType/` or `noteType/`)
 
-Users may choose their preferred form; the engine accepts all of the above.
+Users may choose their preferred form; the engine accepts all of the above. **Prefer `#anki/noteType/*` for new notes.**
 
 ---
 
@@ -255,47 +256,49 @@ Users may choose their preferred form; the engine accepts all of the above.
 
 ---
 
-### TAG-02 — cardType and model are mutually exclusive
+### TAG-02 — cardType and noteType are mutually exclusive
 
-**Rule:** A single heading cannot carry both `#anki/cardType/*` and `#anki/model/*` (or legacy model tags). → **error**
+**Rule:** A single heading cannot carry both `#anki/cardType/*` and `#anki/noteType/*` (or legacy noteType tags). → **error**
 
 **Example — error:**
 
 ```markdown
-#### Bad #anki/cardType/cloze #anki/model/Vocab
+#### Bad #anki/cardType/cloze #anki/noteType/Vocab
 ```
 
 ---
 
-### TAG-03 — Model id mapping
+### TAG-03 — Note type id mapping
 
-**Rule:** The model id suffix (e.g. `My_Vocab`) maps to the Anki model name by:
+**Rule:** The note type id suffix (e.g. `My_Vocab`) maps to the Anki note type name by:
 
 1. Convention: underscores → spaces
-2. Settings / config `anki_modelMap` overrides
-3. AnkiConnect validation at sync (`modelNames`); clear error if not found
+2. Settings / config `anki_noteTypeMap` overrides
+3. AnkiConnect validation at sync (`noteTypeNames`); clear error if not found
 
 **Example:**
 
 ```markdown
-#### Word #anki/model/My_Vocab
+#### Word #anki/noteType/My_Vocab
 ```
 
-Maps to Anki model `"My Vocab"` unless `anki_modelMap` says otherwise.
+Maps to Anki note type display name `"My Vocab"` unless `anki_noteTypeMap` says otherwise.
 
 ---
 
-### TAG-04 — `#anki/noteType/*` is rejected
+### TAG-04 — Built-in names require `#anki/cardType/*`
 
-**Rule:** `#anki/noteType/*` is **not** a valid engine directive. Only `#anki/cardType/*` declares built-in types. Hashtags like `#anki/noteType/cloze` are ignored for type resolution (treated as ordinary user tags unless they match another reserved pattern).
+**Rule:** Built-in types (`basic`, `cloze`, `reversible`, `typed`) are declared **only** via `#anki/cardType/<id>`.
 
-**Example — invalid for type resolution:**
+`#anki/noteType/<id>` always refers to a **custom** Anki note type id, even when the id matches a built-in name (e.g. `#anki/noteType/cloze` is custom note type `cloze`, **not** built-in cloze).
+
+**Example — common mistake:**
 
 ```markdown
 ### Section #anki/noteType/cloze
 ```
 
-**Outcome:** Section does **not** inherit `cloze`. Use `#anki/cardType/cloze` instead.
+**Outcome:** Descendants inherit **custom** note type `cloze`, not built-in cloze. Use `#anki/cardType/cloze` for built-in.
 
 **Example — correct:**
 
@@ -317,7 +320,7 @@ flowchart TD
   step2 --> found{Type tag found?}
   found -->|yes| resolved
   found -->|no| step3{Body has ::: FieldName blocks?}
-  step3 -->|yes and anki_customCardDefault| resolvedCustom[Resolved custom model]
+  step3 -->|yes and anki_customCardDefault| resolvedCustom[Resolved custom note type]
   step3 -->|no| step4{anki_cardDefault set?}
   step4 -->|yes| resolved
   step4 -->|no| step5{Delimiter :::r or :::t?}
@@ -394,7 +397,7 @@ A measure of dispersal.
 
 ### RES-04 — Custom default is layout-triggered
 
-**Rule:** `anki_customCardDefault` applies only when the card body contains `::: FieldName` block(s) and steps 1–2 did not resolve a model.
+**Rule:** `anki_customCardDefault` applies only when the card body contains `::: FieldName` block(s) and steps 1–2 did not resolve a note type.
 
 **Example:**
 
@@ -410,7 +413,7 @@ entropy
 A measure of energy dispersal.
 ```
 
-**Outcome:** Custom model `Vocab` (no hashtag required).
+**Outcome:** Custom note type `Vocab` (no hashtag required).
 
 ---
 
@@ -484,14 +487,14 @@ Water.
 
 ---
 
-### RES-08 — Model tags inherit on sections
+### RES-08 — Note type tags inherit on sections
 
-**Rule:** `#anki/model/<ModelId>` (and legacy forms) on organizational headings inherit to descendant cards identically to `#anki/cardType/*`.
+**Rule:** `#anki/noteType/<NoteTypeId>` (and legacy forms) on organizational headings inherit to descendant cards identically to `#anki/cardType/*`.
 
 **Example:**
 
 ```markdown
-### Vocabulary #anki/model/Vocab
+### Vocabulary #anki/noteType/Vocab
 
 #### Term 1
 ::: Word
@@ -500,7 +503,7 @@ entropy
 Energy dispersal measure.
 ```
 
-**Outcome:** Custom model `Vocab` for `Term 1`.
+**Outcome:** Custom note type `Vocab` for `Term 1`.
 
 ---
 
@@ -565,12 +568,12 @@ Paris
 
 ### DEL-04 — Custom field boundary `::: FieldName`
 
-**Rule:** When custom model is resolved: line-start `:::`, then **exactly one space**, then field name (trimmed; case-insensitive match to Anki model fields). Content until next `::: FieldName` or next card heading belongs to that field.
+**Rule:** When custom note type is resolved: line-start `:::`, then **exactly one space**, then field name (trimmed; case-insensitive match to Anki note type fields). Content until next `::: FieldName` or next card heading belongs to that field.
 
 **Example:**
 
 ```markdown
-#### Term #anki/model/Vocab
+#### Term #anki/noteType/Vocab
 ::: Word
 entropy
 ::: Definition
@@ -596,12 +599,12 @@ Use `:::r` instead.
 
 ### DEL-06 — Field name `r` vs reserved `:::r`
 
-**Rule:** Only the token `:::r` or `:::t` immediately after line-start `:::` (no space) is reserved. `::: r` parses as custom field name `r` (when custom model active).
+**Rule:** Only the token `:::r` or `:::t` immediately after line-start `:::` (no space) is reserved. `::: r` parses as custom field name `r` (when custom note type active).
 
 **Example:**
 
 ```markdown
-#### Custom #anki/model/Edge
+#### Custom #anki/noteType/Edge
 ::: r
 content for field named "r"
 ```
@@ -902,14 +905,14 @@ Prose with no deletions.
 
 ---
 
-### CLZ-12 — Cloze syntax on custom model
+### CLZ-12 — Cloze syntax on custom note type
 
 **Rule:** When resolved type is **custom** (not `cloze`), `{{...}}` in field bodies is **literal** unless the card also resolves to `cloze` (impossible per TAG-02). Custom vocab cards do not auto-cloze.
 
 **Example:**
 
 ```markdown
-#### Term #anki/model/Vocab
+#### Term #anki/noteType/Vocab
 ::: Word
 {{not a cloze}}
 ```
@@ -918,9 +921,9 @@ Prose with no deletions.
 
 ## Section 8 — Built-in type: `reversible`
 
-### REV-01 — Anki model mapping
+### REV-01 — Anki note type mapping
 
-**Rule:** Internal id `reversible` maps to configurable Anki model name (default: `Basic (and reversed card)`).
+**Rule:** Internal id `reversible` maps to configurable Anki note type name (default: `Basic (and reversed card)`).
 
 ---
 
@@ -1018,29 +1021,29 @@ Lyon
 
 ---
 
-## Section 10 — Custom models
+## Section 10 — Custom note types
 
 ### CUS-01 — Requires field blocks
 
-**Rule:** Resolved custom model requires ≥1 `::: FieldName` block matching a field on the Anki model. → otherwise **skip**.
+**Rule:** Resolved custom note type requires ≥1 `::: FieldName` block matching a field on the Anki note type. → otherwise **skip**.
 
 ---
 
 ### CUS-02 — Unknown field name
 
-**Rule:** `::: Definiton` when model has `Definition` → **error** with available field list.
+**Rule:** `::: Definiton` when note type has `Definition` → **error** with available field list.
 
 **Example error:**
 
 ```text
-Card "Term": unknown field "Definiton"; model "Vocab" has: Word, Definition, Example
+Card "Term": unknown field "Definiton"; note type "Vocab" has: Word, Definition, Example
 ```
 
 ---
 
 ### CUS-03 — Orphan custom layout
 
-**Rule:** `::: Field` blocks present, no model in inheritance chain, no `anki_customCardDefault` → **skip**.
+**Rule:** `::: Field` blocks present, no note type in inheritance chain, no `anki_customCardDefault` → **skip**.
 
 ---
 
@@ -1073,7 +1076,7 @@ Card "Term": unknown field "Definiton"; model "Vocab" has: Word, Definition, Exa
 | ID | Signals | Resolved type | Layout | Outcome | Example |
 |----|---------|---------------|--------|---------|---------|
 | CX-01 | `#anki/cardType/cloze` + `#anki/cardType/basic` same heading | — | — | **error** | TAG-01 |
-| CX-02 | `#anki/cardType/cloze` + `#anki/model/Vocab` same heading | — | — | **error** | TAG-02 |
+| CX-02 | `#anki/cardType/cloze` + `#anki/noteType/Vocab` same heading | — | — | **error** | TAG-02 |
 | CX-03 | `### cloze` + `#### #anki/cardType/basic` | basic | `:::` | **sync** | RES-01 |
 | CX-04 | `### cloze` + `####` no override | cloze | `{{text}}` | **sync** | STR-02 |
 | CX-05 | `### cloze` + `####` no `{{}}` | cloze | prose only | **skip** | CLZ-01 |
@@ -1093,7 +1096,7 @@ Card "Term": unknown field "Definiton"; model "Vocab" has: Word, Definition, Exa
 | CX-19 | resolved `custom` | custom | `::: Field` × N | **sync** | CUS-01 |
 | CX-20 | resolved `custom` | custom | plain `:::` only | **skip** | CUS-04 |
 | CX-21 | resolved `custom` | custom | `:::r` | **error** | CUS-05 |
-| CX-22 | `::: Field` only, no model, no `anki_customCardDefault` | — | custom layout | **skip** | CUS-03 |
+| CX-22 | `::: Field` only, no note type, no `anki_customCardDefault` | — | custom layout | **skip** | CUS-03 |
 | CX-23 | `### Unit A cloze` then `## Unit B` sibling | basic (no inherit) | `:::` | **sync** | RES-02 |
 | CX-24 | `{{c1::x}}` only in Back | basic | `:::` | **sync** basic | BAS-05 |
 | CX-25 | resolved `cloze` + `{{c1::}}` in Text + optional `:::` | cloze | valid | **sync** | CLZ-02 |
@@ -1111,7 +1114,7 @@ Card "Term": unknown field "Definiton"; model "Vocab" has: Word, Definition, Exa
 | Outcome | When |
 |---------|------|
 | **sync** | Resolved type matches body layout; all validations pass |
-| **skip** | Missing required delimiter or `{{}}`; orphan custom layout; empty cloze; model not found |
+| **skip** | Missing required delimiter or `{{}}`; orphan custom layout; empty cloze; note type not found |
 | **error** | Conflicting type signals on same card (tag vs delimiter vs layout) |
 | **warn** | Bare `{{word}}` on basic; `{{cN::...}}` literal on basic (default); hint mismatch; informational inheritance |
 
@@ -1121,7 +1124,7 @@ Card "Term": unknown field "Definiton"; model "Vocab" has: Word, Definition, Exa
 Card "<title>": basic card missing ::: delimiter — skipped
 Card "<title>": cloze card has no {{}} deletions in Text region — skipped
 Card "<title>": cloze deletions only in Back region — skipped
-Card "<title>": custom field layout but no model resolved — skipped
+Card "<title>": custom field layout but no note type resolved — skipped
 Card "<title>": layout conflicts with resolved type "<type>" — skipped
 Card "<title>": empty cloze deletion — skipped
 ```
@@ -1130,7 +1133,7 @@ Card "<title>": empty cloze deletion — skipped
 
 ```text
 Card "<title>": conflicting cardType tags on heading — error
-Card "<title>": cardType and model tags on same heading — error
+Card "<title>": cardType and noteType tags on same heading — error
 Card "<title>": :::r conflicts with resolved type "basic" — error
 Card "<title>": :::t conflicts with resolved type "cloze" — error
 ```
@@ -1148,7 +1151,7 @@ Card "<title>": resolved cloze (inherited from ### <section>) — info
 
 ## Section 13 — Deferred / out of scope v1
 
-- **CUS-07:** Settings remapping basic `:::` / `:::r` layout → custom model field names
+- **CUS-07:** Settings remapping basic `:::` / `:::r` layout → custom note type field names
 - **TYP-05:** Multiple acceptable typed answers (`Paris|Lyon`)
 - Per-card YAML type blocks
 
@@ -1159,7 +1162,7 @@ Card "<title>": resolved cloze (inherited from ### <section>) — info
 | ID | Decision |
 |----|----------|
 | **BAS-04 / RES-06 / CX-27** | `{{cN::...}}` on **basic-resolved** cards → **literal + warn** by default; plugin Advanced setting `inferClozeFromManualSyntaxOnBasic` opts into cloze reclassification |
-| **TAG-04** | `#anki/noteType/*` **rejected**; use `#anki/cardType/*` only |
+| **TAG-04** | Built-in types use `#anki/cardType/*` only; `#anki/noteType/*` is always custom (even if id matches a built-in name) |
 | **TYP-04** | Typed-answer back → **first non-empty line** after strip/trim/decode |
 
 ---
@@ -1193,7 +1196,7 @@ Question?
 :::t
 exact answer
 
-#### Custom #anki/model/Vocab
+#### Custom #anki/noteType/Vocab
 ::: Word
 entropy
 ::: Definition

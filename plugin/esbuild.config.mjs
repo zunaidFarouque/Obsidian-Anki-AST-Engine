@@ -40,6 +40,10 @@ const context = await esbuild.context({
 			repoRoot,
 			'dist/io/vaultAdapter.js',
 		),
+		'obsidian-anki-ast-engine/cardSyntax': path.join(
+			repoRoot,
+			'dist/cardSyntax/pluginApi.js',
+		),
 		'node:fs/promises': path.join(
 			fileURLToPath(new URL('.', import.meta.url)),
 			'shims/fs-promises.js',

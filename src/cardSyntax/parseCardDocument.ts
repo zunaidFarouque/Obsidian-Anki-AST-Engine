@@ -39,7 +39,7 @@ const ANKI_ID_REGEX =
 
 const HASHTAG_STRIP_PATTERN = /#[^\s#,;!.?()[\]{}]+/g;
 
-const MODEL_FIELD_NAMES: Record<string, string[]> = {
+const NOTE_TYPE_FIELD_NAMES: Record<string, string[]> = {
   Vocab: ["Word", "Definition", "Example"],
 };
 
@@ -315,7 +315,7 @@ function toHeadingDeclaration(
     headingLevel,
     headingTitle,
     builtinType: hashtags.cardType,
-    modelId: hashtags.model,
+    noteTypeId: hashtags.noteTypeId,
   };
 }
 
@@ -421,8 +421,8 @@ function toLayoutResolvedType(
   if (resolved.kind === "custom") {
     return {
       kind: "custom",
-      modelId: resolved.modelId,
-      fieldNames: MODEL_FIELD_NAMES[resolved.modelId] ?? [],
+      noteTypeId: resolved.noteTypeId,
+      fieldNames: NOTE_TYPE_FIELD_NAMES[resolved.noteTypeId] ?? [],
     };
   }
 
@@ -433,7 +433,7 @@ function toOutputResolvedType(
   type: LayoutResolvedCardType | ReturnType<typeof resolveCardType>,
 ): ResolvedCardType {
   if (type.kind === "custom") {
-    return customCardType(type.modelId);
+    return customCardType(type.noteTypeId);
   }
   return { kind: "builtin", type: type.type };
 }
@@ -475,8 +475,8 @@ function collectCardHashtags(
     if (tags.cardType) {
       engine.push(`#anki/cardType/${tags.cardType}`);
     }
-    if (tags.model) {
-      engine.push(`#anki/model/${tags.model}`);
+    if (tags.noteTypeId) {
+      engine.push(`#anki/noteType/${tags.noteTypeId}`);
     }
   }
 

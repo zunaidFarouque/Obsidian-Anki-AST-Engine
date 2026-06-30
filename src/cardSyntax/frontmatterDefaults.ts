@@ -53,8 +53,8 @@ export function parseBuiltInCardDefault(value: string): BuiltInCardType | null {
 }
 
 export function parseCustomCardDefault(value: string): string | null {
-  const modelId = unquoteYamlValue(value.trim());
-  return modelId.length > 0 ? modelId : null;
+  const noteTypeId = unquoteYamlValue(value.trim());
+  return noteTypeId.length > 0 ? noteTypeId : null;
 }
 
 export function parseAnkiCardDefaultFromFrontmatter(

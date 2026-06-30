@@ -39,26 +39,34 @@ describe("hashtagParser", () => {
     });
   });
 
-  test("extracts #anki/model/<id>", () => {
+  test("extracts #anki/noteType/<id>", () => {
+    expect(parseHeadingHashtags("Word #anki/noteType/My_Vocab")).toEqual({
+      userTags: [],
+      noteTypeId: "My_Vocab",
+      errors: [],
+    });
+  });
+
+  test("legacy #anki/model/<id> alias maps to noteTypeId", () => {
     expect(parseHeadingHashtags("Word #anki/model/My_Vocab")).toEqual({
       userTags: [],
-      model: "My_Vocab",
+      noteTypeId: "My_Vocab",
       errors: [],
     });
   });
 
-  test("extracts legacy #anki_card_<ModelId>", () => {
+  test("extracts legacy #anki_card_<NoteTypeId>", () => {
     expect(parseHeadingHashtags("D2 Custom legacy tag #anki_card_Vocab")).toEqual({
       userTags: [],
-      model: "Vocab",
+      noteTypeId: "Vocab",
       errors: [],
     });
   });
 
-  test("extracts legacy #anki/CustomCards/<id> as model", () => {
+  test("extracts legacy #anki/CustomCards/<id> as noteType", () => {
     expect(parseHeadingHashtags("Card #anki/CustomCards/Vocab")).toEqual({
       userTags: [],
-      model: "CustomCards/Vocab",
+      noteTypeId: "CustomCards/Vocab",
       errors: [],
     });
   });
@@ -75,12 +83,12 @@ describe("hashtagParser", () => {
       },
     ]);
     expect(result.cardType).toBeUndefined();
-    expect(result.model).toBeUndefined();
+    expect(result.noteTypeId).toBeUndefined();
   });
 
-  test("TAG-02: errors when cardType and #anki/model/* appear together", () => {
+  test("TAG-02: errors when cardType and #anki/noteType/* appear together", () => {
     const result = parseHeadingHashtags(
-      "Bad #anki/cardType/cloze #anki/model/Vocab",
+      "Bad #anki/cardType/cloze #anki/noteType/Vocab",
     );
 
     expect(result.errors).toEqual([
@@ -90,10 +98,10 @@ describe("hashtagParser", () => {
       },
     ]);
     expect(result.cardType).toBeUndefined();
-    expect(result.model).toBeUndefined();
+    expect(result.noteTypeId).toBeUndefined();
   });
 
-  test("TAG-02: errors when cardType and legacy model tag appear together", () => {
+  test("TAG-02: errors when cardType and legacy noteType tag appear together", () => {
     const result = parseHeadingHashtags(
       "Bad #anki/cardType/basic #anki_card_Vocab",
     );
@@ -101,27 +109,26 @@ describe("hashtagParser", () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]?.ruleId).toBe("TAG-02");
     expect(result.cardType).toBeUndefined();
-    expect(result.model).toBeUndefined();
+    expect(result.noteTypeId).toBeUndefined();
   });
 
-  test("TAG-04: treats #anki/noteType/* as user tag, not cardType", () => {
+  test("TAG-04: #anki/noteType/cloze is custom note type id, not built-in cloze", () => {
     expect(
-      parseHeadingHashtags("### Invalid noteType tag #anki/noteType/cloze"),
+      parseHeadingHashtags("### Section #anki/noteType/cloze"),
     ).toEqual({
-      userTags: ["anki/noteType/cloze"],
+      userTags: [],
+      noteTypeId: "cloze",
       errors: [],
     });
+    expect(
+      parseHeadingHashtags("### Section #anki/noteType/cloze").cardType,
+    ).toBeUndefined();
   });
 
-  test("TAG-04: noteType tag does not trigger TAG-02 with cardType", () => {
-    expect(
-      parseHeadingHashtags(
-        "Section #anki/cardType/basic #anki/noteType/cloze",
-      ),
-    ).toEqual({
-      userTags: ["anki/noteType/cloze"],
-      cardType: "basic",
-      errors: [],
-    });
+  test("TAG-04: noteType id matching builtin name does not trigger TAG-02 alone", () => {
+    const result = parseHeadingHashtags("Section #anki/noteType/basic");
+    expect(result.noteTypeId).toBe("basic");
+    expect(result.cardType).toBeUndefined();
+    expect(result.errors).toEqual([]);
   });
 });

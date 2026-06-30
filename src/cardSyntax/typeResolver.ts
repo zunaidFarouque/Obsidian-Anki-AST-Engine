@@ -4,7 +4,7 @@ export interface HeadingTypeDeclaration {
   headingTitle?: string;
   headingLevel: number;
   builtinType?: BuiltinCardType;
-  modelId?: string;
+  noteTypeId?: string;
 }
 
 export interface TypeResolverContext {
@@ -25,7 +25,7 @@ export interface TypeResolverContext {
 
 export type ResolvedCardType =
   | { kind: "builtin"; type: BuiltinCardType; resolvedFrom: string }
-  | { kind: "custom"; modelId: string; resolvedFrom: string };
+  | { kind: "custom"; noteTypeId: string; resolvedFrom: string };
 
 const MANUAL_CLOZE_PATTERN = /\{\{c\d+::/;
 
@@ -38,11 +38,11 @@ function headingLabel(heading: HeadingTypeDeclaration): string {
 function resolveFromCardHeading(
   heading: HeadingTypeDeclaration,
 ): ResolvedCardType | undefined {
-  if (heading.modelId) {
+  if (heading.noteTypeId) {
     return {
       kind: "custom",
-      modelId: heading.modelId,
-      resolvedFrom: `card heading #anki/model/${heading.modelId}`,
+      noteTypeId: heading.noteTypeId,
+      resolvedFrom: `card heading #anki/noteType/${heading.noteTypeId}`,
     };
   }
   if (heading.builtinType) {
@@ -59,8 +59,8 @@ function resolveFromAncestor(
   ancestor: HeadingTypeDeclaration,
 ): ResolvedCardType | undefined {
   const source = `inherited from ${headingLabel(ancestor)}`;
-  if (ancestor.modelId) {
-    return { kind: "custom", modelId: ancestor.modelId, resolvedFrom: source };
+  if (ancestor.noteTypeId) {
+    return { kind: "custom", noteTypeId: ancestor.noteTypeId, resolvedFrom: source };
   }
   if (ancestor.builtinType) {
     return {
@@ -119,7 +119,7 @@ export function resolveCardType(context: TypeResolverContext): ResolvedCardType 
   if (context.hasFieldBlocks && customDefault) {
     return {
       kind: "custom",
-      modelId: customDefault,
+      noteTypeId: customDefault,
       resolvedFrom: `anki_customCardDefault: ${customDefault}`,
     };
   }

@@ -3,6 +3,7 @@ import { $ } from "bun";
 const entryPoints = [
   "src/syncPipeline.ts",
   "src/index.ts",
+  "src/cardSyntax/pluginApi.ts",
   "src/io/vaultAdapter.ts",
   "src/io/nodeVaultAdapter.ts",
   "src/io/inMemoryVaultAdapter.ts",
