@@ -198,6 +198,20 @@ describe('cardPreviewLayout', () => {
 			expect(rule).toBeDefined();
 			expect(rule).toMatch(/cursor:\s*pointer/);
 			expect(rule).toMatch(/appearance:\s*none/);
+			expect(rule).toMatch(/min-height:\s*unset/);
+		});
+
+		test('badge size uses root css variables', () => {
+			const stylesheet = css();
+			const rootRule = stylesheet.match(/:root\s*\{[^}]+\}/)?.[0];
+			expect(rootRule).toBeDefined();
+			expect(rootRule).toMatch(/--anki-card-preview-badge-font-size:/);
+			expect(rootRule).toMatch(/--anki-card-preview-badge-padding:/);
+			expect(rootRule).toMatch(/--anki-card-preview-badge-gap:/);
+			const badgeRule = stylesheet.match(/\.anki-card-preview-badge\s*\{[^}]+\}/)?.[0];
+			expect(badgeRule).toBeDefined();
+			expect(badgeRule).toMatch(/font-size:\s*var\(--anki-card-preview-badge-font-size\)/);
+			expect(badgeRule).toMatch(/padding:\s*var\(--anki-card-preview-badge-padding\)/);
 		});
 
 		test('tooltip sizing escapes badge shrink-to-fit', () => {

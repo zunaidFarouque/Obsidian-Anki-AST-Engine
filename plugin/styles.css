@@ -199,6 +199,13 @@
 	--anki-card-preview-inter-card-gap: 0.28em;
 	--anki-card-preview-section-top-extend: calc(0.5 * 1lh);
 	--anki-card-preview-block-bleed-x: 8px;
+	/* Card badge size — override in a snippet or here while tuning */
+	--anki-card-preview-badge-font-size: 0.2em;
+	--anki-card-preview-badge-padding: 0.02em 0.28em;
+	--anki-card-preview-badge-gap: 0.25em;
+	--anki-card-preview-badge-border-radius: 0.3em;
+	--anki-card-preview-badge-line-height: 0.5;
+	--anki-card-preview-badge-font-weight: 400;
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-heading {
@@ -218,16 +225,16 @@
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.4em;
+	gap: var(--anki-card-preview-badge-gap);
 	position: absolute;
 	right: 0;
 	top: 50%;
 	transform: translateY(-50%);
-	padding: 0.04em 0.42em;
-	border-radius: 0.35em;
-	font-size: 0.72em;
-	font-weight: 600;
-	line-height: 1.35;
+	padding: var(--anki-card-preview-badge-padding);
+	border-radius: var(--anki-card-preview-badge-border-radius);
+	font-size: var(--anki-card-preview-badge-font-size);
+	font-weight: var(--anki-card-preview-badge-font-weight);
+	line-height: var(--anki-card-preview-badge-line-height);
 	color: var(--text-muted);
 	background: transparent;
 	border: 1px solid transparent;
@@ -286,6 +293,9 @@
 	appearance: none;
 	font: inherit;
 	cursor: pointer;
+	min-height: unset;
+	height: auto;
+	padding: var(--anki-card-preview-badge-padding);
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge--action:hover {
@@ -525,16 +535,16 @@
 .markdown-preview-view .anki-card-preview-badge {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.4em;
+	gap: var(--anki-card-preview-badge-gap);
 	position: absolute;
 	right: 0;
 	top: 50%;
 	transform: translateY(-50%);
-	padding: 0.04em 0.42em;
-	border-radius: 0.35em;
-	font-size: 0.72em;
-	font-weight: 600;
-	line-height: 1.35;
+	padding: var(--anki-card-preview-badge-padding);
+	border-radius: var(--anki-card-preview-badge-border-radius);
+	font-size: var(--anki-card-preview-badge-font-size);
+	font-weight: var(--anki-card-preview-badge-font-weight);
+	line-height: var(--anki-card-preview-badge-line-height);
 	color: var(--text-muted);
 	background: transparent;
 	border: 1px solid transparent;
@@ -561,6 +571,9 @@
 	appearance: none;
 	font: inherit;
 	cursor: pointer;
+	min-height: unset;
+	height: auto;
+	padding: var(--anki-card-preview-badge-padding);
 }
 
 .markdown-preview-view .anki-card-preview-badge--action:hover {
