@@ -110,11 +110,27 @@ export function createCardPreviewBadgeElement(
 	slot.className = BADGE_SLOT_CLASS;
 
 	const badgeModel = buildHeadingBadgeModel(card);
-	const badge = document.createElement('span');
-	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}`;
-	badge.textContent = badgeModel.label;
 	const tooltip = formatCardPreviewTooltip(card);
-	badge.setAttribute('aria-label', tooltip);
+	const badge = onMoreAction
+		? document.createElement('button')
+		: document.createElement('span');
+	const actionClass = onMoreAction ? ` ${BADGE_CLASS}--action` : '';
+	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`;
+	if (onMoreAction) {
+		(badge as HTMLButtonElement).type = 'button';
+		badge.setAttribute('aria-label', `${tooltip}. Open card preview details.`);
+		badge.addEventListener('click', (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			onMoreAction();
+		});
+	} else {
+		badge.setAttribute('aria-label', tooltip);
+	}
+	const label = document.createElement('span');
+	label.className = 'anki-card-preview-badge-label';
+	label.textContent = badgeModel.label;
+	badge.appendChild(label);
 	const tooltipElement = document.createElement('span');
 	tooltipElement.className = 'anki-card-preview-tooltip';
 	tooltipElement.setAttribute('role', 'tooltip');
@@ -123,19 +139,6 @@ export function createCardPreviewBadgeElement(
 	const backOnlyMeta = buildBackOnlyClozeWarningMeta(card);
 	if (backOnlyMeta.hasBackOnlyWarning) {
 		badge.dataset.backOnlyClozeWarning = backOnlyMeta.ruleId ?? 'true';
-	}
-	if (onMoreAction) {
-		const moreAction = document.createElement('button');
-		moreAction.type = 'button';
-		moreAction.className = `${BADGE_CLASS}-more`;
-		moreAction.textContent = 'More';
-		moreAction.setAttribute('aria-label', 'Open card preview details');
-		moreAction.addEventListener('click', (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			onMoreAction();
-		});
-		badge.appendChild(moreAction);
 	}
 	slot.appendChild(badge);
 	return slot;

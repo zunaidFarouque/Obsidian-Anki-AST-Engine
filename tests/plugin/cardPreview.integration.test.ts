@@ -81,7 +81,7 @@ Back line two`,
 				resolvedType: customCardType('Vocab'),
 				messages: [{ level: 'warn', text: 'Unknown custom field' }],
 			}),
-		).toBe('noteType: Vocab — Unknown custom field');
+		).toBe('Type: noteType: Vocab\nProblem: Unknown custom field');
 	});
 
 	test('editor body without YAML parses as sync-eligible via externalFrontmatter', () => {

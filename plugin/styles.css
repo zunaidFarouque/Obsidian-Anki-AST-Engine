@@ -108,8 +108,19 @@
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock {
-	--anki-cardblock-bg: color-mix(in srgb, var(--background-modifier-hover) 38%, transparent);
-	--anki-cardblock-heading-bg: color-mix(in srgb, var(--background-modifier-hover) 54%, transparent);
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 38%;
+	--anki-cardblock-heading-opacity: calc(var(--anki-cardblock-body-opacity) + 20%);
+	--anki-cardblock-bg: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
+		transparent
+	);
+	--anki-cardblock-heading-bg: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) var(--anki-cardblock-heading-opacity),
+		transparent
+	);
 	--anki-cardblock-border-color: var(--background-modifier-border);
 	--anki-cardblock-paint: var(--anki-cardblock-bg);
 	position: relative;
@@ -159,14 +170,12 @@
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--sync {
-	--anki-cardblock-bg: color-mix(in srgb, var(--background-modifier-hover) 38%, transparent);
-	--anki-cardblock-heading-bg: color-mix(in srgb, var(--background-modifier-hover) 54%, transparent);
 	--anki-cardblock-border-color: var(--background-modifier-border);
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--warn {
-	--anki-cardblock-bg: color-mix(in srgb, var(--color-yellow, #d29922) 14%, transparent);
-	--anki-cardblock-heading-bg: color-mix(in srgb, var(--color-yellow, #d29922) 24%, transparent);
+	--anki-cardblock-tint: var(--color-yellow, #d29922);
+	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: color-mix(
 		in srgb,
 		var(--color-yellow, #d29922) 55%,
@@ -175,18 +184,14 @@
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--skip {
-	--anki-cardblock-bg: color-mix(in srgb, var(--text-muted) 12%, transparent);
-	--anki-cardblock-heading-bg: color-mix(in srgb, var(--text-muted) 22%, transparent);
-	--anki-cardblock-border-color: color-mix(
-		in srgb,
-		var(--text-muted) 70%,
-		var(--background-modifier-border)
-	);
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 19%;
+	--anki-cardblock-border-color: var(--background-modifier-border);
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--error {
-	--anki-cardblock-bg: color-mix(in srgb, var(--color-red, #f85149) 14%, transparent);
-	--anki-cardblock-heading-bg: color-mix(in srgb, var(--color-red, #f85149) 24%, transparent);
+	--anki-cardblock-tint: var(--color-red, #f85149);
+	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: var(--color-red, #f85149);
 }
 
@@ -233,12 +238,15 @@
 	position: absolute;
 	right: 0;
 	bottom: calc(100% + 0.4em);
+	width: max-content;
+	min-width: 14em;
 	max-width: 28em;
 	padding: 0.35em 0.5em;
 	border-radius: 0.4em;
 	font-size: 0.82em;
-	line-height: 1.25;
-	white-space: normal;
+	line-height: 1.35;
+	white-space: pre-line;
+	text-align: left;
 	color: var(--text-normal);
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
@@ -250,10 +258,39 @@
 	z-index: 15;
 }
 
-.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge:hover .anki-card-preview-tooltip,
-.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge:focus-within .anki-card-preview-tooltip {
+.markdown-source-view.is-live-preview
+	.cm-content
+	.anki-card-preview-badge:has(.anki-card-preview-badge-label:hover)
+	.anki-card-preview-tooltip,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.anki-card-preview-badge:has(.anki-card-preview-badge-label:focus-visible)
+	.anki-card-preview-tooltip {
 	opacity: 1;
 	transform: translateY(0);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.anki-card-preview-badge--action:hover
+	.anki-card-preview-tooltip,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.anki-card-preview-badge--action:focus-visible
+	.anki-card-preview-tooltip {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge--action {
+	appearance: none;
+	font: inherit;
+	cursor: pointer;
+}
+
+.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge--action:hover {
+	color: var(--text-normal);
+	border-color: color-mix(in srgb, var(--text-normal) 35%, var(--background-modifier-border));
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge--sync {
@@ -274,24 +311,6 @@
 	background: color-mix(in srgb, var(--color-red, #f85149) 16%, transparent);
 	border-color: var(--color-red, #f85149);
 	color: var(--text-normal);
-}
-
-.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge-more {
-	appearance: none;
-	border: 1px solid var(--background-modifier-border);
-	background: transparent;
-	color: var(--text-muted);
-	font: inherit;
-	font-size: 0.88em;
-	line-height: 1.2;
-	padding: 0.05em 0.4em;
-	border-radius: 0.35em;
-	cursor: pointer;
-}
-
-.markdown-source-view.is-live-preview .cm-content .anki-card-preview-badge-more:hover {
-	color: var(--text-normal);
-	border-color: color-mix(in srgb, var(--text-normal) 35%, var(--background-modifier-border));
 }
 
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-delimiter-guide {
@@ -538,15 +557,19 @@
 	color: var(--text-normal);
 }
 
-.markdown-preview-view .anki-card-preview-badge-more {
+.markdown-preview-view .anki-card-preview-badge--action {
 	appearance: none;
-	border: 1px solid var(--background-modifier-border);
-	background: transparent;
-	color: var(--text-muted);
 	font: inherit;
-	font-size: 0.88em;
-	line-height: 1.2;
-	padding: 0.05em 0.4em;
-	border-radius: 0.35em;
 	cursor: pointer;
+}
+
+.markdown-preview-view .anki-card-preview-badge--action:hover {
+	color: var(--text-normal);
+	border-color: color-mix(in srgb, var(--text-normal) 35%, var(--background-modifier-border));
+}
+
+.markdown-preview-view .anki-card-preview-badge--action:hover .anki-card-preview-tooltip,
+.markdown-preview-view .anki-card-preview-badge--action:focus-visible .anki-card-preview-tooltip {
+	opacity: 1;
+	transform: translateY(0);
 }

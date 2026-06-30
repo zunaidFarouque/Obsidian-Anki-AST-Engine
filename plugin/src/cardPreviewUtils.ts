@@ -142,7 +142,11 @@ export function formatCardPreviewTooltip(card: {
 }): string {
 	const typeLabel = formatPreviewTypeLabel(card.resolvedType);
 	const message = pickPreviewMessage(card.messages);
-	return message ? `${typeLabel} — ${message}` : typeLabel;
+	const lines = [`Type: ${typeLabel}`];
+	if (message) {
+		lines.push(`Problem: ${message}`);
+	}
+	return lines.join('\n');
 }
 
 function formatPreviewTypeLabel(type: ResolvedCardType): string {

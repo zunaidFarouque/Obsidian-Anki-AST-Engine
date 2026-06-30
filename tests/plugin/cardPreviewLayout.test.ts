@@ -59,6 +59,56 @@ describe('cardPreviewLayout', () => {
 		expect(css).toMatch(/\.cm-line\.anki-card-preview-cardblock[\s\S]*--anki-cardblock-heading-bg/);
 	});
 
+	test('heading background uses same tint source with fixed +20% opacity bump', () => {
+		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
+		const baseRule = readFileSync(cssPath, 'utf8').match(
+			/\.cm-line\.anki-card-preview-cardblock\s*\{[^}]+\}/s,
+		)?.[0];
+		expect(baseRule).toBeDefined();
+		expect(baseRule).toMatch(
+			/--anki-cardblock-heading-opacity:\s*calc\(var\(--anki-cardblock-body-opacity\) \+ 20%\)/,
+		);
+		expect(baseRule).toMatch(
+			/--anki-cardblock-bg:\s*color-mix\([^;]*var\(--anki-cardblock-tint\)[^;]*var\(--anki-cardblock-body-opacity\)/,
+		);
+		expect(baseRule).toMatch(
+			/--anki-cardblock-heading-bg:\s*color-mix\([^;]*var\(--anki-cardblock-tint\)[^;]*var\(--anki-cardblock-heading-opacity\)/,
+		);
+	});
+
+	test('skip block uses half-opacity neutral background of sync', () => {
+		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
+		const stylesheet = readFileSync(cssPath, 'utf8');
+		const baseRule = stylesheet.match(/\.cm-line\.anki-card-preview-cardblock\s*\{[^}]+\}/s)?.[0];
+		const skipRule = stylesheet.match(/anki-card-preview-cardblock--skip\s*\{[^}]+\}/s)?.[0];
+		expect(baseRule).toBeDefined();
+		expect(skipRule).toBeDefined();
+		const syncBodyOpacity = Number(
+			baseRule!.match(/--anki-cardblock-body-opacity:\s*([\d.]+)%/)?.[1],
+		);
+		const skipBodyOpacity = Number(
+			skipRule!.match(/--anki-cardblock-body-opacity:\s*([\d.]+)%/)?.[1],
+		);
+		expect(skipRule).toMatch(/--anki-cardblock-tint:\s*var\(--background-modifier-hover\)/);
+		expect(skipBodyOpacity).toBe(syncBodyOpacity / 2);
+	});
+
+	test('outcome variants set tint tokens only, not painted background tokens', () => {
+		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
+		const stylesheet = readFileSync(cssPath, 'utf8');
+		for (const variant of ['sync', 'warn', 'skip', 'error'] as const) {
+			const rule = stylesheet.match(
+				new RegExp(`anki-card-preview-cardblock--${variant}\\s*\\{[^}]+\\}`, 's'),
+			)?.[0];
+			expect(rule).toBeDefined();
+			expect(rule).not.toMatch(/--anki-cardblock-heading-bg/);
+			expect(rule).not.toMatch(/--anki-cardblock-bg:/);
+		}
+		expect(stylesheet).toMatch(/anki-card-preview-cardblock--warn[\s\S]*--anki-cardblock-tint/);
+		expect(stylesheet).toMatch(/anki-card-preview-cardblock--skip[\s\S]*--anki-cardblock-tint/);
+		expect(stylesheet).toMatch(/anki-card-preview-cardblock--error[\s\S]*--anki-cardblock-tint/);
+	});
+
 	describe('overlay-only layout contract', () => {
 		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
 		const css = () => readFileSync(cssPath, 'utf8');
@@ -134,6 +184,27 @@ describe('cardPreviewLayout', () => {
 				/\.anki-card-preview-heading--section-start[\s\S]*left:\s*calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/,
 			);
 			expect(stylesheet).not.toMatch(/\.anki-card-preview-envelope/);
+		});
+		test('tooltip shows on actionable badge hover', () => {
+			const stylesheet = css();
+			expect(stylesheet).toMatch(
+				/\.anki-card-preview-badge--action:hover\s+\.anki-card-preview-tooltip/,
+			);
+			expect(stylesheet).not.toMatch(/\.anki-card-preview-badge-more/);
+		});
+
+		test('actionable badge has button reset and pointer cursor', () => {
+			const rule = css().match(/\.anki-card-preview-badge--action\s*\{[^}]+\}/)?.[0];
+			expect(rule).toBeDefined();
+			expect(rule).toMatch(/cursor:\s*pointer/);
+			expect(rule).toMatch(/appearance:\s*none/);
+		});
+
+		test('tooltip sizing escapes badge shrink-to-fit', () => {
+			const rule = css().match(/\.anki-card-preview-tooltip\s*\{[^}]+\}/)?.[0];
+			expect(rule).toBeDefined();
+			expect(rule).toMatch(/width:\s*max-content/);
+			expect(rule).toMatch(/white-space:\s*pre-line/);
 		});
 	});
 

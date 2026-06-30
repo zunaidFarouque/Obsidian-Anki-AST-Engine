@@ -70,13 +70,22 @@ describe('cardPreviewUtils', () => {
 		expect(pickPreviewMessage([{ level: 'warn', text: 'warn' }])).toBe('warn');
 	});
 
-	test('formatCardPreviewTooltip includes resolved type and first message', () => {
+	test('formatCardPreviewTooltip uses structured multi-line type and problem lines', () => {
 		expect(
 			formatCardPreviewTooltip({
 				resolvedType: builtinCardType('cloze'),
 				messages: [{ level: 'warn', text: 'Bare {{}} in text' }],
 			}),
-		).toBe('cloze — Bare {{}} in text');
+		).toBe('Type: cloze\nProblem: Bare {{}} in text');
+	});
+
+	test('formatCardPreviewTooltip omits problem line when there are no messages', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				messages: [],
+			}),
+		).toBe('Type: basic');
 	});
 
 	test('zipCardsToHeadings pairs by document order up to the shorter list', () => {

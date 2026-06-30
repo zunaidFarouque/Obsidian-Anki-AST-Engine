@@ -30,6 +30,7 @@ function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
 class FakeElement {
 	className = '';
 	textContent: string | null = null;
+	type = '';
 	dataset: Record<string, string> = {};
 	private attributes = new Map<string, string>();
 	private children: FakeElement[] = [];
@@ -74,6 +75,13 @@ class FakeElement {
 			return (
 				this.children.find((child) =>
 					(child.className ?? '').split(/\s+/).includes('anki-card-preview-tooltip'),
+				) ?? null
+			);
+		}
+		if (selector === '.anki-card-preview-badge-label') {
+			return (
+				this.children.find((child) =>
+					(child.className ?? '').split(/\s+/).includes('anki-card-preview-badge-label'),
 				) ?? null
 			);
 		}
@@ -124,10 +132,46 @@ describe('card preview editor decorations (Live Preview)', () => {
 			const slot = createCardPreviewBadgeElement(makeCard());
 			const badge = slot.getChildren()[0]!;
 			expect(badge.hasAttribute('title')).toBe(false);
-			expect(badge.getAttribute('aria-label')).toBe('basic');
+			expect(badge.getAttribute('aria-label')).toBe('Type: basic');
 			for (const child of badge.getChildren()) {
 				expect(child.hasAttribute('title')).toBe(false);
 			}
+		});
+	});
+
+	test('actionable badge aria-label includes open-details hint', () => {
+		withFakeDocument(() => {
+			const slot = createCardPreviewBadgeElement(makeCard(), () => {});
+			const badge = slot.getChildren()[0]!;
+			expect(badge.getAttribute('aria-label')).toBe(
+				'Type: basic. Open card preview details.',
+			);
+		});
+	});
+
+	test('badge element wraps label in dedicated label span before tooltip', () => {
+		withFakeDocument(() => {
+			const slot = createCardPreviewBadgeElement(
+				makeCard({
+					messages: [{ level: 'warn', text: 'warn but still sync' }],
+				}),
+				() => {},
+			);
+			const badge = slot.getChildren()[0]!;
+			const label = badge.querySelector('.anki-card-preview-badge-label');
+			expect(label).not.toBeNull();
+			expect(label?.textContent).toBe('basic ⚠️');
+			const tooltip = badge.querySelector('.anki-card-preview-tooltip');
+			expect(tooltip).not.toBeNull();
+			const children = badge.getChildren();
+			const labelIndex = children.findIndex((child) =>
+				(child.className ?? '').includes('anki-card-preview-badge-label'),
+			);
+			const tooltipIndex = children.findIndex((child) =>
+				(child.className ?? '').includes('anki-card-preview-tooltip'),
+			);
+			expect(labelIndex).toBeGreaterThanOrEqual(0);
+			expect(tooltipIndex).toBeGreaterThan(labelIndex);
 		});
 	});
 
@@ -160,18 +204,44 @@ describe('card preview editor decorations (Live Preview)', () => {
 		expect(count).toBe(0);
 	});
 
-	test('badge element renders More action and dispatches callback', () => {
+	test('badge with action renders as single button control', () => {
+		withFakeDocument(() => {
+			const slot = createCardPreviewBadgeElement(
+				makeCard({
+					messages: [{ level: 'warn', text: 'warn but still sync' }],
+				}),
+				() => {},
+			);
+			const badge = slot.getChildren()[0]!;
+			expect(badge.tagName).toBe('button');
+			expect(badge.type).toBe('button');
+			expect(badge.className).toContain('anki-card-preview-badge--action');
+			expect(badge.querySelector('button')).toBeNull();
+			const label = badge.querySelector('.anki-card-preview-badge-label');
+			expect(label?.textContent).toBe('basic ⚠️');
+			expect(badge.querySelector('.anki-card-preview-tooltip')).not.toBeNull();
+		});
+	});
+
+	test('badge button click dispatches onMoreAction', () => {
 		withFakeDocument(() => {
 			let clicked = false;
 			const slot = createCardPreviewBadgeElement(makeCard(), () => {
 				clicked = true;
 			});
 			const badge = slot.getChildren()[0]!;
-			const moreButton = badge.querySelector('button');
-			expect(moreButton).not.toBeNull();
-			expect(moreButton?.textContent).toBe('More');
-			(moreButton as unknown as FakeElement).dispatch('click');
+			expect(badge.tagName).toBe('button');
+			badge.dispatch('click');
 			expect(clicked).toBe(true);
+		});
+	});
+
+	test('badge without action renders as non-interactive span', () => {
+		withFakeDocument(() => {
+			const slot = createCardPreviewBadgeElement(makeCard());
+			const badge = slot.getChildren()[0]!;
+			expect(badge.tagName).toBe('span');
+			expect(badge.className).not.toContain('anki-card-preview-badge--action');
 		});
 	});
 
