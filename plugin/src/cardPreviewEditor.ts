@@ -43,6 +43,13 @@ const DELIMITER_GUIDE_REVERSIBLE_CLASS = 'anki-card-preview-delimiter-guide--rev
 const DELIMITER_EXTRA_CLASS = 'anki-card-preview-delimiter-extra';
 const CLOZE_TOKEN_CLASS = 'anki-card-preview-cloze-token';
 
+let badgeAccessibilityIdCounter = 0;
+
+function nextBadgeAccessibilityId(prefix: string): string {
+	badgeAccessibilityIdCounter += 1;
+	return `${prefix}-${badgeAccessibilityIdCounter}`;
+}
+
 function buildDelimiterGuideClasses(garnishText?: string): string {
 	const classes = [DELIMITER_GUIDE_CLASS];
 	if (garnishText === 'ℹ') {
@@ -116,9 +123,21 @@ export function createCardPreviewBadgeElement(
 		: document.createElement('span');
 	const actionClass = onMoreAction ? ` ${BADGE_CLASS}--action` : '';
 	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`;
+	const label = document.createElement('span');
+	label.className = 'anki-card-preview-badge-label';
+	label.textContent = badgeModel.label;
+	const tooltipElement = document.createElement('span');
+	tooltipElement.className = 'anki-card-preview-tooltip';
+	tooltipElement.setAttribute('role', 'tooltip');
+	tooltipElement.textContent = tooltip;
+	const tooltipId = nextBadgeAccessibilityId('anki-card-preview-tooltip');
+	tooltipElement.setAttribute('id', tooltipId);
 	if (onMoreAction) {
 		(badge as HTMLButtonElement).type = 'button';
-		badge.setAttribute('aria-label', `${tooltip}. Open card preview details.`);
+		const labelId = nextBadgeAccessibilityId('anki-card-preview-badge-label');
+		label.setAttribute('id', labelId);
+		badge.setAttribute('aria-labelledby', labelId);
+		badge.setAttribute('aria-describedby', tooltipId);
 		badge.addEventListener('click', (event) => {
 			event.preventDefault();
 			event.stopPropagation();
@@ -127,14 +146,7 @@ export function createCardPreviewBadgeElement(
 	} else {
 		badge.setAttribute('aria-label', tooltip);
 	}
-	const label = document.createElement('span');
-	label.className = 'anki-card-preview-badge-label';
-	label.textContent = badgeModel.label;
 	badge.appendChild(label);
-	const tooltipElement = document.createElement('span');
-	tooltipElement.className = 'anki-card-preview-tooltip';
-	tooltipElement.setAttribute('role', 'tooltip');
-	tooltipElement.textContent = tooltip;
 	badge.appendChild(tooltipElement);
 	const backOnlyMeta = buildBackOnlyClozeWarningMeta(card);
 	if (backOnlyMeta.hasBackOnlyWarning) {

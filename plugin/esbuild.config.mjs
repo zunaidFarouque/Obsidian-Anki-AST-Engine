@@ -23,6 +23,9 @@ const context = await esbuild.context({
 	},
 	entryPoints: ['src/main.ts'],
 	bundle: true,
+	loader: {
+		'.svg': 'text',
+	},
 	alias: {
 		'obsidian-anki-ast-engine/anki': path.join(
 			repoRoot,

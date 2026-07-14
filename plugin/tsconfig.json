@@ -23,5 +23,5 @@
 			"obsidian-anki-ast-engine/cardSyntax": ["src/shims/cardSyntax.ts"]
 		}
 	},
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

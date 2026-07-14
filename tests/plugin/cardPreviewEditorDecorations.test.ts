@@ -139,13 +139,18 @@ describe('card preview editor decorations (Live Preview)', () => {
 		});
 	});
 
-	test('actionable badge aria-label includes open-details hint', () => {
+	test('actionable badge uses aria-describedby instead of descriptive aria-label', () => {
 		withFakeDocument(() => {
 			const slot = createCardPreviewBadgeElement(makeCard(), () => {});
 			const badge = slot.getChildren()[0]!;
-			expect(badge.getAttribute('aria-label')).toBe(
-				'Type: basic. Open card preview details.',
-			);
+			expect(badge.hasAttribute('aria-label')).toBe(false);
+			const tooltip = badge.querySelector('.anki-card-preview-tooltip');
+			const describedBy = badge.getAttribute('aria-describedby');
+			expect(describedBy).not.toBeNull();
+			expect(tooltip?.getAttribute('id')).toBe(describedBy);
+			expect(tooltip?.textContent).toBe('Type: basic');
+			const label = badge.querySelector('.anki-card-preview-badge-label');
+			expect(badge.getAttribute('aria-labelledby')).toBe(label?.getAttribute('id'));
 		});
 	});
 

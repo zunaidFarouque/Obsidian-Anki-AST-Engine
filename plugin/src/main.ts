@@ -1,4 +1,5 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, addIcon } from 'obsidian';
+import { ANKI_SYNC_STAR_ICON_ID, registerPluginIcons } from './icons';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import { registerCardPreview, type CardPreviewManager } from './cardPreview';
 import { formatNoteTypeCacheNotice } from './cardPreviewUtils';
@@ -20,7 +21,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		this.addRibbonIcon('layers', 'Anki AST Sync', () => {
+		registerPluginIcons(addIcon);
+
+		this.addRibbonIcon(ANKI_SYNC_STAR_ICON_ID, 'Anki AST Sync', () => {
 			void this.syncVaultToAnki();
 		});
 
