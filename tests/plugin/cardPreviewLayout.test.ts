@@ -3,11 +3,13 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import {
 	cardFollowsSectionHeading,
-	shouldPaintInterCardTail,
+	findBeforeMidCardHrLineStarts,
 	formatCardPreviewInterCardGap,
 	formatCardPreviewSectionTopExtend,
-	parseMarkdownHeadingLevel,
 	isBlankDocumentLine,
+	isMarkdownThematicBreakLine,
+	parseMarkdownHeadingLevel,
+	shouldPaintInterCardTail,
 } from '../../plugin/src/cardPreviewLayout';
 import type { DocumentLine } from '../../plugin/src/cardPreviewUtils';
 import type { AnkiAstSyncSettings } from '../../plugin/src/settings';
@@ -20,6 +22,19 @@ function linesFromDoc(doc: string): DocumentLine[] {
 		from += text.length + 1;
 	}
 	return result;
+}
+
+function cssCmContentRule(stylesheet: string): string | undefined {
+	return stylesheet.match(
+		/\.markdown-source-view\.is-live-preview\s+\.cm-content\s*\{[^}]+\}/s,
+	)?.[0];
+}
+
+function cssPaintHostFormulaRule(stylesheet: string): string | undefined {
+	// Grouped host selector: cardblock, table sibling, before-mid-hr + .hr
+	return stylesheet.match(
+		/\.cm-line\.anki-card-preview-cardblock\s*,[\s\S]*?before-mid-hr[\s\S]*?\+ \.hr\.cm-line\s*\{[^}]+\}/s,
+	)?.[0];
 }
 
 describe('cardPreviewLayout', () => {
@@ -70,38 +85,46 @@ describe('cardPreviewLayout', () => {
 		expect(css).not.toMatch(/\.anki-card-preview-envelope-layer/);
 	});
 
-	test('declaration heading keeps separate background token on cardblock lines for guides', () => {
+	test('declaration heading keeps separate background token for guides', () => {
 		const css = readFileSync(join(import.meta.dir, '../../plugin/styles.css'), 'utf8');
 		expect(css).toContain('--anki-cardblock-heading-bg');
-		expect(css).toMatch(/\.cm-line\.anki-card-preview-cardblock[\s\S]*--anki-cardblock-heading-bg/);
+		expect(css).toMatch(
+			/\.cm-line\.anki-card-preview-cardblock\.anki-card-preview-heading[\s\S]*--anki-cardblock-paint:\s*var\(--anki-cardblock-heading-bg\)/,
+		);
 	});
 
-	test('heading background uses same tint source with fixed +20% opacity bump', () => {
-		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
-		const baseRule = readFileSync(cssPath, 'utf8').match(
-			/\.cm-line\.anki-card-preview-cardblock\s*\{[^}]+\}/s,
-		)?.[0];
-		expect(baseRule).toBeDefined();
-		expect(baseRule).toMatch(
+	test('default tint inputs on LP .cm-content; paint formulas on shared host group', () => {
+		const stylesheet = readFileSync(join(import.meta.dir, '../../plugin/styles.css'), 'utf8');
+		const contentRule = cssCmContentRule(stylesheet);
+		expect(contentRule).toBeDefined();
+		expect(contentRule).toMatch(/--anki-cardblock-tint:\s*var\(--background-modifier-hover\)/);
+		expect(contentRule).toMatch(/--anki-cardblock-body-opacity:\s*38%/);
+		expect(contentRule).not.toMatch(/--anki-cardblock-bg:\s*color-mix/);
+
+		const formulaRule = cssPaintHostFormulaRule(stylesheet);
+		expect(formulaRule).toBeDefined();
+		expect(formulaRule).toMatch(
 			/--anki-cardblock-heading-opacity:\s*calc\(var\(--anki-cardblock-body-opacity\) \+ 20%\)/,
 		);
-		expect(baseRule).toMatch(
+		expect(formulaRule).toMatch(
 			/--anki-cardblock-bg:\s*color-mix\([^;]*var\(--anki-cardblock-tint\)[^;]*var\(--anki-cardblock-body-opacity\)/,
 		);
-		expect(baseRule).toMatch(
+		expect(formulaRule).toMatch(
 			/--anki-cardblock-heading-bg:\s*color-mix\([^;]*var\(--anki-cardblock-tint\)[^;]*var\(--anki-cardblock-heading-opacity\)/,
+		);
+		expect(formulaRule).toMatch(
+			/--anki-cardblock-paint-solid:\s*color-mix\([^;]*var\(--background-primary\)/,
 		);
 	});
 
 	test('skip block uses half-opacity neutral background of sync', () => {
-		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
-		const stylesheet = readFileSync(cssPath, 'utf8');
-		const baseRule = stylesheet.match(/\.cm-line\.anki-card-preview-cardblock\s*\{[^}]+\}/s)?.[0];
-		const skipRule = stylesheet.match(/anki-card-preview-cardblock--skip\s*\{[^}]+\}/s)?.[0];
-		expect(baseRule).toBeDefined();
+		const stylesheet = readFileSync(join(import.meta.dir, '../../plugin/styles.css'), 'utf8');
+		const contentRule = cssCmContentRule(stylesheet);
+		const skipRule = stylesheet.match(/anki-card-preview-cardblock--skip\b[^{]*\{[^}]+\}/s)?.[0];
+		expect(contentRule).toBeDefined();
 		expect(skipRule).toBeDefined();
 		const syncBodyOpacity = Number(
-			baseRule!.match(/--anki-cardblock-body-opacity:\s*([\d.]+)%/)?.[1],
+			contentRule!.match(/--anki-cardblock-body-opacity:\s*([\d.]+)%/)?.[1],
 		);
 		const skipBodyOpacity = Number(
 			skipRule!.match(/--anki-cardblock-body-opacity:\s*([\d.]+)%/)?.[1],
@@ -111,16 +134,18 @@ describe('cardPreviewLayout', () => {
 	});
 
 	test('outcome variants set tint tokens only, not painted background tokens', () => {
-		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
-		const stylesheet = readFileSync(cssPath, 'utf8');
+		const stylesheet = readFileSync(join(import.meta.dir, '../../plugin/styles.css'), 'utf8');
 		for (const variant of ['sync', 'warn', 'skip', 'error'] as const) {
 			const rule = stylesheet.match(
-				new RegExp(`anki-card-preview-cardblock--${variant}\\s*\\{[^}]+\\}`, 's'),
+				new RegExp(`anki-card-preview-cardblock--${variant}\\b[^\\{]*\\{[^}]+\\}`, 's'),
 			)?.[0];
 			expect(rule).toBeDefined();
 			expect(rule).not.toMatch(/--anki-cardblock-heading-bg/);
 			expect(rule).not.toMatch(/--anki-cardblock-bg:/);
 		}
+		expect(stylesheet).toMatch(
+			/\.cm-line\.anki-card-preview-cardblock--warn\s*,[\s\S]*\+ \.cm-embed-block\.cm-table-widget\s*,[\s\S]*before-mid-hr[\s\S]*\+ \.hr\.cm-line/,
+		);
 		expect(stylesheet).toMatch(/anki-card-preview-cardblock--warn[\s\S]*--anki-cardblock-tint/);
 		expect(stylesheet).toMatch(/anki-card-preview-cardblock--skip[\s\S]*--anki-cardblock-tint/);
 		expect(stylesheet).toMatch(/anki-card-preview-cardblock--error[\s\S]*--anki-cardblock-tint/);
@@ -257,8 +282,9 @@ describe('cardPreviewLayout', () => {
 				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget\s*\{[^}]+\}/s,
 			)?.[0];
 			expect(widgetRule).toBeDefined();
-			expect(widgetRule).toMatch(/--anki-cardblock-paint:/);
 			expect(widgetRule).toMatch(/position:\s*relative/);
+			// Paint formulas are hoisted; sibling host must not re-copy color-mix.
+			expect(widgetRule).not.toMatch(/color-mix/);
 		});
 
 		test('table underlay paints on embed widget with positive bleed inset (no overflow)', () => {
@@ -306,14 +332,12 @@ describe('cardPreviewLayout', () => {
 		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
 		const css = () => readFileSync(cssPath, 'utf8');
 
-		test('mid-card HR line underlay uses .hr.cm-line sibling gated by following cardblock', () => {
+		test('mid-card HR underlay uses before-mid-hr adjacent sibling (no :has)', () => {
 			const stylesheet = css();
 			expect(stylesheet).toMatch(
-				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)/,
+				/\.cm-line\.anki-card-preview-cardblock\.anki-card-preview-before-mid-hr\s*\+\s*\.hr\.cm-line\s*\{/s,
 			);
-			expect(stylesheet).toMatch(
-				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-gap\s*\+\s*\.cm-line\.anki-card-preview-cardblock\)/,
-			);
+			expect(stylesheet).not.toMatch(/\.hr\.cm-line:has\(/);
 			// Wrong DOM guess from earlier attempt — Obsidian uses .hr.cm-line, not embed-block.
 			expect(stylesheet).not.toMatch(/\.cm-embed-block:has\(hr\)/);
 			// Must not paint every HR after a cardblock (trailing --- stays outside envelope).
@@ -325,13 +349,14 @@ describe('cardPreviewLayout', () => {
 		test('HR underlay uses solid box-shadow peek accent at bleed edge', () => {
 			const stylesheet = css();
 			const hrRule = stylesheet.match(
-				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)\s*\{[^}]+\}/s,
+				/\.cm-line\.anki-card-preview-cardblock\.anki-card-preview-before-mid-hr\s*\+\s*\.hr\.cm-line\s*\{[^}]*background-color:[^}]+\}/s,
 			)?.[0];
 			expect(hrRule).toBeDefined();
 			expect(hrRule).toMatch(
 				/background-color:\s*var\(--anki-cardblock-paint-solid\)/,
 			);
-			expect(hrRule).toMatch(/--anki-cardblock-paint-solid:\s*color-mix/);
+			expect(hrRule).not.toMatch(/--anki-cardblock-paint-solid:\s*color-mix/);
+			expect(hrRule).not.toMatch(/--anki-cardblock-bg:\s*color-mix/);
 			/* Cover layer at bleed-2, accent peek at -bleed, right at +bleed */
 			expect(hrRule).toMatch(
 				/calc\(-1 \* var\(--anki-card-preview-block-bleed-x\) \+ 2px\)/,
@@ -345,20 +370,46 @@ describe('cardPreviewLayout', () => {
 			expect(hrRule).toMatch(/var\(--anki-cardblock-border-color\)/);
 			expect(hrRule).not.toMatch(/\binset\b/);
 			expect(hrRule).not.toMatch(/\bborder-left\s*:/);
-			/* Pseudos/inset clip at content edge on .hr — do not use for accent */
-			expect(stylesheet).not.toMatch(/\.hr\.cm-line:has\([^)]*\)::before/);
-			expect(stylesheet).not.toMatch(/\.hr\.cm-line:has\([^)]*\)::after/);
+			expect(stylesheet).not.toMatch(/\.hr\.cm-line::before/);
+			expect(stylesheet).not.toMatch(/\.hr\.cm-line::after/);
 		});
 
 		test('HR underlay rules do not change HR layout', () => {
 			const stylesheet = css();
 			const hrRule = stylesheet.match(
-				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)\s*\{[^}]+\}/s,
+				/\.cm-line\.anki-card-preview-cardblock\.anki-card-preview-before-mid-hr\s*\+\s*\.hr\.cm-line\s*\{[^}]*background-color:[^}]+\}/s,
 			)?.[0];
 			expect(hrRule).toBeDefined();
 			expect(hrRule).not.toMatch(/\bpadding\s*:/);
 			expect(hrRule).not.toMatch(/\bmargin\s*:/);
 			expect(hrRule).not.toMatch(/\bwidth\s*:/);
+		});
+
+		test('isMarkdownThematicBreakLine matches setext thematic breaks', () => {
+			expect(isMarkdownThematicBreakLine('---')).toBe(true);
+			expect(isMarkdownThematicBreakLine('***')).toBe(true);
+			expect(isMarkdownThematicBreakLine('___')).toBe(true);
+			expect(isMarkdownThematicBreakLine('  ---  ')).toBe(true);
+			expect(isMarkdownThematicBreakLine('--')).toBe(false);
+			expect(isMarkdownThematicBreakLine('- - -')).toBe(true);
+			expect(isMarkdownThematicBreakLine('not a break')).toBe(false);
+		});
+
+		test('findBeforeMidCardHrLineStarts marks previous covered line for mid-card --- only', () => {
+			const midDoc = ['#### Card', 'before', '---', 'after'].join('\n');
+			const midLines = linesFromDoc(midDoc);
+			const midCovered = midLines.map((line) => line.from);
+			expect(findBeforeMidCardHrLineStarts(midLines, midCovered)).toEqual([
+				midDoc.indexOf('before'),
+			]);
+
+			const trailingDoc = ['#### Card', 'body', '---'].join('\n');
+			const trailingLines = linesFromDoc(trailingDoc);
+			// Trailing --- excluded from covered offsets (stripAuthoring / contentEnd).
+			const trailingCovered = trailingLines
+				.filter((line) => line.text !== '---')
+				.map((line) => line.from);
+			expect(findBeforeMidCardHrLineStarts(trailingLines, trailingCovered)).toEqual([]);
 		});
 	});
 

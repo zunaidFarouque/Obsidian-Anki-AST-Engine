@@ -61,6 +61,33 @@ export function isBlankDocumentLine(text: string): boolean {
 	return text.trim().length === 0;
 }
 
+/** CommonMark thematic break: --- / *** / ___ (spaces between markers allowed). */
+export function isMarkdownThematicBreakLine(text: string): boolean {
+	return /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(text);
+}
+
+/**
+ * Mid-card `---` stays in covered offsets; trailing separators are excluded by
+ * contentEnd / stripAuthoring. Mark the previous covered line so CSS can paint
+ * `.hr.cm-line` via adjacent sibling without `:has()`.
+ */
+export function findBeforeMidCardHrLineStarts(
+	lines: { from: number; text: string }[],
+	coveredLineStarts: number[],
+): number[] {
+	const lineByFrom = new Map(lines.map((line) => [line.from, line] as const));
+	const marked = new Set<number>();
+	for (let index = 1; index < coveredLineStarts.length; index += 1) {
+		const hrFrom = coveredLineStarts[index]!;
+		const hrLine = lineByFrom.get(hrFrom);
+		if (!hrLine || !isMarkdownThematicBreakLine(hrLine.text)) {
+			continue;
+		}
+		marked.add(coveredLineStarts[index - 1]!);
+	}
+	return [...marked];
+}
+
 export function formatCardPreviewInterCardGap(settings: AnkiAstSyncSettings): string {
 	const gap = settings.cardPreviewInterCardGapEm;
 	const normalized = Number.isFinite(gap) && gap >= 0 ? gap : 0;

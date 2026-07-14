@@ -27,6 +27,7 @@ import {
 } from './cardPreviewUtils';
 import {
 	cardFollowsSectionHeading,
+	findBeforeMidCardHrLineStarts,
 	isBlankDocumentLine,
 	shouldPaintInterCardTail,
 } from './cardPreviewLayout';
@@ -35,6 +36,7 @@ const HEADING_OUTLINE_CLASS = 'anki-card-preview-heading';
 const HEADING_SECTION_START_CLASS = 'anki-card-preview-heading--section-start';
 const CARD_BLOCK_CLASS = 'anki-card-preview-cardblock';
 const CARD_BLOCK_TAIL_CLASS = 'anki-card-preview-cardblock--tail';
+const CARD_BLOCK_BEFORE_MID_HR_CLASS = 'anki-card-preview-before-mid-hr';
 const BADGE_CLASS = 'anki-card-preview-badge';
 export const BADGE_SLOT_CLASS = 'anki-card-preview-badge-slot';
 const DELIMITER_GUIDE_CLASS = 'anki-card-preview-delimiter-guide';
@@ -325,6 +327,9 @@ export function buildCardPreviewDecorations(
 			nextLineAfterCard == null || isBlankDocumentLine(nextLineAfterCard.text),
 		);
 		const lastCoveredLineStart = coveredLineStarts[coveredLineStarts.length - 1];
+		const beforeMidHrStarts = new Set(
+			findBeforeMidCardHrLineStarts(lines, coveredLineStarts),
+		);
 
 		for (const lineStart of coveredLineStarts) {
 			const isTail = paintTail && lineStart === lastCoveredLineStart;
@@ -335,6 +340,7 @@ export function buildCardPreviewDecorations(
 					class: [
 						`${CARD_BLOCK_CLASS} ${CARD_BLOCK_CLASS}--${badgeModel.displayOutcome}`,
 						isTail ? CARD_BLOCK_TAIL_CLASS : '',
+						beforeMidHrStarts.has(lineStart) ? CARD_BLOCK_BEFORE_MID_HR_CLASS : '',
 					]
 						.filter(Boolean)
 						.join(' '),

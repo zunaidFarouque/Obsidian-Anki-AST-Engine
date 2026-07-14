@@ -109,7 +109,7 @@ Settings sync to `:root` via `plugin/src/cardPreviewLayout.ts` (`applyCardPrevie
 
 **Sync content boundary:** Preview tint follows `ResolvedCard.range`, which ends at learner-facing content only. Outside the envelope: trailing authoring lines (`%% … %%`, non-binding `<!-- … -->`, binding `<!--anki-id-->`), trailing blank lines, and trailing section separators (`---` / thematic breaks) — including mixed tails of separators + comments only. Mid-card `---` between real paragraphs stays inside. See [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
 
-**Live Preview sibling widgets:** Tables render as `.cm-embed-block.cm-table-widget` siblings (adjacent-sibling `::before` underlay). Mid-card thematic breaks render as `.hr.cm-line` siblings without cardblock decorations (Obsidian resets `::before` on `.hr`). Tint: element paint + right `box-shadow` bleed + narrow left `::after` strip (bleed fill + `border-left` accent). Mid-card `---` underlay is gated by a following cardblock line so trailing separators stay outside the envelope.
+**Live Preview sibling widgets:** Tables render as `.cm-embed-block.cm-table-widget` siblings (adjacent-sibling `::before` underlay with **positive** bleed inset). Mid-card thematic breaks render as `.hr.cm-line` siblings (Obsidian resets/clips `::before`/`::after` outside the content box). Tint: opaque solid fill + three `box-shadow` layers (±bleed + 2px left accent peek). Gate: previous covered line gets `anki-card-preview-before-mid-hr` (trailing `---` excluded from covered offsets); CSS is `.cardblock.before-mid-hr + .hr.cm-line` — no `:has()`.
 
 ### 5.3 Sync marker options
 
@@ -435,3 +435,4 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 | 2026-06-30 | §5.2.2 overlay-only envelope: section-top extend + inter-card tail mask; settings `cardPreviewSectionTopExtend`, `cardPreviewInterCardGapEm` |
 | 2026-06-30 | Sync content boundary: authoring `%%` / `<!-- -->` lines excluded from envelope tint |
 | 2026-07-15 | Sync content boundary: trailing `---` / thematic breaks (alone or with comment tails) excluded from envelope tint |
+| 2026-07-15 | Mid-card HR underlay: decorator `before-mid-hr` + solid box-shadow peek (no `:has()` / no `::after` accent); shared paint-host formulas |
