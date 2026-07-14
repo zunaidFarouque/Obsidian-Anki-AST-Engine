@@ -302,6 +302,66 @@ describe('cardPreviewLayout', () => {
 		});
 	});
 
+	describe('card-block thematic-break underlay', () => {
+		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
+		const css = () => readFileSync(cssPath, 'utf8');
+
+		test('mid-card HR line underlay uses .hr.cm-line sibling gated by following cardblock', () => {
+			const stylesheet = css();
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)/,
+			);
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-gap\s*\+\s*\.cm-line\.anki-card-preview-cardblock\)/,
+			);
+			// Wrong DOM guess from earlier attempt — Obsidian uses .hr.cm-line, not embed-block.
+			expect(stylesheet).not.toMatch(/\.cm-embed-block:has\(hr\)/);
+			// Must not paint every HR after a cardblock (trailing --- stays outside envelope).
+			expect(stylesheet).not.toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line\s*\{/s,
+			);
+		});
+
+		test('HR underlay uses solid box-shadow peek accent at bleed edge', () => {
+			const stylesheet = css();
+			const hrRule = stylesheet.match(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)\s*\{[^}]+\}/s,
+			)?.[0];
+			expect(hrRule).toBeDefined();
+			expect(hrRule).toMatch(
+				/background-color:\s*var\(--anki-cardblock-paint-solid\)/,
+			);
+			expect(hrRule).toMatch(/--anki-cardblock-paint-solid:\s*color-mix/);
+			/* Cover layer at bleed-2, accent peek at -bleed, right at +bleed */
+			expect(hrRule).toMatch(
+				/calc\(-1 \* var\(--anki-card-preview-block-bleed-x\) \+ 2px\)/,
+			);
+			expect(hrRule).toMatch(
+				/calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/,
+			);
+			expect(hrRule).toMatch(
+				/calc\(1 \* var\(--anki-card-preview-block-bleed-x\)\)/,
+			);
+			expect(hrRule).toMatch(/var\(--anki-cardblock-border-color\)/);
+			expect(hrRule).not.toMatch(/\binset\b/);
+			expect(hrRule).not.toMatch(/\bborder-left\s*:/);
+			/* Pseudos/inset clip at content edge on .hr — do not use for accent */
+			expect(stylesheet).not.toMatch(/\.hr\.cm-line:has\([^)]*\)::before/);
+			expect(stylesheet).not.toMatch(/\.hr\.cm-line:has\([^)]*\)::after/);
+		});
+
+		test('HR underlay rules do not change HR layout', () => {
+			const stylesheet = css();
+			const hrRule = stylesheet.match(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.hr\.cm-line:has\(\+\s*\.cm-line\.anki-card-preview-cardblock\)\s*\{[^}]+\}/s,
+			)?.[0];
+			expect(hrRule).toBeDefined();
+			expect(hrRule).not.toMatch(/\bpadding\s*:/);
+			expect(hrRule).not.toMatch(/\bmargin\s*:/);
+			expect(hrRule).not.toMatch(/\bwidth\s*:/);
+		});
+	});
+
 	test('formats layout css variables', () => {
 		expect(
 			formatCardPreviewSectionTopExtend({ cardPreviewSectionTopExtend: 0.5 } as AnkiAstSyncSettings),

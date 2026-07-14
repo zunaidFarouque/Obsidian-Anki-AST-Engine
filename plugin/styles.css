@@ -216,6 +216,98 @@
 	border-left: 2px solid var(--anki-cardblock-border-color);
 }
 
+/*
+ * Mid-card thematic breaks (runtime): .hr.cm-line sibling without cardblock.
+ * ±bleed box-shadow paints BG outside the content box (works). Absolute
+ * ::before/::after and inset accents cannot — DevTools: left:-1px clips to
+ * 1px, left:-2px vanishes even when overflow:visible. Accent = box-shadow
+ * peek at bleed edge: opaque solid paint covers border-colored shadow so
+ * translucent-underlay "blob" does not show through.
+ * Gate on a following cardblock so trailing --- stays outside the envelope.
+ */
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .hr.cm-line:has(+ .cm-gap + .cm-line.anki-card-preview-cardblock),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .hr.cm-line:has(+ .cm-line.anki-card-preview-cardblock) {
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 38%;
+	--anki-cardblock-bg: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
+		transparent
+	);
+	/* Opaque stand-in for translucent underlay over the editor (needed so
+	   a full-size border shadow cannot show through as a gray blob). */
+	--anki-cardblock-paint-solid: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
+		var(--background-primary)
+	);
+	--anki-cardblock-paint: var(--anki-cardblock-bg);
+	--anki-cardblock-border-color: var(--background-modifier-border);
+	position: relative;
+	overflow: visible !important;
+	box-sizing: border-box;
+	background-color: var(--anki-cardblock-paint-solid);
+	box-shadow:
+		/* Top: solid from bleed-2 — covers border except leftmost 2px */
+		calc(-1 * var(--anki-card-preview-block-bleed-x) + 2px) 0 0 0
+			var(--anki-cardblock-paint-solid),
+		/* Peek accent at left edge of BG (-bleed) */
+		calc(-1 * var(--anki-card-preview-block-bleed-x)) 0 0 0
+			var(--anki-cardblock-border-color),
+		/* Right bleed (same outer extent as before) */
+		calc(1 * var(--anki-card-preview-block-bleed-x)) 0 0 0
+			var(--anki-cardblock-paint-solid);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .hr.cm-line:has(+ .cm-gap + .cm-line.anki-card-preview-cardblock),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .hr.cm-line:has(+ .cm-line.anki-card-preview-cardblock) {
+	--anki-cardblock-tint: var(--color-yellow, #d29922);
+	--anki-cardblock-body-opacity: 14%;
+	--anki-cardblock-border-color: color-mix(
+		in srgb,
+		var(--color-yellow, #d29922) 55%,
+		var(--background-modifier-border)
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .hr.cm-line:has(+ .cm-gap + .cm-line.anki-card-preview-cardblock),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .hr.cm-line:has(+ .cm-line.anki-card-preview-cardblock) {
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 19%;
+	--anki-cardblock-border-color: var(--background-modifier-border);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .hr.cm-line:has(+ .cm-gap + .cm-line.anki-card-preview-cardblock),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .hr.cm-line:has(+ .cm-line.anki-card-preview-cardblock) {
+	--anki-cardblock-tint: var(--color-red, #f85149);
+	--anki-cardblock-body-opacity: 14%;
+	--anki-cardblock-border-color: var(--color-red, #f85149);
+}
+
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading {

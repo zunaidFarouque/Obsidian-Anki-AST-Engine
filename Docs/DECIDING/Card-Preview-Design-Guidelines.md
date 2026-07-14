@@ -109,6 +109,8 @@ Settings sync to `:root` via `plugin/src/cardPreviewLayout.ts` (`applyCardPrevie
 
 **Sync content boundary:** Preview tint follows `ResolvedCard.range`, which ends at learner-facing content only. Outside the envelope: trailing authoring lines (`%% … %%`, non-binding `<!-- … -->`, binding `<!--anki-id-->`), trailing blank lines, and trailing section separators (`---` / thematic breaks) — including mixed tails of separators + comments only. Mid-card `---` between real paragraphs stays inside. See [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
 
+**Live Preview sibling widgets:** Tables render as `.cm-embed-block.cm-table-widget` siblings (adjacent-sibling `::before` underlay). Mid-card thematic breaks render as `.hr.cm-line` siblings without cardblock decorations (Obsidian resets `::before` on `.hr`). Tint: element paint + right `box-shadow` bleed + narrow left `::after` strip (bleed fill + `border-left` accent). Mid-card `---` underlay is gated by a following cardblock line so trailing separators stay outside the envelope.
+
 ### 5.3 Sync marker options
 
 Default is none. Optional marker in subtle mode:
