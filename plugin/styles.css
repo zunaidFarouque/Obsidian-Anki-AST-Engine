@@ -143,6 +143,79 @@
 	border-left: 2px solid var(--anki-cardblock-border-color);
 }
 
+/*
+ * Card-block tables: .cm-table-widget is a sibling of .cm-line.
+ * Logs: widget ~732, cm-line ~700 (≈ +2×16px padding), line underlay bleeds 8px
+ * outside the line → visual paint ≈ 716. Painting with left/right: -8px overflows
+ * overflow-x:auto (scrollWidth 740). Painting on .table-wrapper shrink-wraps with
+ * the table (e.g. 619) and disconnects from the card envelope.
+ * Fix: paint on the embed widget with +bleed inset (inside the box) so width matches
+ * card-line underlay and scrollWidth stays equal to clientWidth.
+ */
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block.cm-table-widget {
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 38%;
+	--anki-cardblock-bg: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
+		transparent
+	);
+	--anki-cardblock-paint: var(--anki-cardblock-bg);
+	--anki-cardblock-border-color: var(--background-modifier-border);
+	position: relative;
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .cm-embed-block.cm-table-widget {
+	--anki-cardblock-tint: var(--color-yellow, #d29922);
+	--anki-cardblock-body-opacity: 14%;
+	--anki-cardblock-border-color: color-mix(
+		in srgb,
+		var(--color-yellow, #d29922) 55%,
+		var(--background-modifier-border)
+	);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .cm-embed-block.cm-table-widget {
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 19%;
+	--anki-cardblock-border-color: var(--background-modifier-border);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .cm-embed-block.cm-table-widget {
+	--anki-cardblock-tint: var(--color-red, #f85149);
+	--anki-cardblock-body-opacity: 14%;
+	--anki-cardblock-border-color: var(--color-red, #f85149);
+}
+
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block.cm-table-widget::before {
+	content: '';
+	position: absolute;
+	z-index: 0;
+	pointer-events: none;
+	/* inset by bleed (not negative) — stays inside overflow:auto box */
+	left: var(--anki-card-preview-block-bleed-x);
+	right: var(--anki-card-preview-block-bleed-x);
+	top: 0;
+	bottom: 0;
+	background: var(--anki-cardblock-paint);
+	border-left: 2px solid var(--anki-cardblock-border-color);
+}
+
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading {

@@ -69,6 +69,84 @@ describe("stripAuthoringContent", () => {
     expect(contentEndOffsetFromNodes(ast.children, 0)).toBe(answerEnd);
   });
 
+  test("contentEndOffsetFromNodes ends before trailing --- and anki-id", () => {
+    const raw = [
+      "Answer line",
+      "",
+      "---",
+      `<!--anki-id: ${ANKI_ID}-->`,
+    ].join("\n");
+    const ast = parseMarkdown(raw, "/vault");
+    const answerEnd = raw.indexOf("Answer line") + "Answer line".length;
+
+    expect(contentEndOffsetFromNodes(ast.children, 0)).toBe(answerEnd);
+  });
+
+  test("contentEndOffsetFromNodes ends before multiple trailing ---, comments, and anki-id", () => {
+    const raw = [
+      "Answer line",
+      "",
+      "---",
+      "",
+      "---",
+      "<!-- expect: sync -->",
+      `<!--anki-id: ${ANKI_ID}-->`,
+    ].join("\n");
+    const ast = parseMarkdown(raw, "/vault");
+    const answerEnd = raw.indexOf("Answer line") + "Answer line".length;
+
+    expect(contentEndOffsetFromNodes(ast.children, 0)).toBe(answerEnd);
+  });
+
+  test("contentEndOffsetFromNodes keeps mid-card --- inside content range", () => {
+    const raw = [
+      "First point",
+      "",
+      "---",
+      "",
+      "Second point",
+      `<!--anki-id: ${ANKI_ID}-->`,
+    ].join("\n");
+    const ast = parseMarkdown(raw, "/vault");
+    const secondEnd = raw.indexOf("Second point") + "Second point".length;
+
+    expect(contentEndOffsetFromNodes(ast.children, 0)).toBe(secondEnd);
+  });
+
+  test("stripTrailingAuthoringNodes peels trailing --- when terminal", () => {
+    const ast = parseMarkdown(
+      [
+        "Answer line",
+        "",
+        "---",
+        "",
+        "---",
+      ].join("\n"),
+      "/vault",
+    );
+
+    const stripped = stripTrailingAuthoringNodes(ast.children);
+    expect(stripped).toHaveLength(1);
+    expect(stripped[0]?.type).toBe("paragraph");
+    expect(stripped.some((node) => node.type === "thematicBreak")).toBe(false);
+  });
+
+  test("stripTrailingAuthoringNodes keeps trailing anki-id and does not peel past it", () => {
+    const ast = parseMarkdown(
+      [
+        "Answer line",
+        "",
+        "---",
+        `<!--anki-id: ${ANKI_ID}-->`,
+      ].join("\n"),
+      "/vault",
+    );
+
+    const stripped = stripTrailingAuthoringNodes(ast.children);
+    expect(stripped[stripped.length - 1]?.type).toBe("html");
+    expect(stripped.some((node) => node.type === "thematicBreak")).toBe(true);
+  });
+
   test("stripAuthoringHtmlFromNodes removes authoring html anywhere in the list", () => {
     const ast = parseMarkdown(
       [

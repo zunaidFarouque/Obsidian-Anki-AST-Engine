@@ -37,7 +37,7 @@ Implementation: [`src/ast/cardCompiler.ts`](../src/ast/cardCompiler.ts) (`compil
 | `strong` / `emphasis` | `<strong>` / `<em>` |
 | `delete` (GFM) | `<del>` |
 | `list` / `listItem` | `<ul>` / `<ol>` + `<li>` |
-| `table` | `<table>` |
+| `table` | `<table class="anki-md-table">` |
 | `thematicBreak` | `<hr>` |
 
 ### Trailing section separators (`---`)
@@ -45,6 +45,8 @@ Implementation: [`src/ast/cardCompiler.ts`](../src/ast/cardCompiler.ts) (`compil
 In Obsidian, authors often place one or more `---` lines **after** a card’s answer and **before** the next H1–H4 heading to add visual separation. Those lines are still inside the card’s back buffer when the state machine finalizes at the next heading, which would compile to hanging `<hr>` elements at the bottom of the Anki field.
 
 Before compile, [`stripTrailingSectionSeparators`](../src/parser/stripTrailingSectionSeparators.ts) removes **trailing** `thematicBreak` nodes from each card’s `frontNodes` / `backNodes`. Trailing `<!--anki-id-->` html nodes are preserved for vault binding.
+
+Live Preview uses the same trailing-`---` rule for the card envelope: [`contentEndOffsetFromNodes`](../src/ast/stripAuthoringContent.ts) ends `ResolvedCard.range` at the last learner-facing block, so trailing `---` (alone or mixed with trailing comments / anki-id) is **not tinted**. Mid-card `---` between real paragraphs stays inside the envelope.
 
 | Kept | Removed |
 |------|---------|
@@ -112,9 +114,15 @@ Non-binding HTML comments are **authoring-only** — they stay in the vault but 
 | `<!--anki-id: uuid-->` | Visible; used for binding | Not in field HTML | Not tinted (binding metadata) |
 | `<!--` inside fenced code | Literal text | Preserved | Follows card content rules |
 
-Trailing whole-line comments at the bottom of a card (including `%%` blocks and `<!-- … -->` lines) are dropped from sync content and from `ResolvedCard.range` used for preview tinting.
+Trailing decoration-only tails at the bottom of a card are dropped from sync content and from `ResolvedCard.range` used for preview tinting:
 
-Implementation: [`stripAuthoringContent.ts`](../src/ast/stripAuthoringContent.ts) (trailing strip + HTML filter) and [`remarkObsidianComment.ts`](../src/ast/remarkObsidianComment.ts) (`%%`).
+- whole-line comments (`%%` blocks, non-binding `<!-- … -->`, and binding `<!--anki-id-->` for envelope extent)
+- one or more trailing section separators (`---`)
+- trailing blank paragraphs
+
+A mid-card `---` between learner-facing paragraphs is **not** a decoration tail and stays inside the envelope.
+
+Implementation: [`stripAuthoringContent.ts`](../src/ast/stripAuthoringContent.ts) (trailing strip + HTML filter; `contentEndOffsetFromNodes` for preview range) and [`remarkObsidianComment.ts`](../src/ast/remarkObsidianComment.ts) (`%%`).
 
 ## Paragraph and line-break rules
 

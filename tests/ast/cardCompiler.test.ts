@@ -54,7 +54,7 @@ describe("cardCompiler", () => {
     expect(backHtml).toMatch(/<h2[^>]*>.*Preview section title/s);
     expect(backHtml).toContain("<strong>bold</strong>");
     expect(backHtml).toContain("<em>italic</em>");
-    expect(backHtml).toContain("<table>");
+    expect(backHtml).toMatch(/<table[^>]*class="anki-md-table"/);
     expect(backHtml).toContain("<hr>");
     expect(backHtml).toContain("<mark>highlighted</mark>");
     expect(backHtml).toContain("<pre>");

@@ -68,6 +68,12 @@ export function stripTrailingAuthoringNodes(nodes: Content[]): Content[] {
       continue;
     }
 
+    // Trailing --- used as Obsidian section chrome (not mid-answer content)
+    if (last.type === "thematicBreak") {
+      result.pop();
+      continue;
+    }
+
     break;
   }
 

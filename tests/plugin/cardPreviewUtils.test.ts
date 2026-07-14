@@ -6,15 +6,18 @@ import {
 	buildHeadingBadgeModel,
 	computeContentCacheKey,
 	formatCardPreviewTooltip,
+	formatProblemForHeadingContext,
 	frontmatterFromObsidianMetadata,
 	hashString,
 	outcomeToBadgeClass,
 	pickPreviewMessage,
 	shouldRebuildCardPreviewDecorations,
+	stripCanonicalOutcomeSuffix,
 	zipCardsToHeadings,
 } from '../../plugin/src/cardPreviewUtils';
 import {
 	builtinCardType,
+	customCardType,
 	type CardMessage,
 	type ResolvedCard,
 } from '../../src/cardSyntax/types';
@@ -70,22 +73,161 @@ describe('cardPreviewUtils', () => {
 		expect(pickPreviewMessage([{ level: 'warn', text: 'warn' }])).toBe('warn');
 	});
 
-	test('formatCardPreviewTooltip uses structured multi-line type and problem lines', () => {
+	test('stripCanonicalOutcomeSuffix removes trailing outcome markers only', () => {
 		expect(
-			formatCardPreviewTooltip({
-				resolvedType: builtinCardType('cloze'),
-				messages: [{ level: 'warn', text: 'Bare {{}} in text' }],
-			}),
-		).toBe('Type: cloze\nProblem: Bare {{}} in text');
+			stripCanonicalOutcomeSuffix(
+				'Card "A2": basic card missing ::: delimiter — skipped',
+			),
+		).toBe('Card "A2": basic card missing ::: delimiter');
+		expect(
+			stripCanonicalOutcomeSuffix('Card "A3": {{username}} treated as literal — warning'),
+		).toBe('Card "A3": {{username}} treated as literal');
+		expect(stripCanonicalOutcomeSuffix('Conflict — error')).toBe('Conflict');
+		expect(stripCanonicalOutcomeSuffix('do not strip — skipped mid — keep')).toBe(
+			'do not strip — skipped mid — keep',
+		);
+		expect(stripCanonicalOutcomeSuffix('plain message')).toBe('plain message');
 	});
 
-	test('formatCardPreviewTooltip omits problem line when there are no messages', () => {
+	test('formatCardPreviewTooltip is Type only for healthy sync', () => {
 		expect(
 			formatCardPreviewTooltip({
 				resolvedType: builtinCardType('basic'),
 				messages: [],
+				outcome: 'sync',
 			}),
 		).toBe('Type: basic');
+	});
+
+	test('formatCardPreviewTooltip uses Situation and Problem for skip', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				outcome: 'skip',
+				messages: [
+					{
+						level: 'skip',
+						text: 'Card "A2 Basic SKIP No Delimiter": basic card missing ::: delimiter — skipped',
+					},
+				],
+			}),
+		).toBe(
+			[
+				'Type: basic',
+				'Situation: skipped',
+				'Problem: Card "A2 Basic SKIP No Delimiter": basic card missing ::: delimiter',
+			].join('\n'),
+		);
+	});
+
+	test('formatCardPreviewTooltip uses Situation and Warning for warn', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				outcome: 'sync',
+				messages: [
+					{
+						level: 'warn',
+						text: 'Card "A3 Basic WARN Bare Mustache": {{username}} treated as literal on basic card — warning',
+					},
+				],
+			}),
+		).toBe(
+			[
+				'Type: basic',
+				'Situation: warning',
+				'Warning: Card "A3 Basic WARN Bare Mustache": {{username}} treated as literal on basic card',
+			].join('\n'),
+		);
+	});
+
+	test('formatCardPreviewTooltip keeps Warning label when warn has no suffix', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('cloze'),
+				outcome: 'sync',
+				messages: [{ level: 'warn', text: 'Bare {{}} in text' }],
+			}),
+		).toBe('Type: cloze\nSituation: warning\nWarning: Bare {{}} in text');
+	});
+
+	test('formatCardPreviewTooltip uses Situation and Problem for error', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				outcome: 'error',
+				messages: [
+					{
+						level: 'error',
+						text: 'Card "F1": :::r conflicts with resolved type "basic" — error',
+					},
+				],
+			}),
+		).toBe(
+			[
+				'Type: basic',
+				'Situation: error',
+				'Problem: Card "F1": :::r conflicts with resolved type "basic"',
+			].join('\n'),
+		);
+	});
+
+	test('formatCardPreviewTooltip uses noteType wording for custom types', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: customCardType('Vocab'),
+				outcome: 'sync',
+				messages: [{ level: 'warn', text: 'Unknown custom field' }],
+			}),
+		).toBe('Type: noteType: Vocab\nSituation: warning\nWarning: Unknown custom field');
+	});
+
+	test('formatCardPreviewTooltip uses Situation and Info for info-only', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				outcome: 'sync',
+				messages: [{ level: 'info', text: 'Resolved cloze inherited from section' }],
+			}),
+		).toBe(
+			['Type: basic', 'Situation: info', 'Info: Resolved cloze inherited from section'].join(
+				'\n',
+			),
+		);
+	});
+
+	test('formatCardPreviewTooltip prefers error over warn for Situation and detail', () => {
+		expect(
+			formatCardPreviewTooltip({
+				resolvedType: builtinCardType('basic'),
+				outcome: 'sync',
+				messages: [
+					{ level: 'warn', text: 'warn — warning' },
+					{ level: 'error', text: 'bad conflict — error' },
+				],
+			}),
+		).toBe('Type: basic\nSituation: error\nProblem: bad conflict');
+	});
+
+	test('formatProblemForHeadingContext strips canonical outcome suffixes', () => {
+		expect(
+			formatProblemForHeadingContext({
+				level: 'skip',
+				text: 'Card "A2": basic card missing ::: delimiter — skipped',
+			}),
+		).toBe('Localized line issue: Card "A2": basic card missing ::: delimiter');
+		expect(
+			formatProblemForHeadingContext({
+				level: 'warn',
+				text: 'Card has inconsistent structure — warning',
+			}),
+		).toBe('Summary issue: Card has inconsistent structure');
+		expect(
+			formatProblemForHeadingContext({
+				level: 'error',
+				text: 'Delimiter conflict on this line — error',
+			}),
+		).toBe('Localized line issue: Delimiter conflict on this line');
 	});
 
 	test('zipCardsToHeadings pairs by document order up to the shorter list', () => {

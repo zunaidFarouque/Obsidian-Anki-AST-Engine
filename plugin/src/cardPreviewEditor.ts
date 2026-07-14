@@ -27,6 +27,7 @@ import {
 } from './cardPreviewUtils';
 import {
 	cardFollowsSectionHeading,
+	isBlankDocumentLine,
 	shouldPaintInterCardTail,
 } from './cardPreviewLayout';
 
@@ -317,7 +318,12 @@ export function buildCardPreviewDecorations(
 		const sectionStart =
 			sectionTopExtend > 0 &&
 			cardFollowsSectionHeading(lines, heading.from, headingLevel);
-		const paintTail = shouldPaintInterCardTail(index < pairs.length - 1, interCardGapEm);
+		const nextLineAfterCard = lines.find((line) => line.from >= cardBlockEndOffset);
+		const paintTail = shouldPaintInterCardTail(
+			index < pairs.length - 1,
+			interCardGapEm,
+			nextLineAfterCard == null || isBlankDocumentLine(nextLineAfterCard.text),
+		);
 		const lastCoveredLineStart = coveredLineStarts[coveredLineStarts.length - 1];
 
 		for (const lineStart of coveredLineStarts) {

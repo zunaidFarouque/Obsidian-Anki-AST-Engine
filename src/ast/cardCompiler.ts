@@ -105,6 +105,16 @@ const compiler = unified()
         state.patch(node, result);
         return state.applyData(node, result);
       },
+      table(state: State, node: Parents): Element {
+        const result: Element = {
+          type: "element",
+          tagName: "table",
+          properties: { className: ["anki-md-table"] },
+          children: state.all(node),
+        };
+        state.patch(node, result);
+        return state.applyData(node, result);
+      },
     },
   } as Parameters<typeof remarkRehype>[0])
   .use(rehypeStringify, { allowDangerousHtml: true });

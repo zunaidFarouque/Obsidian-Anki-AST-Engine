@@ -126,26 +126,69 @@ export function computePreviewOutcomeClass(
 }
 
 export function pickPreviewMessage(messages: CardMessage[]): string | undefined {
+	return pickPrimaryPreviewMessage(messages)?.text;
+}
+
+export function pickPrimaryPreviewMessage(
+	messages: CardMessage[],
+): CardMessage | undefined {
 	const priority: CardMessage['level'][] = ['error', 'warn', 'skip', 'info'];
 	for (const level of priority) {
 		const message = messages.find((entry) => entry.level === level);
 		if (message) {
-			return message.text;
+			return message;
 		}
 	}
 	return undefined;
 }
 
+const CANONICAL_OUTCOME_SUFFIX = / — (skipped|warning|error)$/;
+
+export function stripCanonicalOutcomeSuffix(text: string): string {
+	return text.replace(CANONICAL_OUTCOME_SUFFIX, '');
+}
+
+function situationLabelForMessage(level: CardMessage['level']): string {
+	switch (level) {
+		case 'skip':
+			return 'skipped';
+		case 'warn':
+			return 'warning';
+		case 'error':
+			return 'error';
+		case 'info':
+			return 'info';
+	}
+}
+
+function detailLabelForMessage(level: CardMessage['level']): string {
+	switch (level) {
+		case 'warn':
+			return 'Warning';
+		case 'info':
+			return 'Info';
+		case 'error':
+		case 'skip':
+			return 'Problem';
+	}
+}
+
 export function formatCardPreviewTooltip(card: {
 	resolvedType: ResolvedCardType;
 	messages: CardMessage[];
+	outcome?: SyncOutcome;
 }): string {
 	const typeLabel = formatPreviewTypeLabel(card.resolvedType);
-	const message = pickPreviewMessage(card.messages);
 	const lines = [`Type: ${typeLabel}`];
-	if (message) {
-		lines.push(`Problem: ${message}`);
+	const primary = pickPrimaryPreviewMessage(card.messages);
+	if (!primary) {
+		return lines.join('\n');
 	}
+
+	lines.push(`Situation: ${situationLabelForMessage(primary.level)}`);
+	lines.push(
+		`${detailLabelForMessage(primary.level)}: ${stripCanonicalOutcomeSuffix(primary.text)}`,
+	);
 	return lines.join('\n');
 }
 
@@ -157,24 +200,21 @@ function formatPreviewTypeLabel(type: ResolvedCardType): string {
 }
 
 export function formatProblemForHeadingContext(message: CardMessage): string {
+	const text = stripCanonicalOutcomeSuffix(message.text);
 	const localizedPattern = /\b(delimiter|line|field|token)\b/i;
-	if (localizedPattern.test(message.text)) {
-		return `Localized line issue: ${message.text}`;
+	if (localizedPattern.test(text)) {
+		return `Localized line issue: ${text}`;
 	}
-	return `Summary issue: ${message.text}`;
+	return `Summary issue: ${text}`;
 }
 
 export function buildLightweightTooltip(card: {
 	resolvedType: ResolvedCardType;
 	messages: CardMessage[];
 	resolvedFrom: string;
+	outcome?: SyncOutcome;
 }): string {
-	const lines: string[] = [];
-	const problem = pickPreviewMessage(card.messages);
-	if (problem) {
-		lines.push(`Problems: ${problem}`);
-	}
-	lines.push(`Type: ${formatPreviewTypeLabel(card.resolvedType)}`);
+	const lines = [formatCardPreviewTooltip(card)];
 	lines.push(`Resolved from: ${card.resolvedFrom}`);
 	return lines.join('\n');
 }

@@ -79,9 +79,10 @@ Back line two`,
 		expect(
 			formatCardPreviewTooltip({
 				resolvedType: customCardType('Vocab'),
+				outcome: 'sync',
 				messages: [{ level: 'warn', text: 'Unknown custom field' }],
 			}),
-		).toBe('Type: noteType: Vocab\nProblem: Unknown custom field');
+		).toBe('Type: noteType: Vocab\nSituation: warning\nWarning: Unknown custom field');
 	});
 
 	test('editor body without YAML parses as sync-eligible via externalFrontmatter', () => {

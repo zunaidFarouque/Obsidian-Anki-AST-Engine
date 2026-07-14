@@ -7,6 +7,7 @@ import {
 	formatCardPreviewInterCardGap,
 	formatCardPreviewSectionTopExtend,
 	parseMarkdownHeadingLevel,
+	isBlankDocumentLine,
 } from '../../plugin/src/cardPreviewLayout';
 import type { DocumentLine } from '../../plugin/src/cardPreviewUtils';
 import type { AnkiAstSyncSettings } from '../../plugin/src/settings';
@@ -43,6 +44,22 @@ describe('cardPreviewLayout', () => {
 		expect(shouldPaintInterCardTail(true, 0.28)).toBe(true);
 		expect(shouldPaintInterCardTail(true, 0)).toBe(false);
 		expect(shouldPaintInterCardTail(false, 0.28)).toBe(false);
+	});
+
+	test('shouldPaintInterCardTail skips when next line is non-blank (e.g. anki-id)', () => {
+		expect(shouldPaintInterCardTail(true, 0.28, true)).toBe(true);
+		expect(shouldPaintInterCardTail(true, 0.28, false)).toBe(false);
+		expect(isBlankDocumentLine('')).toBe(true);
+		expect(isBlankDocumentLine('<!--anki-id: 55b5de48-795e-4722-915d-7b6e9c24e203-->')).toBe(
+			false,
+		);
+		expect(
+			shouldPaintInterCardTail(
+				true,
+				0.28,
+				isBlankDocumentLine('<!--anki-id: 55b5de48-795e-4722-915d-7b6e9c24e203-->'),
+			),
+		).toBe(false);
 	});
 
 	test('section-start overlay extends cardblock ::before upward on heading lines', () => {
@@ -221,6 +238,67 @@ describe('cardPreviewLayout', () => {
 			expect(rule).toBeDefined();
 			expect(rule).toMatch(/width:\s*max-content/);
 			expect(rule).toMatch(/white-space:\s*pre-line/);
+		});
+	});
+
+	describe('card-block table underlay', () => {
+		const cssPath = join(import.meta.dir, '../../plugin/styles.css');
+		const css = () => readFileSync(cssPath, 'utf8');
+
+		test('table widget underlay uses adjacent-sibling selector (not nested in cm-line)', () => {
+			const stylesheet = css();
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget\s*\{/s,
+			);
+			expect(stylesheet).not.toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s+\.cm-table-widget\s*\{/s,
+			);
+			const widgetRule = stylesheet.match(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget\s*\{[^}]+\}/s,
+			)?.[0];
+			expect(widgetRule).toBeDefined();
+			expect(widgetRule).toMatch(/--anki-cardblock-paint:/);
+			expect(widgetRule).toMatch(/position:\s*relative/);
+		});
+
+		test('table underlay paints on embed widget with positive bleed inset (no overflow)', () => {
+			const stylesheet = css();
+			expect(stylesheet).not.toMatch(
+				/\.cm-table-widget\s*>\s*\.table-wrapper::before/,
+			);
+			const beforeRule = stylesheet.match(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget::before\s*\{[^}]+\}/s,
+			)?.[0];
+			expect(beforeRule).toBeDefined();
+			expect(beforeRule).toMatch(/background:\s*var\(--anki-cardblock-paint\)/);
+			expect(beforeRule).toMatch(/pointer-events:\s*none/);
+			expect(beforeRule).toMatch(/z-index:\s*0/);
+			expect(beforeRule).toMatch(
+				/left:\s*var\(--anki-card-preview-block-bleed-x\)/,
+			);
+			expect(beforeRule).toMatch(
+				/right:\s*var\(--anki-card-preview-block-bleed-x\)/,
+			);
+			expect(beforeRule).not.toMatch(/calc\(-1 \* var\(--anki-card-preview-block-bleed-x\)\)/);
+		});
+
+		test('table underlay rules do not change table layout', () => {
+			const stylesheet = css();
+			const tableRules = [
+				stylesheet.match(
+					/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget\s*\{[^}]+\}/s,
+				)?.[0],
+				stylesheet.match(
+					/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.cm-table-widget::before\s*\{[^}]+\}/s,
+				)?.[0],
+			];
+			for (const rule of tableRules) {
+				expect(rule).toBeDefined();
+				expect(rule).not.toMatch(/\bpadding\s*:/);
+				expect(rule).not.toMatch(/\bmargin\s*:/);
+				expect(rule).not.toMatch(/\bwidth\s*:/);
+			}
+			expect(tableRules[0]).not.toMatch(/\bborder(-left|-right|-top|-bottom)?\s*:/);
 		});
 	});
 

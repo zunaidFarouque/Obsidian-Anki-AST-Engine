@@ -31,28 +31,34 @@ function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
 }
 
 describe('card preview tooltip + modal content', () => {
-	test('lightweight tooltip keeps problems first then type and resolvedFrom', () => {
+	test('lightweight tooltip shares hover Type/Situation/detail then resolvedFrom', () => {
 		const tooltip = buildLightweightTooltip(
 			makeCard({
 				resolvedType: builtinCardType('typed'),
 				resolvedFrom: 'inherited from ### Section',
-				messages: [{ level: 'warn', text: 'Typed answer has formatting' }],
+				outcome: 'sync',
+				messages: [{ level: 'warn', text: 'Typed answer has formatting — warning' }],
 			}),
 		);
 
 		expect(tooltip).toBe(
-			'Problems: Typed answer has formatting\nType: typed\nResolved from: inherited from ### Section',
+			[
+				'Type: typed',
+				'Situation: warning',
+				'Warning: Typed answer has formatting',
+				'Resolved from: inherited from ### Section',
+			].join('\n'),
 		);
 	});
 
 	test('heading messaging distinguishes summary vs localized delimiter issues', () => {
 		const localized: CardMessage = {
 			level: 'error',
-			text: 'Delimiter conflict on this line',
+			text: 'Delimiter conflict on this line — error',
 		};
 		const summary: CardMessage = {
 			level: 'warn',
-			text: 'Card has inconsistent structure',
+			text: 'Card has inconsistent structure — warning',
 		};
 
 		expect(formatProblemForHeadingContext(localized)).toBe(

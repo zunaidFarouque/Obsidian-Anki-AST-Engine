@@ -1,0 +1,29 @@
+/* Paste into Anki: Tools → Manage Note Types → Basic → Cards → Styling */
+
+.anki-md-table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 0.5em 0;
+}
+
+.anki-md-table th,
+.anki-md-table td {
+	border: 1px solid #ccc;
+	padding: 0.4em 0.6em;
+	text-align: left;
+	vertical-align: top;
+}
+
+.anki-md-table th {
+	background: rgba(0, 0, 0, 0.08);
+	font-weight: 600;
+}
+
+.nightMode .anki-md-table th {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.nightMode .anki-md-table th,
+.nightMode .anki-md-table td {
+	border-color: #555;
+}

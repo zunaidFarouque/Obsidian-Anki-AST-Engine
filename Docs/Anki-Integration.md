@@ -54,6 +54,7 @@ Optional styling for compiled HTML:
 
 - **Math** — MathJax (default on Anki 2.1.20+ desktop).
 - **Callouts** — add CSS for `.callout`, `.callout-tip`, etc. in Basic card styling.
+- **Tables** — compiled tables use `class="anki-md-table"`. Paste [`templates/anki-basic-table.css`](../templates/anki-basic-table.css) into Basic card styling (or add your own rules for `.anki-md-table`).
 - **Highlights** — `<mark>` renders with default browser/Anki styling.
 
 ### Decks

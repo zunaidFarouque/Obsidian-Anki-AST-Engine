@@ -107,7 +107,7 @@ Layout spacing is **overlay-only**: pseudo-elements on decorated `cm-line` nodes
 
 Settings sync to `:root` via `plugin/src/cardPreviewLayout.ts` (`applyCardPreviewLayoutCssVariables`). Snippets may override the CSS variables directly.
 
-**Sync content boundary:** Preview tint follows `ResolvedCard.range`, which ends at learner-facing content only. Trailing authoring lines (`%% … %%`, `<!-- … -->` except binding metadata) are outside the envelope — see [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
+**Sync content boundary:** Preview tint follows `ResolvedCard.range`, which ends at learner-facing content only. Outside the envelope: trailing authoring lines (`%% … %%`, non-binding `<!-- … -->`, binding `<!--anki-id-->`), trailing blank lines, and trailing section separators (`---` / thematic breaks) — including mixed tails of separators + comments only. Mid-card `---` between real paragraphs stays inside. See [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
 
 ### 5.3 Sync marker options
 
@@ -130,7 +130,15 @@ If a card has warnings/errors, that section appears first in tooltip and modal.
 
 ### 5.5 Tooltip and modal structure
 
-**Lightweight tooltip (hover/focus):** problems (if any) + one-line type + `resolvedFrom`.
+**Lightweight tooltip (hover/focus):**
+
+1. `Type: <resolved type>` (always)
+2. `Situation: <state>` when the card has a primary message (`skipped` / `warning` / `error` / `info`)
+3. Severity-labeled detail for that one primary message (`Problem:` / `Warning:` / `Info:`)
+
+Presentation strips trailing canonical engine suffixes (` — skipped` / ` — warning` / ` — error`) so Situation and badge state are not repeated. Canonical engine message strings themselves are unchanged.
+
+Healthy sync with no messages is Type only. Hover stays short; `resolvedFrom` and the full message list live in the modal.
 
 **“More” modal (lazy-loaded):** full content in this order:
 
@@ -424,3 +432,4 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 | 2026-06-30 | Verification pass: per-type structure text, conflict matrix, BAS-04/CLZ back rules, heading vs line indicators, DEL-08 vs first-delimiter guides, file-level states, accessibility |
 | 2026-06-30 | §5.2.2 overlay-only envelope: section-top extend + inter-card tail mask; settings `cardPreviewSectionTopExtend`, `cardPreviewInterCardGapEm` |
 | 2026-06-30 | Sync content boundary: authoring `%%` / `<!-- -->` lines excluded from envelope tint |
+| 2026-07-15 | Sync content boundary: trailing `---` / thematic breaks (alone or with comment tails) excluded from envelope tint |

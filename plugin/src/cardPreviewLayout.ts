@@ -39,11 +39,26 @@ export function cardFollowsSectionHeading(
 	return priorHeadingLevel !== null && priorHeadingLevel < cardDeclarationHeadingLevel;
 }
 
+/**
+ * Inter-card gap mask (::after on last card line) must only paint into empty space.
+ * If authoring (`<!--anki-id-->`, etc.) sits on the immediate next line, the opaque
+ * primary mask overlaps and half-hides that line (debug H10).
+ */
 export function shouldPaintInterCardTail(
 	hasFollowingCard: boolean,
 	interCardGapEm: number,
+	nextLineIsBlank = true,
 ): boolean {
-	return hasFollowingCard && Number.isFinite(interCardGapEm) && interCardGapEm > 0;
+	return (
+		hasFollowingCard &&
+		Number.isFinite(interCardGapEm) &&
+		interCardGapEm > 0 &&
+		nextLineIsBlank
+	);
+}
+
+export function isBlankDocumentLine(text: string): boolean {
+	return text.trim().length === 0;
 }
 
 export function formatCardPreviewInterCardGap(settings: AnkiAstSyncSettings): string {
