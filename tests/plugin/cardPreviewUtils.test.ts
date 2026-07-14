@@ -278,6 +278,65 @@ describe('cardPreviewUtils', () => {
 		});
 	});
 
+	test('buildDelimiterLineDecorations garnishes plain ::: for tag-resolved reversible and typed', () => {
+		expect(
+			buildDelimiterLineDecorations(
+				makeCard({
+					resolvedType: builtinCardType('reversible'),
+					regions: {
+						delimiters: [{ kind: ':::', range: { start: 10, end: 13 } }],
+					},
+				}),
+			)[0],
+		).toMatchObject({ isPrimary: true, garnishText: '↑↓' });
+
+		expect(
+			buildDelimiterLineDecorations(
+				makeCard({
+					resolvedType: builtinCardType('typed'),
+					regions: {
+						delimiters: [{ kind: ':::', range: { start: 10, end: 13 } }],
+					},
+				}),
+			)[0],
+		).toMatchObject({ isPrimary: true, garnishText: '⌨' });
+	});
+
+	test('buildDelimiterLineDecorations garnishes :::t for typed and skips mismatched kinds', () => {
+		expect(
+			buildDelimiterLineDecorations(
+				makeCard({
+					resolvedType: builtinCardType('typed'),
+					regions: {
+						delimiters: [{ kind: ':::t', range: { start: 10, end: 14 } }],
+					},
+				}),
+			)[0],
+		).toMatchObject({ isPrimary: true, garnishText: '⌨' });
+
+		expect(
+			buildDelimiterLineDecorations(
+				makeCard({
+					resolvedType: builtinCardType('basic'),
+					regions: {
+						delimiters: [{ kind: ':::', range: { start: 10, end: 13 } }],
+					},
+				}),
+			)[0]?.garnishText,
+		).toBeUndefined();
+
+		expect(
+			buildDelimiterLineDecorations(
+				makeCard({
+					resolvedType: builtinCardType('reversible'),
+					regions: {
+						delimiters: [{ kind: ':::t', range: { start: 10, end: 14 } }],
+					},
+				}),
+			)[0]?.garnishText,
+		).toBeUndefined();
+	});
+
 	test('buildClozeTokenDecorations highlights text-region cloze with stable palette index', () => {
 		const content = '#### Card\n{{c1::one}} and {{c5::two}}\n:::\n{{c1::back}}\n';
 		const textEnd = content.indexOf('\n:::');

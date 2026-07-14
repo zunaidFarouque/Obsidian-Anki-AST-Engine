@@ -333,10 +333,11 @@ function delimiterGarnish(card: ResolvedCard, kind: DelimiterKind): string | und
 	if (card.resolvedType.kind !== 'builtin') {
 		return undefined;
 	}
-	if (card.resolvedType.type === 'reversible' && kind === ':::r') {
+	// Tag-resolved reversible/typed use plain :::; :::r / :::t also accepted (§5.7).
+	if (card.resolvedType.type === 'reversible' && (kind === ':::' || kind === ':::r')) {
 		return '↑↓';
 	}
-	if (card.resolvedType.type === 'typed' && kind === ':::t') {
+	if (card.resolvedType.type === 'typed' && (kind === ':::' || kind === ':::t')) {
 		return '⌨';
 	}
 	if (card.resolvedType.type === 'cloze' && kind === ':::') {
