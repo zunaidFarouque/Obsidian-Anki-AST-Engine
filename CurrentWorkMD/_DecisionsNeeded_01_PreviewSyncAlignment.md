@@ -18,6 +18,8 @@ Your stated principle: *If the UI means something to the user, logic must match.
 
 ---
 
+
+
 ## D1 — Core alignment principle
 
 **BLOCK**
@@ -33,17 +35,21 @@ When preview shows an outcome chip (sync / skip / warn / error), what must sync 
 The {{c1::powerhouse}} of the cell.
 ```
 
-| Layer | Current behavior |
-|-------|------------------|
-| Preview | Chip: `cloze` (sync tint) |
-| Sync | Creates/updates **Basic** note; `{{c1::…}}` may appear literally in Front |
 
-- [ ] **Option A — Strict mirror:** Preview outcome is authoritative. `skip`/`error` never sync. `warn` syncs but surfaces warnings in sync results. `sync` uses the resolved type (cloze, reversible, etc.).
+| Layer   | Current behavior                                                          |
+| ------- | ------------------------------------------------------------------------- |
+| Preview | Chip: `cloze` (sync tint)                                                 |
+| Sync    | Creates/updates **Basic** note; `{{c1::…}}` may appear literally in Front |
+
+
+- [x] **Option A — Strict mirror:** Preview outcome is authoritative. `skip`/`error` never sync. `warn` syncs but surfaces warnings in sync results. `sync` uses the resolved type (cloze, reversible, etc.).
 - [ ] **Option B — Block on bad, allow type lag:** `skip`/`error` never sync; `warn`/`sync` sync today as Basic until multi-type sync ships (preview may show wrong type temporarily).
 - [ ] **Option C — Preview is advisory only:** Sync always attempts Basic extraction; preview is author guidance only (document the mismatch).
 - [ ] **Other (write below):** ___
 
 ---
+
+
 
 ## D2 — Skip and error must block sync
 
@@ -64,17 +70,23 @@ Answer
 
 (No `#anki/cardType/reversible` — resolved **basic** + `:::r` → preview **error** BAS-06)
 
-| Layer | Current behavior |
-|-------|------------------|
-| Preview | `basic ❌` |
-| Sync | Still splits at `:::` and syncs as Basic; stray `r` may appear in Back |
+
+| Layer   | Current behavior                                                       |
+| ------- | ---------------------------------------------------------------------- |
+| Preview | `basic ❌`                                                              |
+| Sync    | Still splits at `:::` and syncs as Basic; stray `r` may appear in Back |
+
 
 - [ ] **Option A — Hard block:** `skip` and `error` cards are excluded from sync entirely (no add/update).
 - [ ] **Option B — Block error only:** `error` blocks; `skip` still syncs (not recommended — contradicts chip).
 - [ ] **Option C — Soft block:** Sync runs but shows a confirmation / dry-run warning for mismatched cards.
-- [ ] **Other (write below):** ___
+- [x] **Other (write below):**   
+
+YOUR UNDERSTANDING HAS PROBLEMS. `:::r` means that it will be a reversible card even if explicitly not mentioned with tags. I am assuming another major error for a valid error case. it will Hard block. so option A.
 
 ---
+
+
 
 ## D3 — Warn vs sync
 
@@ -91,17 +103,21 @@ If preview shows **warn** (e.g. `{{c1::x}}` on a basic card with default setting
 The {{c1::answer}} is here.
 ```
 
-| Layer | Current behavior |
-|-------|------------------|
-| Preview | `basic ⚠️` (BAS-04 — literal cloze on basic) |
-| Sync | Syncs as Basic; cloze syntax in Front HTML |
 
-- [ ] **Option A — Warn syncs:** Proceed; include warning in sync results modal.
+| Layer   | Current behavior                             |
+| ------- | -------------------------------------------- |
+| Preview | `basic ⚠️` (BAS-04 — literal cloze on basic) |
+| Sync    | Syncs as Basic; cloze syntax in Front HTML   |
+
+
+- [x] **Option A — Warn syncs:** Proceed; include warning in sync results modal.
 - [ ] **Option B — Warn blocks until fixed:** Treat as skip until author fixes or enables a setting (see D4).
 - [ ] **Option C — Depends on warning rule:** Some warns sync, some skip (list rules in notes).
 - [ ] **Other (write below):** ___
 
 ---
+
+
 
 ## D4 — `inferClozeFromManualSyntaxOnBasic` setting
 
@@ -118,23 +134,27 @@ Settings label says this toggle “matches sync resolver BAS-04,” but sync doe
 {{c1::Photosynthesis}} in chloroplasts.
 ```
 
-| Setting | Preview | Sync (today) |
-|---------|---------|--------------|
-| `false` (default) | `basic ⚠️` | Basic, literal `{{c1::…}}` |
-| `true` | `cloze` sync | Basic, literal `{{c1::…}}` |
 
-- [ ] **Option A — Affects both:** When enabled, preview **and** sync treat card as cloze (requires cloze Anki model — see file 02).
+| Setting           | Preview      | Sync (today)               |
+| ----------------- | ------------ | -------------------------- |
+| `false` (default) | `basic ⚠️`   | Basic, literal `{{c1::…}}` |
+| `true`            | `cloze` sync | Basic, literal `{{c1::…}}` |
+
+
+- [x] **Option A — Affects both:** When enabled, preview **and** sync treat card as cloze (requires cloze Anki model — see file 02).
 - [ ] **Option B — Preview only:** Rename/describe setting honestly; sync unchanged until multi-type sync.
 - [ ] **Option C — Remove setting:** Always use explicit `#anki/cardType/cloze` or inheritance; no inference toggle.
 - [ ] **Other (write below):** ___
 
 ---
 
+
+
 ## D5 — `:::r` / `:::t` on cards synced as Basic today
 
 **BLOCK**
 
-Sync’s delimiter check matches `:::` via `indexOf`, so `:::r` and `:::t` split like `:::` but can leave **`r`** or **`t`** in the Back field.
+Sync’s delimiter check matches `:::` via `indexOf`, so `:::r` and `:::t` split like `:::` but can leave `r` or `t` in the Back field.
 
 **Why it matters:** Preview shows reversible/typed garnish; sync may produce garbage Back text.
 
@@ -147,17 +167,21 @@ What is ATP?
 Adenosine triphosphate
 ```
 
-| Layer | Current behavior |
-|-------|------------------|
-| Preview | `reversible` (or error if basic) with ↕ garnish on `:::r` |
-| Sync | Basic note; Back may start with `r` then newline, or whole line mishandled |
 
-- [ ] **Option A — Block until typed sync:** Cards with `:::r`/`:::t` are skip/error in sync until reversible/typed models ship (file 02).
+| Layer   | Current behavior                                                           |
+| ------- | -------------------------------------------------------------------------- |
+| Preview | `reversible` (or error if basic) with ↕ garnish on `:::r`                  |
+| Sync    | Basic note; Back may start with `r` then newline, or whole line mishandled |
+
+
+- [x] **Option A — Block until typed sync:** Cards with `:::r`/`:::t` are skip/error in sync until reversible/typed models ship (file 02).
 - [ ] **Option B — Strip suffix:** Treat `:::r`/`:::t` as `:::` for Basic sync and strip trailing `r`/`t` from delimiter line (stopgap).
 - [ ] **Option C — Ignore line:** If resolved type isn’t reversible/typed, treat `:::r`/`:::t` as non-delimiter text (no split).
 - [ ] **Other (write below):** ___
 
 ---
+
+
 
 ## D6 — Sync results must report preview conflicts
 
@@ -168,16 +192,21 @@ When sync and preview would disagree (during any transition period), how should 
 **Why it matters:** Reduces silent wrong notes in Anki.
 
 - [ ] **Option A — Per-card row in sync results:** “Preview: cloze / Synced: Basic”
-- [ ] **Option B — Pre-sync summary dialog:** Count of mismatched cards before run
+- [x] **Option B — Pre-sync summary dialog:** Count of mismatched cards before run
 - [ ] **Option C — No extra UI:** Fix alignment first (D1), no transitional messaging
 - [ ] **Other (write below):** ___
 
 ---
 
+
+
 ## Your notes / questions for me
 
-_Use this space for anything unclear, vault examples, or “decide later” markers._
+*Use this space for anything unclear, vault examples, or “decide later” markers.*
 
 ```
-(your notes here)
+Just a note for you: currently we haven't implemneted typed sync yet. but we will implement now, thats why things maybe not need to be explicitly "Blocked if other type"...
+I think it should just be implemented the typed sync feature, instead of blocking now, implementing later, unblocking after etc.
+one proper change to new implementation
 ```
+

@@ -16,21 +16,25 @@ You said you want non-basic types implemented, not just preview decoration. What
 
 **Why it matters:** Scope drives engineering order and settings UI.
 
-| Type | Preview today | Sync today |
-|------|---------------|------------|
-| basic | ✅ | ✅ Basic model |
-| cloze | ✅ | ❌ Basic only |
-| reversible | ✅ | ❌ Basic only |
-| typed | ✅ | ❌ Basic only |
-| custom | ✅ (needs noteType cache) | ❌ Basic only |
 
-- [ ] **Option A — All built-ins:** basic + cloze + reversible + typed in one pass; custom later.
+| Type       | Preview today            | Sync today    |
+| ---------- | ------------------------ | ------------- |
+| basic      | ✅                        | ✅ Basic model |
+| cloze      | ✅                        | ❌ Basic only  |
+| reversible | ✅                        | ❌ Basic only  |
+| typed      | ✅                        | ❌ Basic only  |
+| custom     | ✅ (needs noteType cache) | ❌ Basic only  |
+
+
+- [x] **Option A — All built-ins:** basic + cloze + reversible + typed in one pass; custom later.
 - [ ] **Option B — Cloze first:** Cloze is highest pain (literal `{{c1::}}` in Anki); others follow.
 - [ ] **Option C — Cloze + reversible:** Typed and custom in phase 2.
 - [ ] **Option D — Full parity:** All built-ins + custom in first pass.
 - [ ] **Other (write below):** ___
 
 ---
+
+
 
 ## D2 — Anki note type name mapping (built-ins)
 
@@ -42,21 +46,25 @@ Spec defaults (Card-Syntax-Spec §2). What are **your** Anki model names?
 
 **Example mapping table — fill in or tick defaults:**
 
-| Internal id | Spec default Anki name | Your Anki model name |
-|-------------|------------------------|----------------------|
-| `basic` | Basic | |
-| `cloze` | Cloze | |
-| `reversible` | Basic (and reversed card) | |
-| `typed` | *(not in spec default table — you choose)* | |
 
-- [ ] **Option A — Use spec defaults** (create models in Anki if missing).
+| Internal id  | Spec default Anki name                     | Your Anki model name |
+| ------------ | ------------------------------------------ | -------------------- |
+| `basic`      | Basic                                      |                      |
+| `cloze`      | Cloze                                      |                      |
+| `reversible` | Basic (and reversed card)                  |                      |
+| `typed`      | *(not in spec default table — you choose)* |                      |
+
+
+- [x] **Option A — Use spec defaults** (create models in Anki if missing).
 - [ ] **Option B — Custom names** (write in table above; plugin needs `anki_noteTypeMap` setting).
 - [ ] **Option C — Single “Obsidian” family** (e.g. `Obsidian Basic`, `Obsidian Cloze`, …).
 - [ ] **Other (write below):** ___
 
-**Typed model name (if you use typed cards):** ___
+**Typed model name (if you use typed cards):** Also know that the users SHOULD HAVE the default anki cards. so sync will simply use the default anki card names. WE MIGHT ADD REMAPPING THEM LATER, but go for least resistance for user - default anki card types should simply work.
 
 ---
+
+
 
 ## D3 — Field mapping per built-in type
 
@@ -75,25 +83,31 @@ The {{c1::mitochondria}} produces ATP.
 Extra diagram link here.
 ```
 
-| Region | Expected Anki field |
-|--------|----------------------|
+
+| Region              | Expected Anki field           |
+| ------------------- | ----------------------------- |
 | Text (before `:::`) | `Text` (cloze deletions here) |
-| After `:::` | `Back Extra` |
+| After `:::`         | `Back Extra`                  |
+
 
 **Basic / reversible / typed — confirm or edit:**
 
-| Type | Text region → | Back region → | Notes |
-|------|---------------|---------------|-------|
-| basic | Front | Back | |
-| reversible | Front | Back | Same fields; Anki generates reverse card |
-| typed | Front | Back (plain text per TYP-03/04) | Strip HTML to plain text |
-| cloze | Text | Back Extra (optional) | |
 
-- [ ] **Option A — Spec mapping as table above**
+| Type       | Text region → | Back region →                   | Notes                                    |
+| ---------- | ------------- | ------------------------------- | ---------------------------------------- |
+| basic      | Front         | Back                            |                                          |
+| reversible | Front         | Back                            | Same fields; Anki generates reverse card |
+| typed      | Front         | Back (plain text per TYP-03/04) | Strip HTML to plain text                 |
+| cloze      | Text          | Back Extra (optional)           |                                          |
+
+
+- [x] **Option A — Spec mapping as table above**
 - [ ] **Option B — Custom field names** (list per type below)
 - [ ] **Other (write below):** ___
 
 ---
+
+
 
 ## D4 — Custom note types (`#anki/noteType/Vocab`)
 
@@ -118,14 +132,16 @@ Powerhouse of the cell; produces ATP.
 The mitochondria in muscle cells are abundant.
 ```
 
-- [ ] **Option A — Phase 2:** Built-ins first; custom cards stay preview-only until cache + sync wired.
+- [x] **Option A — Phase 2:** Built-ins first; custom cards stay preview-only until cache + sync wired.
 - [ ] **Option B — Same pass as built-ins:** Custom included if noteType cache is populated.
 - [ ] **Option C — Custom only for explicit tags:** `#anki/noteType/X` syncs custom; orphan `::: Field` stays skip (CUS-03).
-- [ ] **Other (write below):** ___
+- [x] **Other (write below):** CUSTOM TYPES WILL BE IMPLEMENTED IN FUTURE. THE CARD TYPE COULD BE IDENTIFIED, BUT THERE SHOULD BE WARNING THAT CUSTOM TYPE IS NOT YET IMPLEMENTED 
 
 **Primary custom note types you use (names):** ___
 
 ---
+
+
 
 ## D5 — Auto-create missing Anki models?
 
@@ -135,12 +151,14 @@ If mapped model name doesn’t exist in Anki, should sync create it?
 
 **Why it matters:** `autoCreateDecks` exists today; models are different (fields, templates, cloze type flag).
 
-- [ ] **Option A — Fail with clear error:** “Model Cloze not found — create in Anki or fix map.”
-- [ ] **Option B — Auto-create built-ins only:** Use Anki’s stock templates where possible.
+- [x] **Option A — Fail with clear error:** “Model Cloze not found — create in Anki or fix map.”
+- [x] **Option B — Auto-create built-ins only:** Use Anki’s stock templates where possible.
 - [ ] **Option C — Auto-create all mapped types:** Including custom from cache field list.
-- [ ] **Other (write below):** ___
+- [x] **Other (write below):** Auto create built-ins and fail with clear error for custom. User can opt out from Auto create built-ins using a toggle in settings.
 
 ---
+
+
 
 ## D6 — One card → wrong model already in Anki
 
@@ -154,11 +172,13 @@ If `<!-- anki-id: … -->` links to a Basic note but preview now resolves **cloz
 
 - [ ] **Option A — Block:** Error until user removes id or fixes type manually in Anki.
 - [ ] **Option B — Delete + recreate:** Remove old note, add new (loses review history).
-- [ ] **Option C — Update in place if Anki allows:** Best-effort model change via AnkiConnect.
+- [x] **Option C — Update in place if Anki allows:** Best-effort model change via AnkiConnect.
 - [ ] **Option D — Sync as old model:** Keep Basic until user clears id.
-- [ ] **Other (write below):** ___
+- [x] **Other (write below):** Also show in sync summary that N items have type-migrated
 
 ---
+
+
 
 ## D7 — Typed answer: HTML stripping depth
 
@@ -175,19 +195,24 @@ Capital of France?
 **Paris** with <sub>accent</sub>
 ```
 
-| Layer | Preview | Expected Back value |
-|-------|---------|---------------------|
+
+| Layer   | Preview      | Expected Back value             |
+| ------- | ------------ | ------------------------------- |
 | Preview | `typed` sync | `Paris with accent` or `Paris`? |
 
-- [ ] **Option A — First line, strip all HTML** (spec TYP-04)
-- [ ] **Option B — Strip formatting only, keep text** (`**Paris**` → `Paris`)
+
+- [x] **Option A — First line, strip all HTML** (spec TYP-04)
+- [ ] **Option B — Strip formatting only, keep text** (`**Paris`** → `Paris`)
 - [ ] **Option C — Literal HTML to Anki** (Anki types plain text; may fail matching)
-- [ ] **Other (write below):** ___
+- [x] **Other (write below):** `**Paris** with <sub>accent</sub>` -> `Paris with accent`
 
 ---
+
+
 
 ## Your notes / questions for me
 
 ```
 (your notes here)
 ```
+
