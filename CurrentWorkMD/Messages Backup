@@ -1,0 +1,477 @@
+# Consistency Report: Card-Preview CSS vs Anki Sync
+
+``````
+# Consistency Report: Card-Preview CSS vs Anki Sync
+
+**Repo:** `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine`  
+**Layers compared:**
+- **A** — CSS visualization (`plugin/styles.css` + CM decorations)
+- **B** — Preview / `cardSyntax` resolution (`src/cardSyntax/*`, `plugin/src/cardPreview*.ts`)
+- **C** — Live Anki sync (`src/syncPipeline.ts` → `stateMachine` → `anki/syncEngine.ts`)
+
+---
+
+## 1. Executive summary
+
+**Verdict: Layers A and B are largely consistent with each other; both diverge sharply from Layer C.**
+
+Card preview (badge tint, cardblock outcome classes, delimiter garnishes, cloze hatch colors) is driven by `parseCardDocument` / `cardSyntax` outcomes. Spot-check of `plugin/src/cardPreviewEditor.ts` confirms decorations apply `--${displayOutcome}` and type garnishes from the same `ResolvedCard` model — so **A ↔ B holds**.
+
+Live sync (`runSync`) does **not** import `cardSyntax`. It extracts cards via `extractCards` in `src/parser/stateMachine.ts` and always writes **Basic Front/Back** (`noteModelName` default `"Basic"` in `src/config/configParser.ts`, fields built in `src/anki/syncEngine.ts`). Cloze, reversible, typed, and custom types are resolved and visualized in preview but are **not wired into Anki write-back**.
+
+**Top risk:** A green “Cloze” / “Typed” / “Reversible” badge (outcome ≈ sync) does **not** mean Anki receives that note type. Layout `skip`/`error` in preview also does **not** stop Layer C from writing a Basic note.
+
+---
+
+## 2. Architecture split
+
+```mermaid
+flowchart TB
+  subgraph LayerA ["Layer A — CSS"]
+    CSS["plugin/styles.css<br/>anki-card-preview-*"]
+  end
+
+  subgraph LayerB ["Layer B — Preview / cardSyntax"]
+    PD["parseCardDocument"]
+    TR["typeResolver + layoutValidator"]
+    CP["cardPreviewEditor decorations<br/>badge / cardblock / delimiter / cloze"]
+    PD --> TR --> CP
+    CP --> CSS
+  end
+
+  subgraph LayerC ["Layer C — Anki sync"]
+    SP["syncPipeline.runSync"]
+    SM["parser/stateMachine.extractCards"]
+    CC["compileCardFields → Front/Back HTML"]
+    SE["anki/syncEngine<br/>addNote/updateNoteFields<br/>modelName = noteModelName (Basic)"]
+    SP --> SM --> CC --> SE
+  end
+
+  MD["Markdown note<br/>AnkiSync + H4 + :::"] --> PD
+  MD --> SP
+
+  CP -.->|"NO import"| SP
+  PD -.->|"cardSyntax NOT used by sync"| SP
+```
+
+| Concern | Layer A | Layer B | Layer C |
+|--------|---------|---------|---------|
+| Entry | `styles.css` classes | `plugin/src/cardPreview.ts` → `parseCardDocument` | `plugin/src/syncOrchestrator.ts` → `runSync` |
+| Parser | — | `src/cardSyntax/*` | `src/parser/stateMachine.ts` |
+| Types | Badge text + delimiter garnish + cloze marks (no per-type block tints) | `basic` / `cloze` / `reversible` / `typed` / `custom` | Always Basic Front/Back |
+| Gate | Decorations only if `syncEligible` | `shouldSync(frontmatter)` (`ankisync: true`) | `shouldSyncFile` (same gate) |
+| Outcome vocabulary | `--sync` / `--warn` / `--skip` / `--error` | Same via `SyncOutcome` | add / update / skip / fail (different semantics: duplicates, unchanged fields, etc.) |
+
+**Design doc:** `Docs/DECIDING/Card-Preview-Design-Guidelines.md` describes Layer A/B intent; it does not claim Layer C implements multi-type write-back.
+
+---
+
+## 3. Consistent areas
+
+| Concept | A | B | C | Notes |
+|---------|---|---|---|-------|
+| Frontmatter sync gate | Decorations suppressed when ineligible | `parseCardDocument` → `syncEligible: false` if `ankisync` not true | `shouldSyncFile` skips file | Shared `src/io/frontmatterFilter.ts` |
+| Card declaration heading level | Covered lines under `####` (default) | `cardDeclarationHeadingLevel` (default 4) | Same option passed into `extractCards` | Both read frontmatter / settings |
+| Structural `:::` split existence | Delimiter guide on primary ::: line | Layout expects plain `:::` for basic | `findDelimiterIndex` splits on configured delimiter (default `:::`) | Shared *concept*; typed variants differ (below) |
+| HTML Front/Back envelopes for basic cards | Block tint around heading→body | Resolves text/back regions | Compiles `frontNodes`/`backNodes` to HTML | For plain basic F/B, intent aligns |
+| `<!--anki-id: uuid-->` awareness | Not CSS-visible | Parsed for card identity in cardSyntax | Extracted in stateMachine; drives update vs add | B+C both know IDs; A does not show them |
+| Tags & decks (conceptual presence) | Not CSS | Hashtags / file defaults partially modeled | `file_anki_tags`, `target_anki_deck`, heading tag, UUID tags written | Data exists on sync; preview does not decorate it |
+| Outcome vocabulary (names) | `--sync/warn/skip/error` | Same enum + messages | Different action enum, but “skip” exists | Names overlap; **meaning** of skip diverges |
+| Mid-HR / tables / section-start / inter-card gap | CSS + layout helpers | Covered-line painting in editor | Sync ignores presentation | Consistent that these are **preview-only chrome** |
+
+**A ↔ B alignment (spot-check):** In `buildCardPreviewDecorations`, each covered line gets `anki-card-preview-cardblock--${badgeModel.displayOutcome}`; badges use the same `displayOutcome` from `effectivePreviewOutcome(card)`. Cloze marks require `resolvedType.type === 'cloze'`. Delimiter garnish classes (`--info` / `--typed` / `--reversible`) come from `buildDelimiterLineDecorations` → `buildDelimiterGuideClasses`. **Layer A faithfully paints Layer B.**
+
+---
+
+## 4. Inconsistent / divergent areas
+
+| User-visible claim | Layer A+B | Layer C | Impact |
+|--------------------|-----------|---------|--------|
+| Badge “Cloze” (often with sync tint) | Type resolved; cloze tokens colored; may outcome=`sync` | Writes Basic note; `{{cN::…}}` compiled as ordinary HTML in Front/Back | User believes cloze note type will exist in Anki |
+| Badge “Reversible” + ↑↓ garnish on `:::` / `:::r` | Builtin reversible | Basic Front/Back only — no reverse card generation | Reverse cards never created |
+| Badge “Typed” + ⌨ garnish on `:::` / `:::t` | Builtin typed + typed-layout warnings | Basic Front/Back; typed answer not special-cased | No type-in answer model |
+| Badge “Custom … note type” | Resolves `#anki/noteType/…` / field blocks | Still `modelName: config.noteModelName` (Basic) with only Front/Back | Custom models never selected |
+| Outcome `skip` / `error` (layout rules BAS-01, CLZ-01, CLZ-11, etc.) | Tint + badge suffix ⛔/❌; implies will not sync | `layoutValidator` **not** consulted; card still queued for add/update | False confidence that bad layouts are blocked |
+| `:::r` / `:::t` lines | First-class delimiter kinds in cardSyntax | `delimiterCheck` matches `:::` via `indexOf(":::")`, so `:::r` splits after `:::`; suffix `r`/`t` can leak into Back | Preview treats as typed delimiter; sync may leave letter remnant |
+| Manual `{{}}` on basic + `inferClozeFromManualSyntaxOnBasic` | Preview reclassifies as cloze (settings toggle in `plugin/src/settings.ts`) | Sync never switches model; literals remain in Basic fields | Setting name promises sync behavior; only affects preview |
+| Preview outcome `warn` | Yellow tint; still “will sync” semantics for B | Sync may succeed without surfacing those warnings | Warnings are authoring-only |
+| Reading mode | Partial `.markdown-preview-view` badge CSS in `styles.css` | N/A | Styles exist but **no** `registerMarkdownPostProcessor` — Reading Mode unwired (`cardPreview.ts` only registers editor extension) |
+
+---
+
+## 5. CSS-only concepts (visualized; not in sync)
+
+| Concept | CSS / decoration | Sync role |
+|---------|------------------|-----------|
+| Outcome block tints (`--sync/warn/skip/error`) | Cardblock + badge | Sync does not use these outcomes |
+| Delimiter guides + info/typed/reversible garnishes | `anki-card-preview-delimiter-guide--*` | No Anki effect |
+| Extra-delimiter discouragement | `delimiter-extra` + tooltip | Sync may still treat content after first `:::` as Back |
+| Cloze hatch + 4 group palette colors | `anki-card-preview-cloze-group-1..4` | Not cloze note sync |
+| Section-start top extend | `--anki-card-preview-section-top-extend` | Presentation only |
+| Inter-card gap tail mask | `--anki-card-preview-inter-card-gap` | Presentation only |
+| Mid-HR sibling underlay | `before-mid-hr` + `.hr.cm-line` rules | Presentation only |
+| Table sibling underlay | `.cm-table-widget` rules | Presentation only |
+| Badge style subtle/explicit, sync marker emojis | Settings → CSS vars / labels | Presentation only |
+| Reading-mode badge rules | `.markdown-preview-view …` | Dead path until post-processor exists |
+| Per-type block tints | Intentionally absent (type via badge + garnish) | N/A |
+
+---
+
+## 6. Sync-only concepts (written to Anki; not reflected in CSS)
+
+| Concept | Layer C location | Layer A/B |
+|---------|------------------|-----------|
+| Always Basic Front/Back fields | `syncEngine.buildSyncFields`, `noteModelName` | Preview shows multi-type |
+| Deck targeting | `getTargetAnkiDeck` / `target_anki_deck` | No deck chip/tint |
+| File + engine + UUID tags | `getFileAnkiTags`, `buildAnkiTags`, `syncTagPrefix` | No tag decoration |
+| Anki ID inject / update path | `<!--anki-id-->` + injection offsets | No ID glyph/status |
+| Vault front collisions / duplicate recovery | `detectVaultFrontCollisions`, relink notices | Preview does not warn of vault collisions |
+| Dry-run parity vs Anki | `applyDryRunParity` | Preview has no Anki round-trip |
+| Media upload / embed resolution | sync payload media plans | Not in cardblock CSS |
+| Scoped footnotes | `buildFootnoteScopeIndex` in syncPipeline | Not visualized |
+| Orphan detection / ignore tag | orphan settings + flow | Not in preview |
+| Runtime skip reasons (`vault_duplicate_front`, unchanged fields) | SyncAction | Different from B’s layout skip |
+
+---
+
+## 7. Risk ranking
+
+| Rank | Mismatch | User-visible impact |
+|------|----------|---------------------|
+| **High** | Multi-type badges (cloze/reversible/typed/custom) claim sync while C writes Basic | Wrong Anki model/fields; cloze syntax stays literal; no reverse/typed/custom notes |
+| **High** | Layout `skip`/`error` in B does not gate C | Users trust preview “won’t sync”; note still created/updated |
+| **High** | `inferClozeFromManualSyntaxOnBasic` labeled as matching sync (BAS-04) but only affects preview | Setting creates false sync expectation |
+| **Med** | `:::r` / `:::t` semantics differ (first-class in B vs `:::` prefix match in C) | Possible stray `r`/`t` in Back; type garnish overstates sync |
+| **Med** | Outcome vocabulary reused (`skip`) with different meaning | Confusion when comparing badge vs Sync Results modal |
+| **Med** | Tags/decks/IDs synced but invisible in CSS | Hard to audit targeting from Live Preview alone |
+| **Low** | Reading-mode CSS present, unwired | Misleading dead styles; Source/LP still works |
+| **Low** | Section gap / mid-HR / table chrome | Cosmetic only; no sync correctness issue |
+| **Low** | A↔B decoration mapping | Spot-checked **aligned** — not a product risk by itself |
+
+---
+
+## 8. Recommended human verification checklist
+
+1. **Basic happy path (should align A/B/C)**  
+   Note with `ankisync: true`, `#### Card`, `:::`, Front/Back text → green Basic badge → Sync → Basic note with matching Front/Back.
+
+2. **Cloze false positive**  
+   `#anki/cardType/cloze` or inferred cloze with `{{c1::x}}` → preview Cloze + hatch colors + sync tint → Sync → confirm Anki model is still **Basic** and HTML contains literal braces (or escaped text), not Cloze note type.
+
+3. **Preview skip does not block sync**  
+   Cloze-tagged card with **no** `{{}}` in Text (CLZ-01) or empty deletion (CLZ-09) → skip tint → Sync anyway → confirm note still added/updated.
+
+4. **Reversible / typed delimiters**  
+   Cards using `:::r` / `:::t` → garnishes ↑↓ / ⌨ → Sync → inspect Back for stray `r`/`t` and confirm no special Anki models.
+
+5. **Custom note type**  
+   `#anki/noteType/SomeModel` or field blocks → Custom badge → Sync → confirm `modelName` remains configured Basic and only Front/Back written.
+
+6. **Infer-cloze setting**  
+   Toggle `inferClozeFromManualSyntaxOnBasic` on a basic card with `{{}}` → preview type flips; sync output unchanged → document as preview-only.
+
+7. **Gate consistency**  
+   Disable `ankisync` → no decorations and sync skips file. Re-enable → both resume.
+
+8. **ID / deck / tags (sync-only audit)**  
+   After sync, verify `<!--anki-id-->`, deck from `target_anki_deck`, and tags — none of these should be expected from CSS alone.
+
+9. **Reading Mode**  
+   Open same note in Reading view → confirm badges/tints missing despite CSS rules existing.
+
+10. **A↔B sanity**  
+    Force layout `error`/`warn`/`skip` → confirm badge class and cardblock class share the same outcome suffix (editor decorations, not sync).
+
+---
+
+### Bottom line
+
+Treat **Live Preview as an authoring linter for the future cardSyntax model**, not as a faithful preview of current Anki write-back. Today, **only the Basic Front/Back path in Layer C is production sync**; Layers A and B already speak a richer language that sync has not adopted.
+``````
+
+
+
+---
+---
+---
+---
+
+# Rule-book audit: Obsidian-Anki-AST-Engine
+
+``````
+# Rule-book audit: Obsidian-Anki-AST-Engine
+
+## Where the rule book lives
+
+| Role | Absolute path |
+|------|----------------|
+| **Primary rule book** | `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine/Docs/DECIDING/Card-Syntax-Spec.md` |
+| **Master conflict matrix** | Same file, §11 (`CX-01`…`CX-30`, `CX-27a`) |
+| **Scenario checklist (A1, B1, …)** | `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine/tests/fixtures/new format/card-syntax-stress-test.md` (HTML comment + per-card `<!-- expect: -->`) |
+| **Orphan scenarios O1–O2** | `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine/tests/fixtures/new format/card-syntax-orphan-custom.md` |
+| **Preview mapping (CSS/UI)** | `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine/Docs/DECIDING/Card-Preview-Design-Guidelines.md` |
+| **Prior design discussion** | `D:/_installed/VScode repos/AI/Cursor/Obsidian-Anki-AST-Engine/Docs/DECIDING/Syntax decision conversation.md` |
+
+**Important naming note:** `A1`/`B2`/etc. are **stress-test scenario IDs**, not the formal rule IDs. Formal IDs are `FM-*`, `STR-*`, `TAG-*`, `RES-*`, `DEL-*`, `BAS-*`, `CLZ-*`, `REV-*`, `TYP-*`, `CUS-*`, `CX-*`.
+
+Spec header still says “Pre-implementation contract”; the stress fixture still says “Engine: not wired yet” — both are **stale**. The engine is implemented under `src/cardSyntax/` and exercised by integration tests.
+
+---
+
+## Scenario ID catalog (A1…O2)
+
+| ID | Short description | Spec rules cited | Fixture expect |
+|----|-------------------|------------------|----------------|
+| A1 | Basic OK + user tag | BAS-01, BAS-02, FM-02 | sync |
+| A2 | Basic missing `:::` | BAS-01, CX-08 | skip |
+| A3 | Bare `{{word}}` on basic | BAS-03, CX-07 | sync+warn |
+| A4 | `{{cN}}` on basic default | BAS-04, CX-27 | sync+warn |
+| A5 | `{{cN}}` only in Back | BAS-05, CX-24 | sync |
+| B1 | Inherited shorthand cloze | STR-02, CLZ-04, CX-04 | sync |
+| B2 | Auto-number + hints | CLZ-05, CLZ-06 | sync |
+| B3 | Manual c1/c2 same text | CLZ-08 | sync |
+| B4 | Cloze + Back Extra | CLZ-02, CX-25 | sync |
+| B5 | Cloze no `{{}}` | CLZ-01, CX-05 | skip |
+| B6 | `{{}}` only after `:::` | CLZ-11, CX-12 | skip |
+| B7 | Basic override in cloze section | RES-01, CX-03 | sync |
+| C1 | Sibling section not inherited | RES-02, CX-23 | sync |
+| D1 | Explicit `#anki/noteType/Vocab` | CUS-01, CUS-06, DEL-04 | sync |
+| D2 | Legacy `#anki_card_Vocab` | TAG-03 | sync |
+| D3 | YAML custom default | RES-04, FM-03 | sync |
+| D4 | Custom, no fields | CUS-01 | skip |
+| D5 | Inherited note type | RES-08 | sync |
+| E1 | `:::r` only | DEL-02, CX-14 | sync |
+| E2 | reversible tag + `:::` | REV-02, CX-16 | sync |
+| E3 | `:::t` HTML strip | TYP-03 (+ fixture lists TYP-05) | sync+warn |
+| E4 | typed tag + `:::` | TYP-01, TYP-02 | sync |
+| E5 | multi-line typed back | TYP-04 | sync+warn |
+| F1 | file basic + `:::r` → reversible | DEL-02, RES-05 | sync |
+| F2 | cloze + `:::t` | CLZ-10, CX-11 | error |
+| F3 | basic tag + `:::r` | CX-17 | error |
+| F4 | custom + `:::r` | CUS-05, CX-21 | error |
+| F5 | basic default vs cloze body no `:::` | CX-06, FM-02, BAS-01 | skip |
+| F6 | custom via file default | RES-04, FM-03 | sync |
+| F7 | TAG conflicts (comment only, not a card) | TAG-01/02, CX-01/02 | docs only |
+| G1 | `:::` in code fence | DEL-07, CLZ-02 | sync |
+| G2a | `::: r` field name | DEL-06 | sync |
+| G2b | `:::r` reserved | DEL-02, DEL-06 | sync |
+| G3 | Empty `{{}}` | CLZ-09, CX-28 | skip |
+| G4 | User vs engine tags | STR-04, CX-29 | sync (**fixture mismatch** — see below) |
+| G5 | `#anki/noteType/cloze` is custom | TAG-04, CUS-04 | skip (expect omits TAG-04) |
+| H1–H10 | merge, REV/TYP skip, CUS-02, CLZ-12, FM-02/04, RES-02/03, … | various | covered in fixture |
+| I1–I8 | audit gaps: BAS-06 field, CX-30, CUS-04, STR-03, TAG on section, DEL-08 | various | covered |
+| O1 | Orphan `::: Field` | CUS-03, CX-22 | skip |
+| O2 | RES-06 cloze inference | RES-06 | sync |
+
+---
+
+## Complete formal rule catalog + status
+
+Legend: **Clear** | **Ambiguous** | **Conflicting** | **Covered-by-tests** | **Specified-but-unimplemented** | **Deferred** | **Positive-rule** (happy-path; often no emitted `ruleId`)
+
+### FM — Frontmatter
+
+| ID | Description | Status |
+|----|-------------|--------|
+| FM-01 | `AnkiSync` truthy gate | **Clear** + **Covered-by-tests** (`parseCardDocument`, pipeline, frontmatterFilter). No formal `ruleId` emission. |
+| FM-02 | `anki_cardDefault` | **Clear** + **Covered-by-tests**. Emitted as companion ID on some skips (CX-06). |
+| FM-03 | `anki_customCardDefault` layout-triggered | **Clear** + **Covered-by-tests**. |
+| FM-04 | Ancestors beat file defaults | **Clear** + **Covered-by-tests**. |
+
+### STR — Structure
+
+| ID | Description | Status |
+|----|-------------|--------|
+| STR-01 | Card boundary by heading depth | **Clear** + **Covered-by-tests** (outline/tree). No `ruleId` emission. |
+| STR-02 | Section type inheritance | **Clear** + **Covered-by-tests**. Listed in expects but usually **not emitted**. |
+| STR-03 | No section type on H5+ | **Clear** + **Covered-by-tests** (I4/I5). |
+| STR-04 | User tags sync; `#anki/` stripped | **Clear** conceptually; **Ambiguous in fixture** (G4 expects CX-29/`#biology` under wrong section). |
+| STR-05 | `<!--anki-id-->` binding | **Clear**; stripping of authoring comments documented. Binding behavior largely inherited; weak rule-ID attestation. |
+
+### TAG — Hashtags
+
+| ID | Description | Status |
+|----|-------------|--------|
+| TAG-01 | One cardType per heading | **Clear** + **Covered-by-tests**. |
+| TAG-02 | cardType ⊥ noteType | **Clear** + **Covered-by-tests**. |
+| TAG-03 | noteType id → Anki name mapping | **Partly Ambiguous** (map + AnkiConnect at sync); legacy forms accepted; limited unit depth. |
+| TAG-04 | Built-ins only via `#anki/cardType/*` | **Clear** + **Covered-by-tests** (G5 / hashtagParser). Rarely emitted as `ruleId`. |
+
+### RES — Resolution
+
+| ID | Description | Status |
+|----|-------------|--------|
+| RES-01 | Card heading wins | **Clear** + **Covered-by-tests**. |
+| RES-02 | Outline parent chain (not scan-order) | **Clear** + **Covered-by-tests**. |
+| RES-03 | Nearest ancestor wins | **Clear** + **Covered-by-tests**. |
+| RES-04 | Custom default layout-triggered | **Clear** + **Covered-by-tests**. |
+| RES-05 | `:::r`/`:::t` set type only if unresolved | **Clear** with gap: matrix covers cloze+`:::r` (CX-30), not reversible↔typed cross. |
+| RES-06 | Infer cloze from `{{cN}}` if unresolved | **Clear** + **Covered-by-tests** (O2, CX-27a path). |
+| RES-07 | Fallback `basic` | **Clear** + **Covered-by-tests**. |
+| RES-08 | noteType inherits on sections | **Clear** + **Covered-by-tests**. |
+| RES-09 | Sync reporting of type source | **Ambiguous / thin** — “should state”; no strong rule-ID tests. |
+
+### DEL — Delimiters
+
+| ID | Description | Status |
+|----|-------------|--------|
+| DEL-01 | Line-start `:::` | **Clear** + **Covered-by-tests**. |
+| DEL-02 | `:::r` | **Clear** + **Covered-by-tests**; sometimes emitted via crossCutting. |
+| DEL-03 | `:::t` | **Clear** + **Covered-by-tests**. |
+| DEL-04 | `::: FieldName` | **Clear** + **Covered-by-tests**. |
+| DEL-05 | Spaced `::: r` / `::: t` not reserved | **Clear** + **Covered-by-tests**. |
+| DEL-06 | `::: r` = field `r` when custom | **Clear** + **Covered-by-tests**. |
+| DEL-07 | Ignore in code/math | **Clear** + **Covered-by-tests**. **Unhandled:** callouts, tables, embeds. |
+| DEL-08 | First structural split wins | **Clear** + **Covered-by-tests**; preview discouragement defined. |
+
+### BAS — Basic
+
+| ID | Description | Status |
+|----|-------------|--------|
+| BAS-01 | Requires `:::` else skip | **Clear** + **Covered-by-tests**. (Oddly cited on *successful* A1 expects.) |
+| BAS-02 | Front/Back mapping | **Positive-rule** / **Clear**; little `ruleId` emission. |
+| BAS-03 | Bare `{{}}` → warn literal | **Clear** + **Covered-by-tests**. |
+| BAS-04 / CX-27 / CX-27a | `{{cN}}` on basic: literal+warn vs reclassify | **Clear** + locked (§14) + **Covered-by-tests**. |
+| BAS-05 | Back-only cloze doesn’t change type | **Clear** + **Covered-by-tests**. |
+| BAS-06 | Wrong layout (`:::r`/`:::t`/`::: Field`) | **Ambiguous / Conflicting** — text says **error / skip**; matrix uses **error**; validator uses **error**. |
+
+### CLZ — Cloze
+
+| ID | Description | Status |
+|----|-------------|--------|
+| CLZ-01 | Need `{{}}` in Text | **Clear** + **Covered-by-tests**. |
+| CLZ-02 | Optional Back Extra via `:::` | **Clear** + **Covered-by-tests**. |
+| CLZ-03 | Manual `{{cN::}}` | **Clear** + **Covered-by-tests**. |
+| CLZ-04 | Shorthand only on cloze | **Clear** + **Covered-by-tests**. |
+| CLZ-05 | Auto-numbering algorithm | **Clear** + **Covered-by-tests**. |
+| CLZ-06 | Hints; first wins; optional warn | **Ambiguous** (“optional warn”); implemented warn, but orchestrator tags it **CLZ-07** (mis-ID). |
+| CLZ-07 | Manual+auto merge | **Clear** + **Covered-by-tests**; rule text is example-only (thin). |
+| CLZ-08 | Intentional duplicate manuals | **Clear** + **Covered-by-tests**. |
+| CLZ-09 | Empty deletion → skip | **Clear** + **Covered-by-tests**. |
+| CLZ-10 | cloze + `:::r`/`:::t` → error | **Clear** + **Covered-by-tests**. |
+| CLZ-11 | Back-only deletions → skip | **Conflicting with preview** (preview: “warn or skip”). Spec = **skip**. |
+| CLZ-12 | `{{}}` literal on custom | **Clear** + **Covered-by-tests**. |
+
+### REV — Reversible
+
+| ID | Description | Status |
+|----|-------------|--------|
+| REV-01 | Anki note type mapping | **Positive-rule**; configurable; weak ID coverage. |
+| REV-02 | Tag ≡ `:::r` (redundant OK) | **Clear** + **Covered-by-tests**. |
+| REV-03 | Requires split | **Clear** + **Covered-by-tests**. |
+| REV-04 | basic + `:::r` → error | **Clear** + **Covered-by-tests** (overlaps BAS-06). |
+| REV-05 | cloze + `:::r` → error | **Clear** + **Covered-by-tests** (overlaps CLZ-10). |
+
+### TYP — Typed
+
+| ID | Description | Status |
+|----|-------------|--------|
+| TYP-01 | Tag ≡ `:::t` | **Clear** + **Covered-by-tests**. |
+| TYP-02 | Requires split | **Clear** + **Covered-by-tests**. |
+| TYP-03 | Plain-text answer strip | **Clear** + **Covered-by-tests**. |
+| TYP-04 | First non-empty line | **Clear** + locked + **Covered-by-tests**. |
+| TYP-05 | Spec: multi-answer **Deferred v2** | **Conflicting**: code/fixture misuse **TYP-05** for “formatting in typed answer” (preview §9). Spec meaning ≠ implementation meaning. |
+| TYP-06 | Case/diacritics left to Anki | **Clear** (non-actionable engine pass-through). |
+
+### CUS — Custom
+
+| ID | Description | Status |
+|----|-------------|--------|
+| CUS-01 | ≥1 field block | **Clear** + **Covered-by-tests**. Does **not** require all Anki fields present (**gap**). |
+| CUS-02 | Unknown field → error | **Clear** + **Covered-by-tests**; depends on field-name map. |
+| CUS-03 | Orphan field layout | **Clear** + **Covered-by-tests**. |
+| CUS-04 | Custom + plain `:::` only | **Ambiguous** wording (“skip / layout conflict”); matrix = **skip**. |
+| CUS-05 | Custom + `:::r`/`:::t` | **Clear** + **Covered-by-tests**. |
+| CUS-06 | Field order independent | **Clear** + lightly covered. |
+| CUS-07 | Layout remapping | **Deferred** / **Specified-but-unimplemented** (v1 OOS). |
+
+### CX — Conflict matrix companions
+
+| ID | Outcome | Status |
+|----|---------|--------|
+| CX-01, CX-02, CX-26 | Tag conflicts | **Clear** + **Covered-by-tests**; emitted for TAG failures. |
+| CX-03…CX-05, CX-07…CX-12, CX-14, CX-16…CX-18, CX-20…CX-22, CX-27, CX-28, CX-30 | Matrix cases | Mostly **Covered-by-tests**; many derived in `crossCuttingRules.ts`. |
+| CX-06 | basic default + cloze body no `:::` | **Clear** + covered; slightly overloaded with FM-02. |
+| CX-13, CX-15, CX-19 | Positive sync companions | **Positive-rule**; **rarely/never emitted** by `deriveCrossCuttingRuleIds`. |
+| CX-23, CX-24, CX-25, CX-29 | Structural/tag companions | Cited in fixtures; **weak/no emission** path for most. |
+| CX-25 | Cloze + Back Extra | **Conflicting text**: matrix shows ``{{c1::}}`` (empty) but outcome **sync** vs CLZ-09 **skip** — almost certainly typo for ``{{c1::x}}``. |
+| CX-27a | inferCloze setting | **Clear** + unit-tested; not in main stress fixture (setting-dependent). |
+
+---
+
+## Overlaps
+
+1. **BAS-06 ↔ REV-04 ↔ CX-09 / CX-17** — same basic+`:::r` conflict, multiple IDs (intentional companions, noisy).
+2. **CLZ-10 ↔ REV-05 ↔ CX-11 / CX-30** — cloze+`:::r` triple-tagged.
+3. **TAG-01 ↔ CX-01 ↔ CX-26** — dual cardType on card vs section; nearly duplicate matrix rows.
+4. **BAS-01 ↔ CX-08** — skip companion pair.
+5. **CLZ-01 “require {{}}” vs CX-13 “valid {{}} syncs”** — opposite sides of same rule; CX-13 unused in emitter.
+6. **Preview Guidelines vs Spec** share IDs but soften outcomes (CLZ-11, CLZ-09, BAS-06 presentation).
+
+---
+
+## Gaps the engine/CSS may hit but the rule book barely/doesn’t cover
+
+| Scenario | Notes |
+|----------|--------|
+| **Reversible + `:::t` / Typed + `:::r`** | No CX row. Validator accepts any split for REV/TYP → likely **silent sync**. High severity. |
+| **Basic + `:::t`** | Handled as BAS-06 **error**, but **no CX matrix row** (unlike CX-09 for `:::r`). |
+| **Empty Front or empty Back** | Allowed by BAS-01 as long as `:::` exists; no quality rule. |
+| **Partial custom fields** | CUS-01 only requires ≥1 field; missing required Anki fields unspecified. |
+| **Delimiters in callouts / tables / wiki embeds / blockquotes** | Only code/math (DEL-07). |
+| **Multiple different delimiter kinds after first split** | DEL-08 says first wins; interaction with `:::r`/`:::t` in Back region only partly discouraged in preview. |
+| **`anki_cardDefault: cloze` + prose without `{{}}`** | CX-05 covers inherited cloze; file-default cloze less explicit. |
+| **Legacy `#anki/CustomCards/` / other `#anki/...` paths** | Accepted per §3; interaction with TAG-02/04 lightly specified. |
+| **cardDeclarationHeadingLevel ≠ 4** | Vocab defined; few matrix examples. |
+| **FM-01 off + preview still open** | Preview doc says no decorations; not a syntax CX. |
+| **CLZ-06 hint-mismatch severity** | “Optional” in spec; always warned in code; wrong ruleId (CLZ-07). |
+| **G4 / CX-29** | Card under `### Edge gallery`, expect comment still talks about `#biology` on Thermodynamics — **fixture gap**. |
+
+---
+
+## Explicit UNHANDLED / AMBIGUOUS list (needs clarification)
+
+1. **BAS-06 outcome:** Is layout conflict always **error**, or can it be **skip**? Spec text hedges; matrix + code = error.
+2. **CUS-04 outcome wording:** “skip / layout conflict” vs matrix **skip** — align language with BAS-06 decision.
+3. **TYP-05 ID collision:** Spec = deferred multi-answer; code = formatting warn. **Must rename** one of them.
+4. **CX-25 typo:** ``{{c1::}}`` vs non-empty cloze — fix matrix text.
+5. **CLZ-11 severity:** Spec **skip** vs Preview “warn or skip” — lock one for resolver + UI.
+6. **CLZ-06 “optional” warn:** Always warn? Never? Dry-run only?
+7. **Cross-delimiter REV↔TYP:** error, skip, or allow? Currently **Unhandled**.
+8. **Are all Anki fields required for custom?** Only ≥1 today.
+9. **Positive CX/STR/BAS sync IDs:** Should happy-path cards emit companion IDs, or only failures? Stress expects list IDs that often never appear in messages (assert skipped when `messages.length === 0`).
+10. **CLZ-07 mis-tagging:** Hint-mismatch warnings labeled CLZ-07 — spec ID vs implementation bug.
+11. **RES-09 reporting format** — normative or aspirational?
+12. **DEL-07 scope** — extend beyond code/math?
+
+---
+
+## Recommendations (resolve first)
+
+1. **Lock severity taxonomy** for BAS-06 / CUS-04 / CLZ-11 (error vs skip vs warn) across Spec + Preview + validator — highest UX impact.
+2. **Fix TYP-05 collision** immediately (e.g. keep TYP-05 deferred; give formatting warn a new ID like TYP-07) before more fixtures/docs cite the wrong meaning.
+3. **Add CX rows + validator checks for reversible↔typed delimiter cross** — currently a silent correctness hole.
+4. **Fix CX-25 matrix typo** and add a regression asserting empty `{{c1::}}` stays CX-28/CLZ-09.
+5. **Fix ruleId emission bugs:** CLZ-06 vs CLZ-07; decide whether positive-path CX-* must be emitted (today stress assertions are partly vacuous).
+6. **Repair G4 fixture** so STR-04/CX-29 actually exercise `#biology` on the card’s ancestor.
+7. **Update stale “pre-implementation / not wired” banners** so the rule book reflects live contract status.
+8. After the above: decide CUS complete-field policy and DEL-07 extension to callouts/embeds.
+
+---
+
+## Cross-check: code/tests claiming rule IDs
+
+| Layer | Path | What it implements |
+|-------|------|--------------------|
+| Spec | `Docs/DECIDING/Card-Syntax-Spec.md` | Canonical catalog + matrix |
+| Preview | `Docs/DECIDING/Card-Preview-Design-Guidelines.md` | UI mapping; some softened outcomes |
+| Validation | `src/cardSyntax/layoutValidator.ts` | BAS/CLZ/REV/TYP/CUS failures |
+| Hashtags | `src/cardSyntax/hashtagParser.ts` | TAG-01, TAG-02 |
+| Cloze | `src/cardSyntax/clozeProcessor.ts` | CLZ-03…09 logic |
+| Cross-cutting | `src/cardSyntax/crossCuttingRules.ts` | Many CX/DEL/RES companion IDs |
+| Orchestrator | `src/cardSyntax/parseCardDocument.ts` | CX-01/02/26; **misuses TYP-05 & CLZ-07** |
+| Unit tests | `tests/cardSyntax/*.test.ts` | Strong per-family coverage |
+| Stress integration | `tests/cardSyntax/stress-test.integration.test.ts` + fixtures | A1–O2 outcomes; rule-ID asserts only when messages exist |
+
+**Bottom line:** The rule book is real, detailed, and largely implemented, but outcome hedges, one deferred ID reused for a new meaning, a matrix typo that contradicts CLZ-09, preview–spec drift, and an uncovered REV↔TYP delimiter cross are the main places “the book” still leaves the engine guessing.
+``````
