@@ -2,7 +2,7 @@ import type { Content, Heading, Root, Text } from "mdast";
 import type { Node, Parent } from "unist";
 import { visitParents } from "unist-util-visit-parents";
 import {
-  findDelimiterIndex,
+  findDelimiterMatch,
   isStructuralDelimiter,
 } from "./delimiterCheck";
 import { stripTrailingSectionSeparators } from "./stripTrailingSectionSeparators";
@@ -320,10 +320,14 @@ function buildCard(
   const trimmedBack = stripTrailingAuthoringNodes(
     stripTrailingSectionSeparators(backNodes),
   );
-  const ankiId = extractAnkiId(trimmedBack);
+  // Prefer back (canonical inject site); front covers Text-only cloze / no `:::`.
+  const ankiId = extractAnkiId(trimmedBack) ?? extractAnkiId(trimmedFront);
   let injectionOffset = ankiId ? undefined : getInjectionOffset(trimmedBack);
   if (injectionOffset === undefined && !ankiId && delimiterEndOffset !== undefined) {
     injectionOffset = delimiterEndOffset;
+  }
+  if (injectionOffset === undefined && !ankiId) {
+    injectionOffset = getInjectionOffset(trimmedFront);
   }
 
   return {
@@ -435,20 +439,22 @@ function splitNodeAtDelimiter(
   }
 
   const { parent, textNode, index } = splitInfo;
-  const delimiterIndex = findDelimiterIndex(textNode.value, delimiter);
-  if (delimiterIndex === -1) {
+  const delimiterMatch = findDelimiterMatch(textNode.value, delimiter);
+  if (!delimiterMatch) {
     return null;
   }
+
+  const { index: delimiterIndex, length: delimiterLength } = delimiterMatch;
 
   const textStart = textNode.position?.start?.offset;
   const delimiterEndOffset =
     textStart !== undefined
-      ? textStart + delimiterIndex + delimiter.length
+      ? textStart + delimiterIndex + delimiterLength
       : undefined;
 
   const frontText = textNode.value.slice(0, delimiterIndex).trimEnd();
   const backText = textNode.value
-    .slice(delimiterIndex + delimiter.length)
+    .slice(delimiterIndex + delimiterLength)
     .trimStart();
 
   const frontClone = structuredClone(node) as Content;

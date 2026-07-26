@@ -1,6 +1,8 @@
 # Card Rendering Specification
 
-How front and back **card fields** are compiled from mdast subtrees into HTML for Anki. For vault safety (no stringify back to disk), see [Engine-Architecture.md](Engine-Architecture.md#read-only-ast-and-vault-safety).
+How **card fields** are compiled from mdast subtrees into HTML for Anki. For vault safety (no stringify back to disk), see [Engine-Architecture.md](Engine-Architecture.md#read-only-ast-and-vault-safety).
+
+> **Status as of 2026-07:** Compile still produces learner-facing HTML from extracted node buffers. Which Anki model / field names those buffers map to is owned by card-syntax resolution + sync ([DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md), [DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) §2): `basic`/`reversible` → Front/Back; `cloze` → Text / optional Back Extra; `typed` → Front + plain-text Back. Preview outcome chips hard-gate whether that HTML is written to Anki.
 
 ## Problem
 
@@ -277,12 +279,13 @@ After transclusion grafting, remaining `[[links]]` compile to `<a>` elements. Em
 
 ## Dry-run / AnkiConnect contract
 
-`SyncAction` fields:
+`SyncAction` fields (compiled buffers; sync maps them onto the stock model fields for the resolved type — see [Anki-Integration.md](Anki-Integration.md#note-types-stock-models)):
 
 | Field | Content |
 |-------|---------|
-| `frontHtml` | Compiled HTML for front field |
-| `backHtml` | Compiled HTML for back field |
+| `frontHtml` | Compiled HTML for the Text-region buffer (Basic Front, Cloze Text, etc.) |
+| `backHtml` | Compiled HTML for the Back-region buffer (Basic Back, Cloze Back Extra, …); typed may strip to plain text at sync |
+| `previewOutcome` / warnings | From `parseCardDocument` — `skip`/`error` hard-block Anki writes |
 | `wouldUploadMedia` | Basenames queued for upload |
 | `mediaUploadDetails` | Per-file `{ fileName, transport }` where transport is `path`, `base64`, or `url` |
 

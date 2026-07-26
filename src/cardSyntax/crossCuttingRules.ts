@@ -145,6 +145,10 @@ export function deriveCrossCuttingRuleIds(
     }
   }
 
+  if (hasRule(layoutRuleIds, "REV-06")) {
+    rules.push("CX-31");
+  }
+
   if (hasRule(layoutRuleIds, "CUS-05")) {
     rules.push("CX-21");
   }

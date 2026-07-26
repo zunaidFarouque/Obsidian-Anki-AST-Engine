@@ -13,6 +13,8 @@ function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConne
 
   return {
     deckNames: async () => ["Test::Deck"],
+    modelNames: async () => ["Basic"],
+    createModel: async () => null,
     findNotes: findNotesImpl,
     invokeMulti:
       overrides.invokeMulti ??
@@ -39,6 +41,7 @@ const baseConfig = {
   syncTagPrefix: "obsidian-id",
   defaultEngineTag: "Obsidian-Anki-AST",
   autoCreateDecks: true,
+  autoCreateStockNoteModels: true,
 };
 
 describe("syncEngine batched file sync", () => {

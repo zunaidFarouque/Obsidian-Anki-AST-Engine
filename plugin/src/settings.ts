@@ -13,6 +13,8 @@ export interface AnkiAstSyncSettings {
 	defaultCardDeclarationHeadingLevel: number;
 	includeParentHeadersAsTags: boolean;
 	autoCreateDecks: boolean;
+	/** Auto-create missing stock Anki note types (Basic, Cloze, …). Opt out to require them in Anki. */
+	autoCreateStockNoteModels: boolean;
 	noteModelName: string;
 	syncTagPrefix: string;
 	orphanHandling: 'off' | 'ask';
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	defaultCardDeclarationHeadingLevel: 4,
 	includeParentHeadersAsTags: true,
 	autoCreateDecks: true,
+	autoCreateStockNoteModels: true,
 	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
 	orphanHandling: 'ask',
@@ -225,7 +228,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Infer cloze from {{cN::...}} on basic cards')
 			.setDesc(
-				'When enabled, manual cloze syntax in the Text region reclassifies basic-resolved cards as cloze in preview (matches sync resolver BAS-04).',
+				'When enabled, manual cloze syntax in the Text region reclassifies basic-resolved cards as cloze in preview and sync (BAS-04).',
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -321,6 +324,20 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.autoCreateDecks)
 					.onChange(async (value) => {
 						this.plugin.settings.autoCreateDecks = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Auto-create stock note types')
+			.setDesc(
+				'Create missing stock Anki note types (Basic, Cloze, Basic (and reversed card), Basic (type in the answer)) during sync. Turn off to require them already in Anki.',
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoCreateStockNoteModels)
+					.onChange(async (value) => {
+						this.plugin.settings.autoCreateStockNoteModels = value;
 						await this.plugin.saveSettings();
 					}),
 			);

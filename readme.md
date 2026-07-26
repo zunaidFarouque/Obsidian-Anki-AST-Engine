@@ -15,6 +15,7 @@ This engine solves that by transforming your Obsidian vault into a traversable *
 * **Duplicate detection:** Flags vault cards that compile to the same Front HTML (and `back_mismatch` when answers differ). Warnings are emitted on stderr as JSON for future in-editor notifications. See [Docs/Anki-Integration.md](Docs/Anki-Integration.md#duplicate-detection).
 * **Stable Anki updates:** Normalizes line endings inside compiled code blocks before comparing to Anki, so Windows CRLF does not cause false `update` actions.
 * **Stateless Concurrency Control:** Throttles AnkiConnect HTTP (media uploads, batched card sync) with `p-limit` and automatic retry so large vault syncs do not overwhelm the local Anki server. See [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md).
+* **Shared card syntax + stock multi-type sync:** Live Preview and sync share `parseCardDocument`. Preview skip/error outcomes hard-block Anki writes. Built-ins sync to stock Basic / Cloze / reversible / typed models; custom note types warn and skip until later. See [Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) and [Docs/Anki-Integration.md](Docs/Anki-Integration.md).
 
 ## **🚀 Architecture Overview**
 
@@ -105,5 +106,5 @@ bun test
 
 ## **🤝 Contributing**
 
-Contributions are welcome\! Please ensure you have read the architectural docs in the `docs/` folder ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md), [Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)) before opening a PR. All parsing modifications must include an accompanying edge-case fixture test.
+Contributions are welcome\! Please ensure you have read the architectural docs in the `Docs/` folder ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Anki-Integration.md](Docs/Anki-Integration.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md), [Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)) and the locked card-syntax contract ([DECIDED-Preview-Sync-Contract-2026-07.md](Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md), [Card-Syntax-Spec.md](Docs/DECIDING/Card-Syntax-Spec.md)) before opening a PR. All parsing modifications must include an accompanying edge-case fixture test.
 

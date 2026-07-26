@@ -59,6 +59,8 @@ export {
 export {
   validateCardLayout,
   extractTypedBackPlainText,
+  parseTypedAcceptableAnswers,
+  formatTypedAnswersForAnki,
   type CardFieldBlock,
   type CardLayoutRegions,
   type LayoutValidatorOptions,
@@ -71,6 +73,11 @@ export {
 export { crossCuttingMessages, deriveCrossCuttingRuleIds } from "./crossCuttingRules";
 
 export { parseCardDocument } from "./parseCardDocument";
+export {
+  effectiveCardOutcome,
+  isAnkiWriteAllowed,
+  collectPreviewWarnings,
+} from "./syncEligibility";
 export { getBodyStartOffset } from "../io/frontmatterFilter";
 export {
   loadCardSyntaxStressTest,

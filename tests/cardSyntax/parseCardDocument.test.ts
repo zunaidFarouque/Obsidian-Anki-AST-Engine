@@ -253,13 +253,44 @@ energy dispersal`;
     expect(card.messages.some((m) => m.level === "warn")).toBe(true);
   });
 
-  test("warns when typed answer includes formatting", () => {
+  test("warns TYP-03b when typed answer includes formatting", () => {
     const result = parseDoc(
       "#### Typed #anki/cardType/typed\n\nCapital?\n\n:::t\n\n**Paris**",
     );
     const card = result.cards[0]!;
-    expect(card.messages.some((m) => m.ruleId === "TYP-05")).toBe(true);
+    expect(card.messages.some((m) => m.ruleId === "TYP-03b")).toBe(true);
+    expect(card.messages.some((m) => m.ruleId === "TYP-05")).toBe(false);
     expect(card.messages.some((m) => m.level === "warn")).toBe(true);
+  });
+
+  test("warns CLZ-06 on cloze hint mismatch (not CLZ-07)", () => {
+    const result = parseDoc(
+      "### Section #anki/cardType/cloze\n\n#### Hint\n\n{{bank}} then {{bank::river edge}}",
+    );
+    const card = result.cards[0]!;
+    expect(card.outcome).toBe("sync");
+    expect(card.messages.some((m) => m.ruleId === "CLZ-06")).toBe(true);
+    expect(card.messages.some((m) => m.ruleId === "CLZ-07")).toBe(false);
+    expect(card.messages.some((m) => m.level === "warn")).toBe(true);
+  });
+
+  test("errors REV-06 when reversible tag conflicts with :::t", () => {
+    const result = parseDoc(
+      "#### Mismatch #anki/cardType/reversible\n\nQuestion\n\n:::t\n\nAnswer",
+    );
+    const card = result.cards[0]!;
+    expect(card.outcome).toBe("error");
+    expect(card.messages.some((m) => m.ruleId === "REV-06")).toBe(true);
+  });
+
+  test("errors CLZ-11 when cloze deletions are only in Back", () => {
+    const result = parseDoc(
+      "#### Late #anki/cardType/cloze\n\nProse with no deletions.\n\n:::\n\n{{c1::too late}}",
+    );
+    const card = result.cards[0]!;
+    expect(card.outcome).toBe("error");
+    expect(card.messages.some((m) => m.ruleId === "CLZ-11")).toBe(true);
+    expect(card.messages.some((m) => m.level === "error")).toBe(true);
   });
 });
 

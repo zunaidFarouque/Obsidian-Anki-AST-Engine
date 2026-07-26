@@ -31,6 +31,8 @@ describe("configParser", () => {
     expect(config.includeParentHeadersAsTags).toBe(true);
     expect(config.noteModelName).toBe("Basic");
     expect(config.autoCreateDecks).toBe(true);
+    expect(config.autoCreateStockNoteModels).toBe(true);
+    expect(config.inferClozeFromManualSyntaxOnBasic).toBe(false);
     expect(config.syncTagPrefix).toBe("obsidian-id");
 
     await rm(dir, { recursive: true, force: true });

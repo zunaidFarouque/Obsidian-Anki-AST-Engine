@@ -1,8 +1,8 @@
 # Card Preview — Design Guidelines (v1)
 
-Living UX spec for in-editor card-syntax overlays in Obsidian Live Preview. Grammar and resolver behavior are defined in [Card-Syntax-Spec.md](Card-Syntax-Spec.md); this document covers how outcomes look while authoring.
+Living UX spec for in-editor card-syntax overlays in Obsidian Live Preview. Grammar and rule IDs: [Card-Syntax-Spec.md](Card-Syntax-Spec.md). **Preview ↔ sync product locks** (outcome meanings, CLZ-11, custom phasing, cosmetic vs behavioral): [DECIDED-Preview-Sync-Contract-2026-07.md](./DECIDED-Preview-Sync-Contract-2026-07.md). Where Spec text still says ambiguous “warn / skip / error,” **the Decided contract wins** until Spec rule text is patched.
 
-Status: design locked for v1 subtle mode; implementation tracks `plugin/src/cardPreviewEditor.ts`.
+Status: design locked for v1 subtle mode; outcome chrome must mirror sync eligibility per the Decided contract. Implementation tracks `plugin/src/cardPreviewEditor.ts`.
 
 ---
 
@@ -14,7 +14,22 @@ Status: design locked for v1 subtle mode; implementation tracks `plugin/src/card
 | Problems stand out | Skip, warn, and error states must be findable without scanning every line |
 | Never hide syntax | Authors edit real Markdown (`:::`, `{{cN::...}}`, field blocks); overlays guide only |
 | Editing mode first | Primary surface is Live Preview while editing (CodeMirror 6) |
-| Same brain as sync | All outcomes come from `parseCardDocument`; preview is not a second parser |
+| Same brain as sync | All outcomes come from `parseCardDocument`; preview is not a second parser. Chips mean what sync will do (§1.1) |
+
+### 1.1 Outcome meanings (authoritative — Decided contract §1)
+
+Chips and block tints are **behavioral**, not decorative hints. Future AI: treat this table as the UX contract for “will it hit Anki?”
+
+| Effective outcome | Preview chrome | Sync must |
+|-------------------|----------------|-----------|
+| **error** | `❌` + faint red tint / red accent | **Will NOT sync** (hard block — no add/update) |
+| **skip** | `⛔` + faint neutral tint | **Will NOT sync** (hard block — no add/update) |
+| **warn** | `⚠️` + faint yellow tint | **May sync** — proceed; surface warnings in sync results |
+| **sync** | Type chip only (optional sync marker §5.3) | **Will sync** for **implemented** built-ins (`basic` / `cloze` / `reversible` / `typed`) using the resolved type |
+
+Warn overrides a bare sync visually (`sync` + warn messages → show as warn). Effective outcome shares one engine with sync (`effectiveCardOutcome` / write gate).
+
+**Custom note types (`#anki/noteType/…`):** Identify in the type chip, but until custom sync ships (Decided §2.1 / Phase 3) the card must show **warn — not implemented** — never a healthy sync badge and never silent Basic. See §5.1.
 
 ---
 
@@ -24,6 +39,7 @@ Status: design locked for v1 subtle mode; implementation tracks `plugin/src/card
 - Replacing Obsidian's native hashtag pills
 - Per-card YAML editors
 - Auto-hiding authored syntax
+- Custom noteType Anki payload sync (preview may identify + warn-not-implemented only)
 
 ---
 
@@ -31,12 +47,21 @@ Status: design locked for v1 subtle mode; implementation tracks `plugin/src/card
 
 Use **noteType** language in UI/docs (matches Anki’s editor wording):
 
-- Built-ins: `basic`, `cloze`, `reversible`, `typed`
-- Custom: `#anki/noteType/<Name>` in preview help text and chip guidance
+- Built-ins: `basic`, `cloze`, `reversible`, `typed` — v1 sync targets (implemented / in implementation)
+- Custom: `#anki/noteType/<Name>` in preview help text and chip guidance — **identify + warn-not-implemented** until later phase
 
-Settings/cache naming should prefer `anki_noteTypeMap` in user-facing copy.
+Settings/cache naming should prefer `anki_noteTypeMap` in user-facing copy (`anki_noteTypeMap` remapping UI is deferred; stock built-in names first).
 
 `#anki_card_*` and `#anki/CustomCards/...` are also supported as legacy note type tag forms.
+
+### 3.1 Cosmetic vs behavioral (Decided contract §4)
+
+| Kind | Examples | Rule for Future AI |
+|------|----------|-------------------|
+| **Behavioral** | Outcome tint + chip suffix; resolved **type** chip text for implemented types; delimiter garnish implying type (`:::r` ↕, `:::t` ⌨); tooltip problem text; Text/Back/field regions | Must match sync eligibility and Anki model path. Do not invent a parallel meaning. |
+| **Cosmetic only** | Exact tint/hatch **palette colors**; cloze group rainbow indices; inter-card gap / section-top extend (§5.2.2); `cardPreviewStyle` subtle vs explicit chrome strength; optional sync-marker glyph (§5.3) | Safe to tune visually. Sync marker means “**will** sync” per parser — **not** “already in Anki” (no presence index in v1). |
+
+Outcome severity (which of sync/skip/warn/error) is always behavioral; how strongly CSS paints that severity (subtle vs explicit) is cosmetic preference only.
 
 ---
 
@@ -62,28 +87,31 @@ Each card declaration heading (`####` by default, configurable) gets a right-ali
 
 ### 5.1 Chip text
 
-| Resolved type | Chip label |
-|---------------|------------|
-| basic | `basic` |
-| cloze | `cloze` |
-| reversible | `reversible` |
-| typed | `typed` |
-| custom noteType | noteType name (e.g. `Vocab`, `Edge`) |
+| Resolved type | Chip label | Sync meaning (v1) |
+|---------------|------------|-------------------|
+| basic | `basic` | Will sync as Basic when outcome is sync/warn |
+| cloze | `cloze` | Will sync as Cloze when outcome is sync/warn |
+| reversible | `reversible` | Will sync as reversible model when outcome is sync/warn |
+| typed | `typed` | Will sync as typed model when outcome is sync/warn |
+| custom noteType | noteType name (e.g. `Vocab`, `Edge`) | Until Phase 3: **warn-not-implemented** — identify type, do **not** show healthy sync (§1.1) |
 
 ### 5.2 Outcome styling (subtle mode, default)
 
-| Outcome | Background | Border | Label suffix |
-|---------|------------|--------|--------------|
-| sync | none | none | none (or optional marker, §5.3) |
-| skip | very faint neutral tint | none | `⛔` |
-| warn | faint yellow tint | none | `⚠️` |
-| error | faint red tint | red border accent | `❌` |
+Severity chrome encodes §1.1 meanings (behavioral). Palette intensity is cosmetic.
+
+| Outcome | Background | Border | Label suffix | Author meaning |
+|---------|------------|--------|--------------|----------------|
+| sync | none / very faint | none | none (or optional marker, §5.3) | Will sync (implemented types) |
+| skip | very faint neutral tint | none | `⛔` | Will **not** sync |
+| warn | faint yellow tint | none | `⚠️` | May sync (with warnings) |
+| error | faint red tint | red border accent | `❌` | Will **not** sync |
 
 Format examples:
 - `basic`
 - `basic ⛔`
 - `basic ⚠️`
 - `basic ❌`
+- `Vocab ⚠️` (custom identified, not-yet-implemented)
 
 Warn overrides sync visually (`sync with warning` is shown as warn).
 
@@ -98,7 +126,7 @@ Subtle outcome tint applies to the **entire card block**, not just the declarati
 
 ### 5.2.2 Card block envelope (overlay-only)
 
-Layout spacing is **overlay-only**: pseudo-elements on decorated `cm-line` nodes, never `padding-top` / `margin` on lines and never separate gap-line decorations on blank lines between cards.
+Layout spacing is **overlay-only and cosmetic** (Decided §4): pseudo-elements on decorated `cm-line` nodes, never `padding-top` / `margin` on lines and never separate gap-line decorations on blank lines between cards. Tint **which** card spans are painted remains behavioral via `ResolvedCard.range`.
 
 | Concern | Decoration | CSS |
 |---------|------------|-----|
@@ -113,13 +141,13 @@ Settings sync to `:root` via `plugin/src/cardPreviewLayout.ts` (`applyCardPrevie
 
 ### 5.3 Sync marker options
 
-Default is none. Optional marker in subtle mode:
+Default is none. Optional marker in subtle mode (**cosmetic “will sync”** — parser outcome is sync; does **not** query whether the note already exists in Anki):
 
 - none
 - card emoji
 - custom Anki SVG icon
 
-No `🔄` marker for sync.
+No `🔄` marker for sync. Do not treat this marker as “in Anki” presence.
 
 ### 5.4 Chip interaction model
 
@@ -181,7 +209,7 @@ Custom section lists **field names from cache** for the resolved noteType (e.g. 
 
 ### 5.8 Explicit mode
 
-`cardPreviewStyle = explicit`:
+`cardPreviewStyle = explicit` (**cosmetic preference** — outcomes identical to subtle):
 - uppercase outcome pill (`SYNC`, `SKIP`, `WARN`, `ERROR`)
 - stronger borders
 - intended for QA/stress testing, not daily default
@@ -207,7 +235,7 @@ Do not decorate inside `code`, `inlineCode`, or `math`.
 
 ### 6.2 Reversible / typed garnish
 
-Garnish depends on **resolved noteType** and **delimiter token** (spec tokens are `:::r` / `:::t` without space; UI mock may show spaced labels for readability):
+Garnish depends on **resolved noteType** and **delimiter token** (spec tokens are `:::r` / `:::t` without space; UI mock may show spaced labels for readability). Garnish is **behavioral** (implies the synced type after built-ins ship — Decided §4):
 
 | Resolved type | Delimiter line | Guide garnish |
 |---------------|----------------|---------------|
@@ -244,20 +272,22 @@ Unknown field should match resolver severity (`CUS-02` -> error unless configure
 
 ### 7.1 Token highlight
 
-In cloze-resolved cards, highlight hidden tokens with a subtle checked/hatched background behind the token text.
+In cloze-resolved cards, highlight hidden tokens with a subtle checked/hatched background behind the token text. **Behavioral:** which spans are cloze deletions. **Cosmetic:** hatch/fill colors.
 
 ### 7.2 Group coloring
 
 Tokens sharing same cloze group (`cN`) must share the same color/pattern family.
 Different groups use different colors.
 
-Palette strategy:
+Palette strategy (**cosmetic** — Decided §4):
 - fixed accessible palette with wraparound
 - pattern remains consistent; only color index changes
 
-### 7.3 Back-only cloze and `{{}}` in Back
+### 7.3 Back-only cloze and `{{}}` in Back (CLZ-11 — locked **error**)
 
-If `{{…}}` appears only after the first `:::` on a cloze-resolved card (CLZ-11): **warn** (or skip per resolver); show reason in heading chip problems section. Do not apply cloze deletion highlight in Back for active cloze semantics.
+If resolved type is `cloze` (explicit tag / inheritance) but all `{{…}}` appear only after the first `:::` (no valid Text deletions): outcome is **error** (`cloze ❌`). Show reason in heading chip problems section. **Do not** sync; **do not** soften to warn or skip (Decided contract §3 overrides older Spec “skip” wording until Spec is patched).
+
+Do not apply cloze deletion highlight in Back for active cloze semantics.
 
 On **basic**-resolved cards, `{{cN::…}}` only in Back (BAS-05): no type change; optional info in tooltip only.
 
@@ -275,7 +305,7 @@ On **basic**-resolved cards, `{{cN::…}}` only in Back (BAS-05): no type change
 
 ### 7.6 Empty deletion (CLZ-09)
 
-Empty `{{}}` / `{{c1::}}` → skip or warn per resolver; optional subtle underline on token in Text.
+Empty `{{}}` / `{{c1::}}` → **skip** (hard block; will not sync). Optional subtle underline on token in Text.
 
 ### 7.7 Hint mismatch (CLZ-06)
 
@@ -283,21 +313,23 @@ Secondary warn when grouped hints disagree — show in problems section; no sepa
 
 ### 7.8 Custom noteType with cloze-like text (CLZ-12)
 
-Do not apply cloze highlight for custom noteType cards. Absence of highlight is intentional.
+Do not apply cloze highlight for custom noteType cards. Absence of highlight is intentional. Custom cards still follow §1.1 / §5.1: warn-not-implemented until custom sync (not healthy sync).
 
 ---
 
 ## 8. Built-in layout conflicts (preview mapping)
 
-| Spec | Preview |
-|------|---------|
-| BAS-01 basic, no `:::` | heading `basic ⛔` |
-| BAS-06 basic + `:::r`/`:::t`/field | heading `basic ❌`; localized indicator on conflict line |
-| CLZ-10 cloze + `:::r`/`:::t` | heading `cloze ❌`; indicator on delimiter line |
-| REV-03 / TYP-02 missing split | heading skip styling |
-| CUS-03 orphan `::: Field` | heading skip; field lines may still show guides |
-| CUS-04 custom + plain `:::` only | heading skip |
-| CUS-05 custom + `:::r`/`:::t` | heading error; indicator on reserved delimiter line |
+| Spec | Preview | Sync |
+|------|---------|------|
+| BAS-01 basic, no `:::` | heading `basic ⛔` | will not sync |
+| BAS-06 / delimiter type promotion | Prefer resolved type chip (`reversible` / `typed`) when delimiter promotes type; conflict with opposing explicit type → **error**. Do not show “basic + stray `r`/`t`”. | match resolved type (Decided §3) |
+| CLZ-10 cloze + `:::r`/`:::t` | heading `cloze ❌`; indicator on delimiter line | will not sync |
+| CLZ-11 cloze deletions only after `:::` | heading `cloze ❌` | will not sync |
+| REV-03 / TYP-02 missing split | heading skip styling | will not sync |
+| CUS-03 orphan `::: Field` | heading skip; field lines may still show guides | will not sync (custom later) |
+| CUS-04 custom + plain `:::` only | heading skip | will not sync |
+| CUS-05 custom + `:::r`/`:::t` | heading error; indicator on reserved delimiter line | will not sync |
+| Identified custom, otherwise valid | `Vocab ⚠️` (not-implemented) | no Anki payload until Phase 3 |
 
 ---
 
@@ -381,9 +413,9 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 ## 15. Accessibility and visual tokens
 
 - Do not rely on color alone — combine tint, emoji (non-sync outcomes), and tooltip text
-- Cloze groups: fixed palette with wraparound; hatched/check pattern shared across groups
+- Cloze groups: fixed palette with wraparound; hatched/check pattern shared across groups (**colors cosmetic**; spans behavioral)
 - CSS prefix: `anki-card-preview-*`; prefer Obsidian vars (`--text-muted`, `--color-red`, `--color-yellow`, `--background-modifier-border`)
-- Layout envelope vars (§5.2.2): `--anki-card-preview-section-top-extend`, `--anki-card-preview-inter-card-gap`
+- Layout envelope vars (§5.2.2): `--anki-card-preview-section-top-extend`, `--anki-card-preview-inter-card-gap` (**cosmetic** spacing)
 
 ---
 
@@ -399,16 +431,17 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 ## 17. Implementation checklist
 
 - [ ] Heading chip stays on heading line (no drift into body line)
-- [ ] Subtle outcome styling per §5.2; warn overrides sync
+- [ ] Subtle outcome styling per §5.2; warn overrides sync; meanings match §1.1
 - [ ] Lightweight tooltip + lazy "More" modal (§5.5)
 - [ ] Per-noteType structure text + other-types cheatsheet (§5.7)
 - [ ] Template insertion after heading for all types (§11)
 - [ ] First-delimiter guides; DEL-08 discouragement on extras (§6.1, §10)
-- [ ] Reversible ↑↓ and typed keyboard garnish (§6.2)
+- [ ] Reversible ↑↓ and typed keyboard garnish (§6.2) — behavioral with sync type
 - [ ] Cloze Back Extra ℹ marker (§6.3)
 - [ ] CUS-02 line-end validation with cached noteType map + recache action
+- [ ] Custom identified cards: warn-not-implemented (no healthy sync) until Phase 3
 - [ ] Cloze highlight + BAS-04 reclassify behavior (§7)
-- [ ] Back-only `{{}}` warn (§7.3)
+- [ ] CLZ-11 Back-only deletions → **error** (not warn/skip) (§7.3)
 - [ ] Typed multiline/formatting warns (§9)
 - [ ] Layout conflict mapping (§8)
 - [ ] File-level `AnkiSync` off behavior (§12)
@@ -418,7 +451,8 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 
 ## 18. Related documents
 
-- [Card-Syntax-Spec.md](Card-Syntax-Spec.md) — grammar, rule IDs, outcomes
+- [DECIDED-Preview-Sync-Contract-2026-07.md](./DECIDED-Preview-Sync-Contract-2026-07.md) — locked preview ↔ sync behavior (read first for product meaning)
+- [Card-Syntax-Spec.md](Card-Syntax-Spec.md) — grammar, rule IDs, outcomes (Spec polish may lag Decided locks)
 - [Engine-Architecture.md](../Engine-Architecture.md) — sync pipeline context
 - [Card-Rendering.md](../Card-Rendering.md) — Anki HTML compile (separate concern)
 - Stress fixture: `tests/fixtures/new format/card-syntax-stress-test.md`
@@ -436,3 +470,4 @@ Preview validation uses **resolver + cached noteType fields** (CUS-02). Recache 
 | 2026-06-30 | Sync content boundary: authoring `%%` / `<!-- -->` lines excluded from envelope tint |
 | 2026-07-15 | Sync content boundary: trailing `---` / thematic breaks (alone or with comment tails) excluded from envelope tint |
 | 2026-07-15 | Mid-card HR underlay: decorator `before-mid-hr` + solid box-shadow peek (no `:has()` / no `::after` accent); shared paint-host formulas |
+| 2026-07-15 | Align with Decided preview↔sync contract: §1.1 outcome meanings; §3.1 cosmetic vs behavioral; CLZ-11 → **error**; custom warn-not-implemented; cross-links |

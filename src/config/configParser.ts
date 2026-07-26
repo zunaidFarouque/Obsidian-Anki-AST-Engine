@@ -11,8 +11,17 @@ export const ConfigSchema = z.object({
   ankiConnectUrl: z.string().url().default("http://127.0.0.1:8765"),
   ankiConnectApiKey: z.string().min(1).optional(),
   noteModelName: z.string().min(1).default("Basic"),
-  noteModelType: z.enum(["basic"]).default("basic"),
+  noteModelType: z
+    .enum(["basic", "cloze", "reversible", "typed"])
+    .default("basic"),
   autoCreateDecks: z.boolean().default(true),
+  /** When true, missing stock note types (Basic/Cloze/…) are created via AnkiConnect. */
+  autoCreateStockNoteModels: z.boolean().default(true),
+  /**
+   * When true, basic-resolved cards with {{cN::…}} in Text reclassify as cloze
+   * for both preview and sync (01 D4).
+   */
+  inferClozeFromManualSyntaxOnBasic: z.boolean().default(false),
   syncTagPrefix: z.string().min(1).default("obsidian-id"),
   orphanIgnoreTag: z.string().min(1).default("obsidian-sync-ignore"),
   linkFormat: z.enum(["shortest", "relative", "absolute"]).default("shortest"),

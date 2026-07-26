@@ -28,6 +28,8 @@ describe("syncPipeline injection offsets", () => {
       ankiConnectUrl: "http://127.0.0.1:8765",
       noteModelName: "Basic",
       autoCreateDecks: true,
+      autoCreateStockNoteModels: true,
+      inferClozeFromManualSyntaxOnBasic: false,
       syncTagPrefix: "obsidian-id",
       linkFormat: "shortest",
       defaultCardDeclarationHeadingLevel: 4,
@@ -44,6 +46,12 @@ describe("syncPipeline injection offsets", () => {
           return new Response(JSON.stringify({ result: [], error: null }));
         case "createDeck":
           return new Response(JSON.stringify({ result: 1, error: null }));
+        case "modelNames":
+          return new Response(
+            JSON.stringify({ result: ["Basic"], error: null }),
+          );
+        case "createModel":
+          return new Response(JSON.stringify({ result: null, error: null }));
         case "getMediaFilesNames":
           return new Response(JSON.stringify({ result: [], error: null }));
         case "findNotes":

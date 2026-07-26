@@ -24,6 +24,9 @@ export function buildPluginConfig(
 		noteModelName: settings.noteModelName,
 		noteModelType: 'basic',
 		autoCreateDecks: settings.autoCreateDecks,
+		autoCreateStockNoteModels: settings.autoCreateStockNoteModels,
+		inferClozeFromManualSyntaxOnBasic:
+			settings.inferClozeFromManualSyntaxOnBasic,
 		syncTagPrefix: settings.syncTagPrefix,
 		orphanIgnoreTag: settings.orphanIgnoreTag,
 		linkFormat: settings.linkFormat,

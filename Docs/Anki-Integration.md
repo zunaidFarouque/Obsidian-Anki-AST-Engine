@@ -2,6 +2,9 @@
 
 Live sync from the headless engine to Anki Desktop via [AnkiConnect](https://foosoft.net/projects/ankiconnect/) (add-on code **2055492159**).
 
+> **Status as of 2026-07:** Preview outcomes **hard-gate** Anki writes. Built-in types (`basic` / `cloze` / `reversible` / `typed`) sync to stock Anki models (Phases 1–2c landed: shared gate, stock models, `inferCloze` parity, auto-create + opt-out, TYP-05, migration summary). Custom note types are identified and **warn / hard-skip** (not silent Basic) until Phase 3.  
+> **Rule sources:** [DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) · [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md)
+
 ## Prerequisites
 
 1. **Anki Desktop** running locally.
@@ -46,16 +49,39 @@ Restart Anki after changing config. Quick check: open `http://127.0.0.1:8765` in
 
 If you enable `apiKey` in AnkiConnect, set matching `ankiConnectApiKey` in plugin settings (or `config.json` for CLI).
 
-### Note type
+### Note types (stock models)
 
-This release uses Anki’s built-in **Basic** model (`Front` + `Back`). No custom note type is required.
+> **Status as of 2026-07:** Phase 2 maps each **resolved built-in** to a stock Anki model. Sync keys off `ResolvedCard.resolvedType` from `parseCardDocument`, not a single file-wide Basic write.
+
+| Resolved type | Anki model | Fields |
+|---------------|------------|--------|
+| `basic` | `Basic` | Front / Back |
+| `cloze` | `Cloze` | Text / Back Extra (optional) |
+| `reversible` | `Basic (and reversed card)` | Front / Back |
+| `typed` | `Basic (type in the answer)` | Front / plain-text Back |
+
+**Custom** (`#anki/noteType/…`): identify + **warn “not yet implemented”** and hard-skip — never silent Basic. Full custom field sync is Phase 3.
+
+Stock models are auto-created when missing (`autoCreateStockNoteModels`, default on; settings opt-out). Remapping UI (`anki_noteTypeMap`) is deferred.
 
 Optional styling for compiled HTML:
 
 - **Math** — MathJax (default on Anki 2.1.20+ desktop).
-- **Callouts** — add CSS for `.callout`, `.callout-tip`, etc. in Basic card styling.
-- **Tables** — compiled tables use `class="anki-md-table"`. Paste [`templates/anki-basic-table.css`](../templates/anki-basic-table.css) into Basic card styling (or add your own rules for `.anki-md-table`).
+- **Callouts** — add CSS for `.callout`, `.callout-tip`, etc. in card styling.
+- **Tables** — compiled tables use `class="anki-md-table"`. Paste [`templates/anki-basic-table.css`](../templates/anki-basic-table.css) into card styling (or add your own rules for `.anki-md-table`).
 - **Highlights** — `<mark>` renders with default browser/Anki styling.
+
+### Preview outcome ↔ sync gate
+
+Sync and Live Preview share `parseCardDocument`. Effective outcomes gate Anki writes:
+
+| Outcome | Sync |
+|---------|------|
+| `sync` | Create/update using the resolved stock model |
+| `warn` | Proceed to sync; surface warnings on the action / results |
+| `skip` / `error` | **Hard block** — no add/update, no id inject for that card |
+
+See [DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) §1.
 
 ### Decks
 
@@ -138,7 +164,7 @@ Sync complete (live): 37 card(s) — added 0, updated 4, skipped 33, failed 0, d
 
 1. Read `<!--anki-id: uuid-->` from card back.
 2. Live sync prefetches all obsidian-id lookups for the file in one `multi` request; re-sync uses `findNotes` with `tag:"obsidian-id::<uuid>"` when resolving a single card via `syncCard`.
-3. Compare `Front` / `Back` fields (with code-block line-ending normalization — see below); call `updateNoteFields` only when content truly changed.
+3. Compare model fields (Basic: `Front`/`Back`; Cloze: `Text`/`Back Extra`; typed: plain-text Back — with code-block line-ending normalization — see below); call `updateNoteFields` only when content truly changed. Field-change detection is model-agnostic.
 4. `updateNoteTags` when tag set differs (engine, file, heading, or binding tags).
 
 ### Field comparison and code blocks
@@ -262,8 +288,8 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 | `defaultEngineTag` | `Obsidian-Anki-AST` | Tag on every synced note |
 | `ankiConnectUrl` | `http://127.0.0.1:8765` | AnkiConnect endpoint |
 | `ankiConnectApiKey` | omitted | Matches AnkiConnect `apiKey` when set |
-| `noteModelName` | `Basic` | Note type for `addNote` |
-| `noteModelType` | `basic` | Future: reversible / cloze / custom |
+| `noteModelName` | `Basic` | Fallback model when a payload omits `modelName` (pipeline sets per-card stock names) |
+| `noteModelType` | `basic` | Enum: `basic` \| `cloze` \| `reversible` \| `typed` (legacy/settings; sync keys off resolved type) |
 | `autoCreateDecks` | `true` | `createDeck` when deck missing |
 | `syncTagPrefix` | `obsidian-id` | Prefix for UUID binding tags |
 
@@ -278,13 +304,16 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 | Cards show `update` every run but content unchanged | Often CRLF in code blocks (fixed by normalization) or duplicate-pair tag/back fights — check stderr `duplicate_warning` |
 | `back_mismatch` duplicate warning | Two notes share the same compiled front but disagree on the answer — fix vault content, do not ignore |
 | Images missing in Anki | Re-run sync; check `wouldUploadMedia` in dry-run |
-| Math not rendering | Ensure Basic template supports MathJax |
+| Math not rendering | Ensure the note template supports MathJax |
+| Custom card skipped / warn not implemented | Expected until Phase 3 — use built-ins or wait for custom sync |
+| Cloze / reversible / typed still Basic in Anki | Rebuild/redeploy; confirm Phase 2 stock model map is in the build |
 
 ## Implementation
 
 - HTTP client: [`src/anki/client.ts`](../src/anki/client.ts)
 - Sync logic: [`src/anki/syncEngine.ts`](../src/anki/syncEngine.ts)
-- AnkiConnect client: [`src/anki/client.ts`](../src/anki/client.ts)
+- Stock model map: [`src/anki/stockNoteModels.ts`](../src/anki/stockNoteModels.ts)
+- Preview/sync eligibility: [`src/cardSyntax/syncEligibility.ts`](../src/cardSyntax/syncEligibility.ts)
 - Deck cache: [`src/anki/deckEnsurer.ts`](../src/anki/deckEnsurer.ts)
 - Duplicate front search: [`src/anki/frontSearch.ts`](../src/anki/frontSearch.ts)
 - Performance roadmap: [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md)
@@ -297,7 +326,12 @@ If one card fails for a non-recoverable reason, other successful cards in the sa
 
 ## Deferred
 
-- Reversible / Cloze card types
-- Custom note types with configurable field maps
-- Exact in-note scroll to card byte offset (plugin uses heading anchors today)
-- Full plugin orchestrator tests with mocked Obsidian `requestUrl`
+> **Status as of 2026-07:** Phases **1–2c** (built-in multi-type sync + inferCloze parity + auto-create + TYP-05 + migration summary) are **done**. Items below remain open.
+
+| Item | Status |
+|------|--------|
+| Custom note types with Anki field payloads | Phase **3** — deferred |
+| True Anki **Change Note Type** (AnkiConnect cannot retype notes) | Deferred — best-effort field update / block + summary only |
+| Exact in-note scroll to card byte offset (plugin uses heading anchors today) | Deferred |
+| Full plugin orchestrator tests with mocked Obsidian `requestUrl` | Deferred |
+| Reading-mode card preview CSS (`registerMarkdownPostProcessor`) | Deferred — Live Preview only today |

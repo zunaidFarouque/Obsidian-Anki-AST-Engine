@@ -225,7 +225,7 @@ function resolveCard(
       messages.push({
         level: "warn",
         text: `Card "${title}": ${warning} — warning`,
-        ruleId: "CLZ-07",
+        ruleId: "CLZ-06",
       });
     }
   }
@@ -262,7 +262,7 @@ function resolveCard(
       messages.push({
         level: "warn",
         text: `Card "${title}": typed answer includes formatting; plain text is recommended — warning`,
-        ruleId: "TYP-05",
+        ruleId: "TYP-03b",
       });
     }
   }

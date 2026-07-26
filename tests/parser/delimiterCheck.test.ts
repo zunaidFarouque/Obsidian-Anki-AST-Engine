@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseMarkdown } from "../../src/ast/processor";
-import { isStructuralDelimiter } from "../../src/parser/delimiterCheck";
+import {
+  findDelimiterIndex,
+  findDelimiterMatch,
+  isStructuralDelimiter,
+} from "../../src/parser/delimiterCheck";
 import type { Node } from "unist";
 import { visitParents } from "unist-util-visit-parents";
 
@@ -135,6 +139,25 @@ describe("delimiterCheck", () => {
     expect(matches.length).toBeGreaterThanOrEqual(1);
     expect(structural).toHaveLength(1);
     expect(getText(structural[0]!.node).trim()).toBe(":::");
+  });
+
+  test(":::r match consumes the r suffix so Back is not polluted", () => {
+    const match = findDelimiterMatch(":::r", ":::");
+    expect(match).toEqual({ index: 0, length: 4 });
+    expect(findDelimiterIndex(":::r", ":::")).toBe(0);
+  });
+
+  test(":::t match consumes the t suffix so Back is not polluted", () => {
+    const match = findDelimiterMatch(":::t", ":::");
+    expect(match).toEqual({ index: 0, length: 4 });
+  });
+
+  test("plain ::: still matches length 3", () => {
+    expect(findDelimiterMatch(":::", ":::")).toEqual({ index: 0, length: 3 });
+    expect(findDelimiterMatch("Front ::: Back", ":::")).toEqual({
+      index: 6,
+      length: 3,
+    });
   });
 });
 

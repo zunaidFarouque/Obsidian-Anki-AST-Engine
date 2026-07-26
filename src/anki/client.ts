@@ -53,8 +53,24 @@ export type AddNoteParams = {
   tags: string[];
 };
 
+export type CreateModelCardTemplate = {
+  Name: string;
+  Front: string;
+  Back: string;
+};
+
+export type CreateModelParams = {
+  modelName: string;
+  inOrderFields: string[];
+  cardTemplates: CreateModelCardTemplate[];
+  css?: string;
+  isCloze?: boolean;
+};
+
 export type NoteInfo = {
   noteId: number;
+  /** Present on AnkiConnect notesInfo; used for model-mismatch / migration. */
+  modelName?: string;
   tags: string[];
   cards?: number[];
   fields: Record<string, { value: string; order: number }>;
@@ -195,6 +211,16 @@ export class AnkiConnectClient {
 
   async modelNames(): Promise<string[]> {
     return this.invoke<string[]>("modelNames");
+  }
+
+  async createModel(params: CreateModelParams): Promise<null> {
+    return this.invoke<null>("createModel", {
+      modelName: params.modelName,
+      inOrderFields: params.inOrderFields,
+      cardTemplates: params.cardTemplates,
+      ...(params.css !== undefined ? { css: params.css } : {}),
+      ...(params.isCloze !== undefined ? { isCloze: params.isCloze } : {}),
+    });
   }
 
   async invokeMulti<T extends unknown[]>(

@@ -2,7 +2,9 @@
 
 Authoritative reference for **engine-specific** behavior (not Obsidian-native). For wikilink/embed/block resolution rules, see [Obsidian-Parity.md](Obsidian-Parity.md).
 
-**Card type grammar (v1):** [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md) — stress-test fixture: [`tests/fixtures/new format/card-syntax-stress-test.md`](../tests/fixtures/new%20format/card-syntax-stress-test.md). **Editor preview UX:** [DECIDING/Card-Preview-Design-Guidelines.md](DECIDING/Card-Preview-Design-Guidelines.md).
+> **Status as of 2026-07:** Sync and Live Preview share `parseCardDocument`. Preview outcomes **hard-gate** Anki writes (`skip`/`error` block; `warn` may sync). Built-ins sync to stock Anki models (Phases 1–2c landed: gate, stock models, `inferCloze` parity, auto-create, TYP-05, migration summary). Custom = warn / hard-skip until Phase 3.  
+> **Rule sources:** [DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) · [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md) · [DECIDING/Card-Preview-Design-Guidelines.md](DECIDING/Card-Preview-Design-Guidelines.md)  
+> Stress-test fixture: [`tests/fixtures/new format/card-syntax-stress-test.md`](../tests/fixtures/new%20format/card-syntax-stress-test.md). Anki models / performance: [Anki-Integration.md](Anki-Integration.md).
 
 ## Pipeline overview
 
@@ -16,15 +18,19 @@ flowchart TD
   merge[mergeInjectionMetadata]
   extractPost[extractCards on grafted AST]
   compile[compileCardFields → HTML]
+  resolve[parseCardDocument: type + outcome]
   dup[detectVaultFrontCollisions]
-  anki[syncEngine: add / update / skip]
+  elig[syncEligibility: skip/error hard-block]
+  anki[syncEngine: stock model per type]
   inject[surgicalInjector]
   scan --> gate
   gate -->|no| skip[skip file]
   gate -->|on true yes| parse
   parse --> extractPre --> graft --> extractPost --> merge
-  merge --> compile --> dup
-  compile --> anki
+  merge --> compile --> resolve --> dup
+  resolve --> elig
+  elig -->|allowed| anki
+  elig -->|blocked| skipCard[skip card]
   anki --> inject
 ```
 
@@ -38,10 +44,13 @@ Implemented in [`src/syncPipeline.ts`](../src/syncPipeline.ts):
 6. **Media** — resolve attachment paths; queue dry-run uploads
 7. **Extract (grafted)** — re-run state machine on grafted AST for **compile** buffers (transcluded content in front/back HTML)
 8. **Merge** — `mergeInjectionMetadata` copies `ankiId` and `injectionOffset` from source cards onto grafted cards by index
-9. **Compile** — `compileCardFields` → `frontHtml` / `backHtml` (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
-10. **Duplicate scan** — after all files are compiled, group by `deck + frontHtml`; emit `duplicate_warning` for collisions (see [Anki-Integration.md](Anki-Integration.md#duplicate-detection))
-11. **Anki sync** — batched live path: `invokeMulti` prefetch, `addNotes` chunks, parallel updates; see [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md#live-sync-flow-per-file) and [Anki-Integration.md](Anki-Integration.md#card-sync-performance)
-12. **Inject** — plan or write `<!--anki-id: uuid-->` at pre-graft byte offsets (live sync after successful card sync)
+9. **Compile** — `compileCardFields` → HTML fields (GFM, MathJax, highlights, preview headings, callouts, footnote embed); see [Card-Rendering.md](Card-Rendering.md)
+10. **Card syntax resolve** — `parseCardDocument` produces per-card `resolvedType` + outcome (same brain as Live Preview)
+11. **Eligibility** — `skip` / `error` hard-block Anki writes; `warn` may sync with warnings surfaced; custom → warn + hard-skip until Phase 3 ([DECIDED contract](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) §1)
+12. **Stock model + fields** — map built-ins via [`stockNoteModels.ts`](../src/anki/stockNoteModels.ts) (`basic` / `cloze` / `reversible` / `typed`)
+13. **Duplicate scan** — after all files are compiled, group by `deck + frontHtml`; emit `duplicate_warning` for collisions (see [Anki-Integration.md](Anki-Integration.md#duplicate-detection))
+14. **Anki sync** — batched live path: `invokeMulti` prefetch, `addNotes` chunks, parallel updates; see [Sync-Performance-Roadmap.md](Sync-Performance-Roadmap.md#live-sync-flow-per-file) and [Anki-Integration.md](Anki-Integration.md#card-sync-performance)
+15. **Inject** — plan or write `<!--anki-id: uuid-->` at pre-graft byte offsets (live sync after successful card sync; blocked cards are not injected)
 
 ## Read-only AST and vault safety
 
@@ -288,8 +297,9 @@ Default delimiter: **`:::`**
 ```
 src/
 ├── index.ts                 # CLI entry
-├── syncPipeline.ts          # Orchestration
+├── syncPipeline.ts          # Orchestration (eligibility + stock models)
 ├── config/configParser.ts
+├── cardSyntax/              # parseCardDocument, type resolution, syncEligibility
 ├── io/
 │   ├── scanner.ts
 │   ├── reader.ts
@@ -310,6 +320,7 @@ src/
 ├── anki/
 │   ├── client.ts            # AnkiConnect HTTP (invoke limit, retry, addNotes, multi)
 │   ├── syncEngine.ts        # Batched add/update/skip card sync
+│   ├── stockNoteModels.ts   # Built-in → stock Anki model + field map
 │   ├── deckEnsurer.ts       # Per-run deck name cache
 │   ├── frontSearch.ts       # Targeted duplicate Front lookup queries
 │   ├── duplicateDetect.ts   # Vault front collisions + warning payloads

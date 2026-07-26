@@ -136,6 +136,25 @@ function stripMarkdownInline(text: string): string {
     .replace(/_([^_]+)_/g, "$1");
 }
 
+/**
+ * TYP-05: split a typed first-line answer on `|`, trim each segment, drop empties.
+ * Authoring may use spaces around pipes (`Paris | Lyon`); Anki Back stores `Paris|Lyon`.
+ */
+export function parseTypedAcceptableAnswers(firstLinePlain: string): string[] {
+  return firstLinePlain
+    .split("|")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+/** Join TYP-05 alternatives for the Anki type-in Back field (no spaces around `|`). */
+export function formatTypedAnswersForAnki(answers: string[]): string {
+  return answers.join("|");
+}
+
+/**
+ * TYP-03/04/05: first non-empty line → strip HTML/markdown → pipe-split alternatives.
+ */
 export function extractTypedBackPlainText(backRegion: string): string {
   const withoutHtml = stripHtmlTags(backRegion);
   const withoutMarkdown = stripMarkdownInline(withoutHtml);
@@ -143,7 +162,7 @@ export function extractTypedBackPlainText(backRegion: string): string {
   for (const line of normalized.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (trimmed.length > 0) {
-      return trimmed;
+      return formatTypedAnswersForAnki(parseTypedAcceptableAnswers(trimmed));
     }
   }
   return "";
@@ -284,9 +303,9 @@ function validateClozeLayout(
       messages,
       "error",
       "CLZ-11",
-      `Card "${title}": cloze deletions only in Back region — skipped`,
+      `Card "${title}": cloze deletions only in Back region — error`,
     );
-    return { outcome: "skip", messages, effectiveType };
+    return { outcome: "error", messages, effectiveType };
   }
 
   pushMessage(
@@ -298,12 +317,30 @@ function validateClozeLayout(
   return { outcome: "skip", messages, effectiveType };
 }
 
+function hasTypedSignal(regions: CardLayoutRegions): boolean {
+  return (
+    regions.hasTypedDelimiter || regions.hasEmbeddedTypedDelimiter === true
+  );
+}
+
+function hasReversibleSignal(regions: CardLayoutRegions): boolean {
+  return (
+    regions.hasReversibleDelimiter ||
+    regions.hasEmbeddedReversibleDelimiter === true
+  );
+}
+
 function validateReversibleLayout(
   regions: CardLayoutRegions,
   options: LayoutValidatorOptions,
   messages: LayoutMessage[],
 ): LayoutValidationResult {
   const title = cardLabel(regions, options);
+
+  if (hasTypedSignal(regions)) {
+    messages.push(conflictError(title, ":::t", "reversible", "REV-06"));
+    return { outcome: "error", messages };
+  }
 
   if (!hasSplit(regions)) {
     pushMessage(
@@ -324,6 +361,11 @@ function validateTypedLayout(
   messages: LayoutMessage[],
 ): LayoutValidationResult {
   const title = cardLabel(regions, options);
+
+  if (hasReversibleSignal(regions)) {
+    messages.push(conflictError(title, ":::r", "typed", "REV-06"));
+    return { outcome: "error", messages };
+  }
 
   if (!hasSplit(regions)) {
     pushMessage(

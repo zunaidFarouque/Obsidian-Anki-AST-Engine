@@ -264,7 +264,7 @@ describe("validateCardLayout — CLZ-10/11 cloze delimiter and Back-only deletio
     expect(messageText(result)).toContain(':::t conflicts with resolved type "cloze"');
   });
 
-  test("skips when deletions exist only after :::", () => {
+  test("errors when deletions exist only after ::: (CLZ-11)", () => {
     const result = validateCardLayout(
       cloze,
       regions({
@@ -275,9 +275,10 @@ describe("validateCardLayout — CLZ-10/11 cloze delimiter and Back-only deletio
       options({ cardTitle: "Card" }),
     );
 
-    expect(result.outcome).toBe("skip");
+    expect(result.outcome).toBe("error");
     expect(result.messages.some((m) => m.ruleId === "CLZ-11")).toBe(true);
     expect(messageText(result)).toContain("cloze deletions only in Back region");
+    expect(messageText(result)).toContain("— error");
   });
 });
 
@@ -336,9 +337,57 @@ describe("validateCardLayout — REV-03..05 reversible", () => {
       true,
     );
   });
+
+  test("errors REV-06 when reversible conflicts with :::t", () => {
+    const result = validateCardLayout(
+      reversible,
+      regions({
+        textRegion: "Question",
+        backRegion: "Answer",
+        hasTypedDelimiter: true,
+      }),
+      options({ cardTitle: "Mismatch" }),
+    );
+
+    expect(result.outcome).toBe("error");
+    expect(result.messages.some((m) => m.ruleId === "REV-06")).toBe(true);
+    expect(messageText(result)).toContain(':::t conflicts with resolved type "reversible"');
+  });
+
+  test("errors REV-06 when both :::r and :::t are present", () => {
+    const result = validateCardLayout(
+      reversible,
+      regions({
+        textRegion: "Question",
+        backRegion: "Answer",
+        hasReversibleDelimiter: true,
+        hasEmbeddedTypedDelimiter: true,
+      }),
+      options({ cardTitle: "Both" }),
+    );
+
+    expect(result.outcome).toBe("error");
+    expect(result.messages.some((m) => m.ruleId === "REV-06")).toBe(true);
+  });
 });
 
 describe("validateCardLayout — TYP-02..04 typed", () => {
+  test("errors REV-06 when typed conflicts with :::r", () => {
+    const result = validateCardLayout(
+      typed,
+      regions({
+        textRegion: "Capital?",
+        backRegion: "Paris",
+        hasReversibleDelimiter: true,
+      }),
+      options({ cardTitle: "Mismatch" }),
+    );
+
+    expect(result.outcome).toBe("error");
+    expect(result.messages.some((m) => m.ruleId === "REV-06")).toBe(true);
+    expect(messageText(result)).toContain(':::r conflicts with resolved type "typed"');
+  });
+
   test("skips typed without split", () => {
     const result = validateCardLayout(
       typed,
@@ -386,6 +435,33 @@ describe("extractTypedBackPlainText — TYP-03/04", () => {
     expect(extractTypedBackPlainText("**Paris**\nLyon")).toBe("Paris");
     expect(extractTypedBackPlainText("\n  Paris  \nLyon")).toBe("Paris");
     expect(extractTypedBackPlainText("&amp;")).toBe("&");
+  });
+});
+
+describe("extractTypedBackPlainText — TYP-05 multi-answer", () => {
+  test("splits pipe-separated alternatives and trims spaces around |", () => {
+    expect(extractTypedBackPlainText("Paris | Lyon | Marseille")).toBe(
+      "Paris|Lyon|Marseille",
+    );
+    expect(extractTypedBackPlainText("Paris|Lyon|Marseille")).toBe(
+      "Paris|Lyon|Marseille",
+    );
+    expect(extractTypedBackPlainText("Answer one | Answer two")).toBe(
+      "Answer one|Answer two",
+    );
+  });
+
+  test("drops empty pipe segments and ignores later lines (TYP-04 then TYP-05)", () => {
+    expect(extractTypedBackPlainText("Paris||Lyon")).toBe("Paris|Lyon");
+    expect(extractTypedBackPlainText("Paris | | Lyon\nMarseille")).toBe(
+      "Paris|Lyon",
+    );
+  });
+
+  test("strips formatting before splitting (TYP-03 then TYP-05)", () => {
+    expect(extractTypedBackPlainText("**Paris** | <em>Lyon</em>")).toBe(
+      "Paris|Lyon",
+    );
   });
 });
 

@@ -219,6 +219,40 @@ function assertCardMatchesExpectation(
     ).toBe(true);
   }
 
+  const ankiTagsExtra =
+    expectation.extras.anki_tags ?? expectation.extras["anki tags"];
+  if (ankiTagsExtra) {
+    const expectedTags = ankiTagsExtra
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    for (const tag of expectedTags) {
+      expect(
+        card.hashtags.user,
+        `${expectation.cardId}: expected Anki user tag "${tag}" (got [${card.hashtags.user.join(", ")}])`,
+      ).toContain(tag);
+    }
+  }
+
+  const stripEngineExtra =
+    expectation.extras.strip_engine ??
+    expectation.extras["strip engine"];
+  if (stripEngineExtra) {
+    const engineToken = stripEngineExtra.startsWith("#")
+      ? stripEngineExtra
+      : `#${stripEngineExtra}`;
+    expect(
+      card.hashtags.user.some(
+        (tag) => tag === stripEngineExtra || tag === engineToken,
+      ),
+      `${expectation.cardId}: engine directive ${engineToken} must not appear in Anki user tags`,
+    ).toBe(false);
+    expect(
+      card.hashtags.engine.includes(engineToken),
+      `${expectation.cardId}: expected engine hashtag ${engineToken}`,
+    ).toBe(true);
+  }
+
   if (expectation.rules.length > 0 && card.messages.length > 0) {
     const messageRules = new Set(
       card.messages
@@ -280,6 +314,17 @@ describe("stress-test fixture expect comment parser", () => {
     expect(parsed.rules).toEqual(["BAS-03", "CX-07"]);
     expect(parsed.resolved).toBe("basic");
   });
+
+  test("parses anki_tags and strip_engine extras for STR-04 / CX-29", () => {
+    const parsed = parseExpectComment(
+      "<!-- expect: sync; rules: STR-04,CX-29; anki_tags: biology; strip_engine: anki/cardType/cloze -->",
+    );
+
+    expect(parsed.outcome).toBe("sync");
+    expect(parsed.rules).toEqual(["STR-04", "CX-29"]);
+    expect(parsed.extras.anki_tags).toBe("biology");
+    expect(parsed.extras.strip_engine).toBe("anki/cardType/cloze");
+  });
 });
 
 describe("card-syntax-stress-test.md integration", () => {
@@ -326,6 +371,50 @@ describe("card-syntax-stress-test.md integration", () => {
     },
   );
 
+  test("G4 / CX-29: nearest section ancestor carries #biology + cloze (STR-04)", async () => {
+    const rawText = await readFile(FIXTURE_PATH, "utf8");
+    const bodyStartOffset = getBodyStartOffset(rawText);
+    const result = parseCardDocument!(rawText, {
+      ...DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+      bodyStartOffset,
+    });
+    const g4 = findCardById(result.cards, "G4");
+    expect(g4).toBeDefined();
+    expect(g4!.outcome).toBe("sync");
+    expect(formatResolvedCardType(g4!.resolvedType)).toBe("cloze");
+    expect(g4!.hashtags.user).toContain("biology");
+    expect(g4!.hashtags.user).not.toContain("anki/cardType/cloze");
+    expect(g4!.hashtags.engine).toContain("#anki/cardType/cloze");
+    expect(g4!.resolvedFrom.toLowerCase()).toContain("tag split");
+  });
+
+  test("B4 / CX-25: non-empty cloze + optional Back Extra syncs; empty stays G3 skip", async () => {
+    const rawText = await readFile(FIXTURE_PATH, "utf8");
+    const bodyStartOffset = getBodyStartOffset(rawText);
+    const result = parseCardDocument!(rawText, {
+      ...DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+      bodyStartOffset,
+    });
+
+    const b4 = findCardById(result.cards, "B4");
+    expect(b4).toBeDefined();
+    expect(b4!.outcome).toBe("sync");
+    expect(formatResolvedCardType(b4!.resolvedType)).toBe("cloze");
+    expect(b4!.regions.text).toBeDefined();
+    expect(b4!.regions.back).toBeDefined();
+    const textBody = rawText.slice(b4!.regions.text!.start, b4!.regions.text!.end);
+    expect(textBody.includes("{{}}") || /\{\{c\d+::\}\}/.test(textBody)).toBe(
+      false,
+    );
+    expect(/\{\{[^}]+\}\}/.test(textBody)).toBe(true);
+
+    const g3 = findCardById(result.cards, "G3");
+    expect(g3).toBeDefined();
+    expect(g3!.outcome).toBe("skip");
+    expect(g3!.messages.some((message) => message.ruleId === "CLZ-09")).toBe(
+      true,
+    );
+  });
 });
 
 describe("stress scenario coverage report", () => {

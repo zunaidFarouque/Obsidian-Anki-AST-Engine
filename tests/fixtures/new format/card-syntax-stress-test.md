@@ -22,9 +22,9 @@ Section B  Cloze inheritance (### #anki/cardType/cloze)
   B1  Inherited shorthand cloze            -> sync (CLZ-04, CX-04)
   B2  Auto-number case + groups            -> sync (CLZ-05, CLZ-06)
   B3  Manual c1/c2 same text              -> sync (CLZ-08)
-  B4  Cloze + Back Extra                   -> sync (CLZ-02, CX-25)
+  B4  Non-empty cloze + Back Extra         -> sync (CLZ-02, CX-25); empty = G3/CLZ-09
   B5  Cloze SKIP no {{}}                   -> skip (CLZ-01, CX-05)
-  B6  Cloze SKIP {{}} only after :::       -> skip (CLZ-11, CX-12)
+  B6  Cloze ERROR {{}} only after :::      -> error (CLZ-11, CX-12)
   B7  Basic override in cloze section      -> sync (RES-01, CX-03)
 
 Section C  Outline isolation
@@ -56,8 +56,8 @@ Section F  Conflicts
 Section G  Edge cases
   G1  Delimiter in code fence              -> sync (DEL-07)
   G2a ::: r custom field vs G2b :::r       -> sync (DEL-06)
-  G3  Empty {{}}                            -> skip (CLZ-09)
-  G4  Section user/engine tags             -> sync (STR-04, CX-29)
+  G3  Empty {{}}                            -> skip (CLZ-09, CX-28); not CX-25
+  G4  Section #biology + cloze              -> sync (STR-04, CX-29)
   G5  #anki/noteType/cloze is custom not builtin  -> skip (TAG-04,CUS-04)
 
 Section H  Additional matrix
@@ -175,7 +175,7 @@ First {{c1::ATP}} and second {{c2::ATP}} are separate cloze cards.
 
 Optional reference: second law of thermodynamics.
 
-<!-- expect: sync; rules: CLZ-02,CX-25 -->
+<!-- expect: sync; rules: CLZ-02,CX-25; resolved: cloze; non-empty Text deletion + optional Back Extra (empty = CLZ-09/G3) -->
 
 #### B5 Cloze SKIP no deletions
 
@@ -183,7 +183,7 @@ This inherited cloze card forgot to mark any deletions.
 
 <!-- expect: skip; rules: CLZ-01,CX-05 -->
 
-#### B6 Cloze SKIP deletions only in back
+#### B6 Cloze ERROR deletions only in back
 
 Plain text in the Text region.
 
@@ -191,7 +191,7 @@ Plain text in the Text region.
 
 {{c1::too late}}
 
-<!-- expect: skip; rules: CLZ-11,CX-12 -->
+<!-- expect: error; rules: CLZ-11,CX-12 -->
 
 #### B7 Basic override #anki/cardType/basic
 
@@ -302,7 +302,7 @@ Name the capital of France.
 :::t
 **Paris**
 
-<!-- expect: sync + warn; rules: TYP-03,TYP-05; Back plain: Paris -->
+<!-- expect: sync + warn; rules: TYP-03,TYP-03b; Back plain: Paris -->
 
 #### E4 Typed tag with plain split #anki/cardType/typed
 
@@ -435,13 +435,15 @@ Au
 
 Something {{}} empty here.
 
-<!-- expect: skip; rules: CLZ-09,CX-28 -->
+<!-- expect: skip; rules: CLZ-09,CX-28; empty deletion skip — NOT CX-25 -->
+
+### Tag split demo #biology #anki/cardType/cloze
 
 #### G4 Section tags split correctly
 
 {{ATP}} in cells.
 
-<!-- expect: sync; rules: STR-04,CX-29; #biology on ### Thermodynamics syncs; #anki/cardType/cloze stripped -->
+<!-- expect: sync; rules: STR-04,CX-29; anki_tags: biology; strip_engine: anki/cardType/cloze -->
 
 ### Built-in name on noteType #anki/noteType/cloze
 

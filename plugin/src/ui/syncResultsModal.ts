@@ -92,6 +92,34 @@ export class SyncResultsModal extends Modal {
 				: `Added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}`,
 		});
 
+		if (summary.typeMigrated > 0 || summary.modelMismatchBlocked > 0) {
+			const bits: string[] = [];
+			if (summary.typeMigrated > 0) {
+				bits.push(`${summary.typeMigrated} type-migrated (fields updated; change note type in Anki)`);
+			}
+			if (summary.modelMismatchBlocked > 0) {
+				bits.push(`${summary.modelMismatchBlocked} model-mismatch blocked`);
+			}
+			scroll.createEl('p', {
+				cls: 'anki-ast-sync-results-summary',
+				text: bits.join('; '),
+			});
+		}
+
+		if (summary.typeMix && summary.typeMix.total > 0) {
+			const mix = summary.typeMix;
+			const parts: string[] = [];
+			if (mix.basic > 0) parts.push(`basic ${mix.basic}`);
+			if (mix.cloze > 0) parts.push(`cloze ${mix.cloze}`);
+			if (mix.reversible > 0) parts.push(`reversible ${mix.reversible}`);
+			if (mix.typed > 0) parts.push(`typed ${mix.typed}`);
+			if (mix.custom > 0) parts.push(`custom ${mix.custom}`);
+			scroll.createEl('p', {
+				cls: 'anki-ast-sync-results-summary',
+				text: `Types: ${parts.join(', ')}`,
+			});
+		}
+
 		this.renderFailedSection(scroll);
 		this.renderSkippedConflictsSection(scroll);
 		this.renderDuplicateSection(scroll);

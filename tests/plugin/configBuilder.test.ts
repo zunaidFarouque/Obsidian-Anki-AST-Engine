@@ -15,6 +15,7 @@ const baseSettings: AnkiAstSyncSettings = {
 	defaultCardDeclarationHeadingLevel: 4,
 	includeParentHeadersAsTags: true,
 	autoCreateDecks: true,
+	autoCreateStockNoteModels: true,
 	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
 	orphanHandling: 'ask',
@@ -61,6 +62,9 @@ describe('configBuilder', () => {
 			noteModelName: settings.noteModelName,
 			noteModelType: 'basic',
 			autoCreateDecks: settings.autoCreateDecks,
+			autoCreateStockNoteModels: settings.autoCreateStockNoteModels,
+			inferClozeFromManualSyntaxOnBasic:
+				settings.inferClozeFromManualSyntaxOnBasic,
 			syncTagPrefix: settings.syncTagPrefix,
 			linkFormat: settings.linkFormat,
 			attachmentFolder: settings.attachmentFolder || undefined,

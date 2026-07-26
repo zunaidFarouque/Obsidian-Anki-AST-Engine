@@ -31,6 +31,7 @@ function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConne
     deckNames: async () => ["Science::Physics"],
     createDeck: async () => 1,
     modelNames: async () => ["Basic"],
+    createModel: async () => null,
     findNotes: findNotesImpl,
     notesInfo: async () => [],
     addNote: async () => 12345,
@@ -703,6 +704,241 @@ describe("syncPipeline", () => {
     expect(fileEvents[0]).toMatchObject({ current: 1, total: 2 });
     expect(fileEvents[1]).toMatchObject({ current: 2, total: 2 });
     expect(progressEvents.some((event) => event.phase === "media")).toBe(true);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("hard-blocks Anki write when cardSyntax marks card skip", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-preview-skip-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "skip.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Incomplete",
+      "",
+      "Only front text, no delimiter.",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    let addNotesCalls = 0;
+    const client = createMockClient({
+      addNotes: async (notes) => {
+        addNotesCalls += notes.length;
+        return notes.map(() => 12345);
+      },
+    });
+
+    const { actions } = await runSync(config, {
+      dryRun: true,
+      ankiClient: client,
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("skip");
+    expect(actions[0]?.skipReason).toBe("preview_skip");
+    expect(actions[0]?.previewOutcome).toBe("skip");
+    expect(actions[0]?.wouldInjectId).toBeUndefined();
+    expect(addNotesCalls).toBe(0);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("hard-blocks Anki write when cardSyntax marks card error", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-preview-error-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "error.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Conflict #anki/cardType/basic #anki/cardType/cloze",
+      "",
+      "What is g",
+      "",
+      ":::",
+      "",
+      "9.8",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("skip");
+    expect(actions[0]?.skipReason).toBe("preview_error");
+    expect(actions[0]?.previewOutcome).toBe("error");
+    expect(actions[0]?.wouldInjectId).toBeUndefined();
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("warn-outcome basic cards still sync with warnings surfaced", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-preview-warn-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "warn.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "anki_cardDefault: basic",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Literal cloze",
+      "",
+      "The {{c1::answer}} is here.",
+      "",
+      ":::",
+      "",
+      "Back text",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("add");
+    expect(actions[0]?.previewOutcome).toBe("warn");
+    expect(actions[0]?.previewWarnings?.some((w) => w.includes("BAS-04") || w.includes("literal"))).toBe(
+      true,
+    );
+    expect(actions[0]?.frontHtml).toContain("answer");
+    expect(actions[0]?.backHtml).toContain("Back text");
+    expect(actions[0]?.wouldInjectId).toBeDefined();
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test(":::r delimiter does not leak stray r into Back on Basic sync path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-delim-r-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "reversible.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Vocab",
+      "",
+      "What is ATP?",
+      "",
+      ":::r",
+      "",
+      "Adenosine triphosphate",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("add");
+    expect(actions[0]?.frontHtml).toContain("What is ATP?");
+    expect(actions[0]?.backHtml).toContain("Adenosine triphosphate");
+    expect(actions[0]?.backHtml).not.toMatch(/<p>\s*r\s*<\/p>/);
+    expect(actions[0]?.backHtml).not.toMatch(/^r[\s\S]*Adenosine/m);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test(":::t delimiter does not leak stray t into Back on Basic sync path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-delim-t-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "typed.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "# Science",
+      "",
+      "#### Capital",
+      "",
+      "Capital of France?",
+      "",
+      ":::t",
+      "",
+      "Paris",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.action).toBe("add");
+    expect(actions[0]?.frontHtml).toContain("Capital of France?");
+    expect(actions[0]?.backHtml).toContain("Paris");
+    expect(actions[0]?.backHtml).not.toMatch(/<p>\s*t\s*<\/p>/);
+    expect(actions[0]?.backHtml).not.toMatch(/^t[\s\S]*Paris/m);
 
     await rm(root, { recursive: true, force: true });
   });

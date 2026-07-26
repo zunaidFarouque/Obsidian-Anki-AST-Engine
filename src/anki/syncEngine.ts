@@ -3,6 +3,7 @@ import type { AnkiConnectClient, NoteInfo } from "./client";
 import { AnkiConnectError } from "./client";
 import type { Config } from "../config/configParser";
 import { createDeckEnsurer, type DeckEnsurer } from "./deckEnsurer";
+import { createModelEnsurer, type ModelEnsurer } from "./modelEnsurer";
 import {
   findNoteByFrontInDeck,
   normalizeSyncFieldHtml,
@@ -22,6 +23,10 @@ export type CardSyncPayload = {
   tag: string;
   frontHtml: string;
   backHtml: string;
+  /** Stock / resolved Anki model; defaults to config.noteModelName when omitted. */
+  modelName?: string;
+  /** Anki field map for the model; defaults to Front/Back from frontHtml/backHtml. */
+  fields?: Record<string, string>;
   ankiId?: string;
   wouldInjectId?: string;
   fileAnkiTags?: string[];
@@ -34,11 +39,95 @@ export type CardSyncResult = {
   injectedId?: string;
   error?: string;
   duplicateWarning?: DuplicateWarning;
+  /** Present when vault resolved model ≠ Anki note modelName (02 D6). */
+  typeMigration?: TypeMigrationInfo;
+  /** Human-readable mismatch / migration notice for summaries. */
+  modelMismatchWarning?: string;
 };
+
+export type TypeMigrationStatus =
+  | "fields_updated_model_unchanged"
+  | "blocked_incompatible_fields";
+
+export type TypeMigrationInfo = {
+  previousModel: string;
+  targetModel: string;
+  status: TypeMigrationStatus;
+};
+
+/**
+ * AnkiConnect cannot change note type. When models differ:
+ * - If all required field keys exist on the existing note → update fields in place
+ *   and report type-migration (model remains wrong until user changes it in Anki).
+ * - If required fields are missing → skip write (do not dump Cloze Text into Basic).
+ */
+export function assessModelMigration(
+  noteInfo: Pick<NoteInfo, "modelName" | "fields">,
+  targetModelName: string,
+  fields: Record<string, string>,
+):
+  | { kind: "match" }
+  | {
+      kind: "compatible";
+      previousModel: string;
+      warning: string;
+      typeMigration: TypeMigrationInfo;
+    }
+  | {
+      kind: "incompatible";
+      previousModel: string;
+      error: string;
+      warning: string;
+      typeMigration: TypeMigrationInfo;
+    } {
+  const previousModel = noteInfo.modelName?.trim() || undefined;
+  if (!previousModel || previousModel === targetModelName) {
+    return { kind: "match" };
+  }
+
+  const missingFields = Object.keys(fields).filter(
+    (key) => noteInfo.fields[key] === undefined,
+  );
+
+  if (missingFields.length > 0) {
+    const warning =
+      `Anki note model "${previousModel}" does not match vault type "${targetModelName}" ` +
+      `(missing fields: ${missingFields.join(", ")}); change note type in Anki — AnkiConnect cannot migrate models`;
+    return {
+      kind: "incompatible",
+      previousModel,
+      error: warning,
+      warning,
+      typeMigration: {
+        previousModel,
+        targetModel: targetModelName,
+        status: "blocked_incompatible_fields",
+      },
+    };
+  }
+
+  const warning =
+    `Anki note model "${previousModel}" ≠ vault "${targetModelName}"; ` +
+    `updated overlapping fields in place — change note type in Anki to finish migration (AnkiConnect cannot change models)`;
+  return {
+    kind: "compatible",
+    previousModel,
+    warning,
+    typeMigration: {
+      previousModel,
+      targetModel: targetModelName,
+      status: "fields_updated_model_unchanged",
+    },
+  };
+}
 
 export type SyncEngineConfig = Pick<
   Config,
-  "noteModelName" | "syncTagPrefix" | "autoCreateDecks" | "defaultEngineTag"
+  | "noteModelName"
+  | "syncTagPrefix"
+  | "autoCreateDecks"
+  | "autoCreateStockNoteModels"
+  | "defaultEngineTag"
 >;
 
 export const DEFAULT_SYNC_CONCURRENCY = 10;
@@ -46,6 +135,7 @@ export const DEFAULT_ADD_NOTES_CHUNK = 50;
 
 export type SyncRunContext = {
   deckEnsurer: DeckEnsurer;
+  modelEnsurer: ModelEnsurer;
   syncLimit: ReturnType<typeof pLimit>;
   frontMatchCache: Map<string, NoteInfo | undefined>;
 };
@@ -57,6 +147,10 @@ export function createSyncRunContext(
 ): SyncRunContext {
   return {
     deckEnsurer: createDeckEnsurer(client, config.autoCreateDecks),
+    modelEnsurer: createModelEnsurer(
+      client,
+      config.autoCreateStockNoteModels ?? true,
+    ),
     syncLimit: pLimit(options?.concurrency ?? DEFAULT_SYNC_CONCURRENCY),
     frontMatchCache: new Map(),
   };
@@ -138,6 +232,15 @@ export async function ensureDeck(
   await client.createDeck(deckName);
 }
 
+export async function ensureStockModel(
+  client: AnkiConnectClient,
+  modelName: string,
+  autoCreateStockNoteModels: boolean,
+): Promise<void> {
+  const ensurer = createModelEnsurer(client, autoCreateStockNoteModels);
+  await ensurer.ensureModel(modelName);
+}
+
 function buildSyncFields(
   frontHtml: string,
   backHtml: string,
@@ -148,17 +251,28 @@ function buildSyncFields(
   };
 }
 
+function resolvePayloadFields(payload: CardSyncPayload): Record<string, string> {
+  return payload.fields ?? buildSyncFields(payload.frontHtml, payload.backHtml);
+}
+
+function resolvePayloadModelName(
+  payload: CardSyncPayload,
+  config: SyncEngineConfig,
+): string {
+  return payload.modelName ?? config.noteModelName;
+}
+
 function fieldsChanged(
   noteInfo: { fields: Record<string, { value: string }> },
-  frontHtml: string,
-  backHtml: string,
+  fields: Record<string, string>,
 ): boolean {
-  const front = normalizeSyncFieldHtml(noteInfo.fields.Front?.value ?? "");
-  const back = normalizeSyncFieldHtml(noteInfo.fields.Back?.value ?? "");
-  return (
-    front !== normalizeSyncFieldHtml(frontHtml) ||
-    back !== normalizeSyncFieldHtml(backHtml)
-  );
+  for (const [key, value] of Object.entries(fields)) {
+    const current = normalizeSyncFieldHtml(noteInfo.fields[key]?.value ?? "");
+    if (current !== normalizeSyncFieldHtml(value)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function tagsChanged(noteInfo: { tags: string[] }, tags: string[]): boolean {
@@ -177,7 +291,7 @@ async function updateExistingNote(
   fields: Record<string, string>,
   tags: string[],
 ): Promise<"update" | "skip"> {
-  const needsFieldUpdate = fieldsChanged(noteInfo, fields.Front, fields.Back);
+  const needsFieldUpdate = fieldsChanged(noteInfo, fields);
   const needsTagUpdate = tagsChanged(noteInfo, tags);
 
   if (!needsFieldUpdate && !needsTagUpdate) {
@@ -193,6 +307,46 @@ async function updateExistingNote(
   }
 
   return "update";
+}
+
+async function updateExistingNoteWithMigration(
+  client: AnkiConnectClient,
+  noteId: number,
+  noteInfo: NoteInfo,
+  fields: Record<string, string>,
+  tags: string[],
+  targetModelName: string,
+): Promise<CardSyncResult> {
+  const migration = assessModelMigration(noteInfo, targetModelName, fields);
+
+  if (migration.kind === "incompatible") {
+    return {
+      action: "skip",
+      ankiNoteId: noteId,
+      error: migration.error,
+      typeMigration: migration.typeMigration,
+      modelMismatchWarning: migration.warning,
+    };
+  }
+
+  const action = await updateExistingNote(
+    client,
+    noteId,
+    noteInfo,
+    fields,
+    tags,
+  );
+
+  if (migration.kind === "compatible") {
+    return {
+      action,
+      ankiNoteId: noteId,
+      typeMigration: migration.typeMigration,
+      modelMismatchWarning: migration.warning,
+    };
+  }
+
+  return { action, ankiNoteId: noteId };
 }
 
 async function linkExistingNoteByFront(
@@ -219,17 +373,18 @@ async function linkExistingNoteByFront(
     uuid: linkUuid,
   });
 
-  const action = await updateExistingNote(
+  const modelName = resolvePayloadModelName(payload, config);
+  const migrated = await updateExistingNoteWithMigration(
     client,
     existing.noteId,
     existing,
     fields,
     linkTags,
+    modelName,
   );
 
   return {
-    action,
-    ankiNoteId: existing.noteId,
+    ...migrated,
     injectedId: payload.ankiId ? undefined : linkUuid,
     duplicateWarning: buildAnkiDuplicateRecoveredWarning({
       deck: payload.deck,
@@ -299,7 +454,18 @@ export async function syncCard(
     syncTagPrefix: config.syncTagPrefix,
     uuid,
   });
-  const fields = buildSyncFields(payload.frontHtml, payload.backHtml);
+  const fields = resolvePayloadFields(payload);
+  const modelName = resolvePayloadModelName(payload, config);
+
+  if (context) {
+    await context.modelEnsurer.ensureModel(modelName);
+  } else {
+    await ensureStockModel(
+      client,
+      modelName,
+      config.autoCreateStockNoteModels ?? true,
+    );
+  }
 
   const existingNoteId = await findNoteByObsidianId(
     client,
@@ -330,7 +496,7 @@ export async function syncCard(
     try {
       const noteId = await client.addNote({
         deckName: payload.deck,
-        modelName: config.noteModelName,
+        modelName,
         fields,
         tags,
       });
@@ -353,15 +519,14 @@ export async function syncCard(
     throw new Error(`Anki note ${existingNoteId} not found`);
   }
 
-  const action = await updateExistingNote(
+  return updateExistingNoteWithMigration(
     client,
     existingNoteId,
     noteInfo,
     fields,
     tags,
+    modelName,
   );
-
-  return { action, ankiNoteId: existingNoteId };
 }
 
 export type FileCardSyncItem = {
@@ -403,7 +568,7 @@ function prepareCardItemsWithConfig(
         syncTagPrefix: config.syncTagPrefix,
         uuid,
       }),
-      fields: buildSyncFields(item.payload.frontHtml, item.payload.backHtml),
+      fields: resolvePayloadFields(item.payload),
     };
   });
 }
@@ -415,6 +580,23 @@ async function ensureDecksForItems(
   const decks = new Set(items.map((item) => item.payload.deck));
   await Promise.all(
     [...decks].map((deck) => context.deckEnsurer.ensureDeck(deck)),
+  );
+}
+
+async function ensureModelsForPrepared(
+  context: SyncRunContext,
+  prepared: PreparedCardItem[],
+  config: SyncEngineConfig,
+): Promise<void> {
+  const modelNames = new Set(
+    prepared.map((entry) =>
+      resolvePayloadModelName(entry.item.payload, config),
+    ),
+  );
+  await Promise.all(
+    [...modelNames].map((modelName) =>
+      context.modelEnsurer.ensureModel(modelName),
+    ),
   );
 }
 
@@ -477,7 +659,7 @@ async function addPreparedCard(
   try {
     const noteId = await client.addNote({
       deckName: prepared.item.payload.deck,
-      modelName: config.noteModelName,
+      modelName: resolvePayloadModelName(prepared.item.payload, config),
       fields: prepared.fields,
       tags: prepared.tags,
     });
@@ -506,6 +688,7 @@ async function syncPreparedUpdates(
   client: AnkiConnectClient,
   updates: Array<{ prepared: PreparedCardItem; noteId: number }>,
   noteInfoById: Map<number, NoteInfo>,
+  config: SyncEngineConfig,
   context: SyncRunContext,
   results: CardSyncResult[],
 ): Promise<void> {
@@ -518,14 +701,14 @@ async function syncPreparedUpdates(
             throw new Error(`Anki note ${noteId} not found`);
           }
 
-          const action = await updateExistingNote(
+          results[prepared.index] = await updateExistingNoteWithMigration(
             client,
             noteId,
             noteInfo,
             prepared.fields,
             prepared.tags,
+            resolvePayloadModelName(prepared.item.payload, config),
           );
-          results[prepared.index] = { action, ankiNoteId: noteId };
         } catch (error) {
           results[prepared.index] = {
             action: "skip",
@@ -558,7 +741,7 @@ async function syncPreparedAdds(
       const noteIds = await client.addNotes(
         chunk.map((entry) => ({
           deckName: entry.item.payload.deck,
-          modelName: config.noteModelName,
+          modelName: resolvePayloadModelName(entry.item.payload, config),
           fields: entry.fields,
           tags: entry.tags,
         })),
@@ -656,6 +839,16 @@ async function syncFileCardsBatched(
   let existingByIndex: Map<number, number | undefined>;
 
   try {
+    await ensureModelsForPrepared(context, prepared, config);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    for (let index = 0; index < items.length; index += 1) {
+      results[index] = { action: "skip", error: message };
+    }
+    return { results, injections: [] };
+  }
+
+  try {
     existingByIndex = await batchResolveExistingNoteIds(
       client,
       prepared,
@@ -732,6 +925,7 @@ async function syncFileCardsBatched(
     client,
     updates,
     noteInfoById,
+    config,
     context,
     results,
   );

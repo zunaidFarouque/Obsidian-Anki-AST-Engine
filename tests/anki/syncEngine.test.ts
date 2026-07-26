@@ -16,6 +16,8 @@ function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConne
 
   return {
     deckNames: async () => ["Test::Deck"],
+    modelNames: async () => ["Basic"],
+    createModel: async () => null,
     findNotes: findNotesImpl,
     invokeMulti:
       overrides.invokeMulti ??
@@ -42,6 +44,7 @@ const baseConfig = {
   syncTagPrefix: "obsidian-id",
   defaultEngineTag: "Obsidian-Anki-AST",
   autoCreateDecks: true,
+  autoCreateStockNoteModels: true,
 };
 
 const fullTags = [
@@ -765,5 +768,107 @@ describe("syncEngine", () => {
     );
 
     expect(maxInFlight).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("syncEngine — Phase 2c model migration", () => {
+  test("updates Front/Back when vault typed model differs from existing Basic (best-effort)", async () => {
+    let updatedFields: Record<string, string> | undefined;
+    const client = createMockClient({
+      findNotes: async () => [501],
+      notesInfo: async () => [
+        {
+          noteId: 501,
+          modelName: "Basic",
+          tags: [
+            "Obsidian-Anki-AST",
+            "CS101::Entropy",
+            "obsidian-id::migrate-uuid",
+          ],
+          fields: {
+            Front: { value: "<p>Old</p>", order: 0 },
+            Back: { value: "<p>Old back</p>", order: 1 },
+          },
+        },
+      ],
+      updateNoteFields: async (_id, fields) => {
+        updatedFields = fields;
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "CS101::Entropy",
+        frontHtml: "<p>Capital?</p>",
+        backHtml: "Paris",
+        modelName: "Basic (type in the answer)",
+        fields: { Front: "Capital?", Back: "Paris" },
+        ankiId: "migrate-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(result.action).toBe("update");
+    expect(updatedFields).toEqual({ Front: "Capital?", Back: "Paris" });
+    expect(result.typeMigration).toEqual({
+      previousModel: "Basic",
+      targetModel: "Basic (type in the answer)",
+      status: "fields_updated_model_unchanged",
+    });
+    expect(result.modelMismatchWarning).toContain("Basic");
+    expect(result.modelMismatchWarning).toContain(
+      "Basic (type in the answer)",
+    );
+  });
+
+  test("blocks field update when cloze fields are missing on existing Basic note", async () => {
+    let updated = false;
+    const client = createMockClient({
+      findNotes: async () => [502],
+      notesInfo: async () => [
+        {
+          noteId: 502,
+          modelName: "Basic",
+          tags: [
+            "Obsidian-Anki-AST",
+            "CS101::Entropy",
+            "obsidian-id::cloze-uuid",
+          ],
+          fields: {
+            Front: { value: "<p>Old</p>", order: 0 },
+            Back: { value: "<p>Old back</p>", order: 1 },
+          },
+        },
+      ],
+      updateNoteFields: async () => {
+        updated = true;
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "CS101::Entropy",
+        frontHtml: "<p>{{c1::x}}</p>",
+        backHtml: "",
+        modelName: "Cloze",
+        fields: { Text: "{{c1::x}}", "Back Extra": "" },
+        ankiId: "cloze-uuid",
+      },
+      baseConfig,
+    );
+
+    expect(updated).toBe(false);
+    expect(result.action).toBe("skip");
+    expect(result.typeMigration).toEqual({
+      previousModel: "Basic",
+      targetModel: "Cloze",
+      status: "blocked_incompatible_fields",
+    });
+    expect(result.error).toContain("Cloze");
+    expect(result.modelMismatchWarning).toBeDefined();
   });
 });

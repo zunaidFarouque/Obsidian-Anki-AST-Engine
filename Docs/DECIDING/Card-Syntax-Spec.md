@@ -1,6 +1,7 @@
 # Card Syntax Specification
 
-**Status:** Pre-implementation contract (v1 grammar)  
+**Status:** DECIDED 2026-07 (v1 grammar). Syntax / preview engine is **implemented**. Built-in multi-type Anki sync (basic / cloze / reversible / typed → stock models) **landed** on the shared `parseCardDocument` path (Phases 1–2c: gate, stock models, `inferCloze` parity, auto-create + opt-out, TYP-05, migration summary). Custom note-type sync remains Phase 3.  
+**Decided outcomes (preview↔sync contract):** [DECIDED-Preview-Sync-Contract-2026-07.md](./DECIDED-Preview-Sync-Contract-2026-07.md) — product locks for alignment, Anki models, and rule-book severities. This Spec rule text is updated to match those locks.  
 **Supersedes:** design discussion in [Syntax decision conversation.md](Syntax%20decision%20conversation.md)  
 **Stress-test fixture:** [card-syntax-stress-test.md](../../tests/fixtures/new%20format/card-syntax-stress-test.md)
 
@@ -88,7 +89,7 @@ anki_cardDefault: basic
 ---
 ```
 
-**Effect:** Any card that does not resolve its type from a card heading, ancestor heading, delimiter, or cloze inference (see RES-06) uses `basic`. If the card body layout does not match the resolved type → **skip** (conflict).
+**Effect:** Any card that does not resolve its type from a card heading, ancestor heading, delimiter, or cloze inference (see RES-06) uses `basic`. If the card body layout does not match the resolved type → **error** or **skip** per the conflict matrix (e.g. reserved-delimiter mismatch → **error**/**BAS-06**; missing required `:::` → **skip**/**BAS-01**).
 
 ---
 
@@ -112,7 +113,7 @@ anki_customCardDefault: Vocab
 
 ### FM-04 — File defaults vs ancestor headings
 
-**Rule:** Ancestor heading type declarations (Section 4) **override** file frontmatter defaults. File defaults apply only when steps 1–3 of resolution find nothing.
+**Rule:** Ancestor heading type declarations (Section 4) **override** file frontmatter defaults. File defaults (`anki_cardDefault`) apply only when steps 1–4 of resolution find nothing (card heading, ancestors, custom-default field layout, and `:::r`/`:::t` delimiter all unset).
 
 **Example:**
 
@@ -322,9 +323,9 @@ flowchart TD
   found -->|yes| resolved
   found -->|no| step3{Body has ::: FieldName blocks?}
   step3 -->|yes and anki_customCardDefault| resolvedCustom[Resolved custom note type]
-  step3 -->|no| step4{anki_cardDefault set?}
+  step3 -->|no| step4{Delimiter :::r or :::t?}
   step4 -->|yes| resolved
-  step4 -->|no| step5{Delimiter :::r or :::t?}
+  step4 -->|no| step5{anki_cardDefault set?}
   step5 -->|yes| resolved
   step5 -->|no| step6{"{{cN::...}} in Text region?"}
   step6 -->|yes| resolvedCloze[Resolved cloze]
@@ -420,12 +421,14 @@ A measure of energy dispersal.
 
 ### RES-05 — Delimiter sets type when unresolved
 
-**Rule:** If type is still unresolved after steps 1–4:
+**Rule:** If type is still unresolved after steps 1–3 (card heading, ancestors, custom-default field layout):
 
 - `:::r` anywhere as structural split delimiter → `reversible`
 - `:::t` anywhere as structural split delimiter → `typed`
 
-If type **is already resolved** (e.g. inherited `cloze`) and delimiter is `:::r` or `:::t` → **error** (see conflict matrix).
+This runs **before** `anki_cardDefault` (step 5), so a bare `:::t` / `:::r` card becomes typed/reversible even when the file has `anki_cardDefault: basic`.
+
+If type **is already resolved** from a heading tag (e.g. `#anki/cardType/basic` or inherited `cloze`) and delimiter is a conflicting `:::r` or `:::t` → **error** (see **BAS-06**, **CLZ-10**, conflict matrix). Conflicting reversible vs typed signals → **error** (**REV-06**).
 
 **Example:**
 
@@ -444,7 +447,7 @@ Answer
 
 **Rule:** Step 6 applies **only when type is still unresolved** after steps 1–5. If the Text region contains `{{cN::...}}` (manual Anki cloze form), resolve as `cloze`.
 
-**Rule (basic already resolved):** If type is already `basic` from steps 1–4, step 6 does **not** run. See **BAS-04** for `{{cN::...}}` on basic-resolved cards.
+**Rule (basic already resolved):** If type is already `basic` from steps 1–5, step 6 does **not** run. See **BAS-04** for `{{cN::...}}` on basic-resolved cards.
 
 **Example — infer cloze (no prior type):**
 
@@ -739,18 +742,31 @@ The {{c1::answer}} was hidden here but this is basic back.
 
 ### BAS-06 — Wrong layout for basic
 
-**Rule:** Resolved `basic` + structural `:::r`, `:::t`, or `::: FieldName` → **error** / **skip** (layout conflict).
+**Status: DECIDED** (severity **error**; aligns with CX-09/CX-10 and [DECIDED-Preview-Sync-Contract-2026-07.md](./DECIDED-Preview-Sync-Contract-2026-07.md) §3).
 
-**Example — error:**
+**Rule:** When resolved type is already `basic` from a **heading tag** (card or ancestor `#anki/cardType/basic`) and the body has structural `:::r`, `:::t`, or `::: FieldName` → **error** (layout conflict; hard-blocks sync).
+
+**Not BAS-06:** A card with no heading type tag and only `:::r` / `:::t` resolves to `reversible` / `typed` via **RES-05** (delimiter before `anki_cardDefault`) and syncs as that type — preview already does this.
+
+**Example — error** (heading already resolved `basic`):
 
 ```markdown
-#### Card
+#### Card #anki/cardType/basic
 Question
 :::r
 Answer
 ```
 
-When resolved type is `basic` (not `reversible`).
+**Example — not BAS-06** (delimiter declares type):
+
+```markdown
+#### Card
+Question
+:::t
+4
+```
+
+**Outcome:** `typed` (**RES-05**), not an error.
 
 ---
 
@@ -874,13 +890,14 @@ The {{mitochondria}} is the {{powerhouse::organelle}} of the cell.
 
 ### CLZ-09 — Empty deletion
 
-**Rule:** `{{}}` or `{{c1::}}` with empty text → **skip**.
+**Rule:** `{{}}` or `{{c1::}}` (or any `{{cN::}}`) with empty text → **skip**. Empty deletions never sync (see **CX-28**); do not confuse with **CX-25** / **CLZ-02** (valid non-empty Text deletion + optional Back Extra).
 
 **Example — skip:**
 
 ```markdown
 #### Card #anki/cardType/cloze
 Nothing valid here {{}}.
+Also empty: {{c1::}}.
 ```
 
 ---
@@ -893,9 +910,11 @@ Nothing valid here {{}}.
 
 ### CLZ-11 — Cloze syntax only in Back region
 
-**Rule:** If resolved type is `cloze` but all `{{}}` are only after `:::`, Text region has no valid deletions → **skip**.
+**Status: DECIDED** (severity **error** — stricter than the old skip; explicit cloze must be valid; hard-blocks sync per preview↔sync contract).
 
-**Example — skip:**
+**Rule:** If resolved type is `cloze` but all `{{}}` are only after `:::`, Text region has no valid deletions → **error**.
+
+**Example — error:**
 
 ```markdown
 #### Card #anki/cardType/cloze
@@ -953,13 +972,34 @@ Answer
 
 ### REV-04 — basic + `:::r`
 
-**Rule:** Resolved `basic` + `:::r` → **error**.
+**Rule:** Resolved `basic` (from heading tag) + `:::r` → **error** (**BAS-06**).
 
 ---
 
 ### REV-05 — cloze + `:::r`
 
 **Rule:** Resolved `cloze` + `:::r` → **error**.
+
+---
+
+### REV-06 — Reversible ↔ typed conflict
+
+**Status: DECIDED** (severity **error**).
+
+**Rule:** Any conflicting reversible vs typed signals on the same card → **error**. Includes:
+
+- both `:::r` and `:::t` as structural delimiters on one card
+- `#anki/cardType/reversible` + `:::t`
+- `#anki/cardType/typed` + `:::r`
+
+**Example — error:**
+
+```markdown
+#### Mismatch #anki/cardType/reversible
+Question
+:::t
+Answer
+```
 
 ---
 
@@ -990,7 +1030,17 @@ Capital of France?
 **Paris**
 ```
 
-**Outcome:** Back field value `Paris`.
+**Outcome:** Back field value `Paris` (also emits **TYP-03b** warn when formatting was present).
+
+---
+
+### TYP-03b — Formatting warn on typed back
+
+**Status: DECIDED** (new id for the former formatting-warn meaning of `TYP-05`).
+
+**Rule:** When the typed Back region contains markdown/HTML formatting (bold, italic, links, etc.) before stripping → **warn**; still sync after **TYP-03** plain-text strip.
+
+**Code TODO (Phase 2):** `parseCardDocument` currently emits this warn under rule id `TYP-05`. Rename the runtime `ruleId` to `TYP-03b` when touching that code; do not leave the id collision with multi-answer **TYP-05**.
 
 ---
 
@@ -1012,13 +1062,33 @@ Lyon
 
 ### TYP-05 — Multiple acceptable answers
 
-**Deferred v2.** Out of scope for v1.
+**Status: DECIDED** (v1 — not deferred). Former deferred “multi-answer later” / former code id collision: formatting warn is now **TYP-03b**.
+
+**Rule:** On a resolved `typed` card, after **TYP-04** selects the first non-empty Back line and **TYP-03** strips HTML, split that line on `|` into multiple acceptable answers. Trim whitespace on each segment (spaces around `|` are allowed for readability). Drop empty segments. Sync all remaining segments as acceptable type-in answers.
+
+**Examples:**
+
+```markdown
+#### City #anki/cardType/typed
+Capital of France?
+:::t
+Paris|Lyon|Marseille
+```
+
+```markdown
+#### City #anki/cardType/typed
+Capital of France?
+:::t
+Paris | Lyon | Marseille
+```
+
+**Outcome:** three acceptable answers: `Paris`, `Lyon`, `Marseille`.
 
 ---
 
 ### TYP-06 — Case and diacritics
 
-**Rule:** Engine passes answer string through unchanged after stripping. Case-folding and diacritics are Anki template / user setting concerns.
+**Rule:** Engine passes answer string(s) through unchanged after stripping/splitting. Case-folding and diacritics are Anki template / user setting concerns.
 
 ---
 
@@ -1050,7 +1120,9 @@ Card "Term": unknown field "Definiton"; note type "Vocab" has: Word, Definition,
 
 ### CUS-04 — Plain `:::` on custom
 
-**Rule:** Resolved custom + only plain `:::` (no `::: Field`) → **skip** / layout conflict.
+**Status: DECIDED** (severity **skip**).
+
+**Rule:** Resolved custom + only plain `:::` (no `::: Field`) → **skip** (layout conflict with custom field layout).
 
 ---
 
@@ -1084,10 +1156,10 @@ Card "Term": unknown field "Definiton"; note type "Vocab" has: Word, Definition,
 | CX-06 | `anki_cardDefault: basic` + cloze body, no type tag | basic | `{{foo}}` no `:::` | **skip** | FM-02 |
 | CX-07 | `anki_cardDefault: basic` + `{{word}}` only | basic | `:::` + bare `{{}}` | **sync** + **warn** | BAS-03 |
 | CX-08 | resolved `basic` | basic | no `:::` | **skip** | BAS-01 |
-| CX-09 | resolved `basic` | basic | `:::r` | **error** | BAS-06, REV-04 |
-| CX-10 | resolved `basic` | basic | `::: Field` | **error** | BAS-06 |
+| CX-09 | resolved `basic` (heading tag) | basic | `:::r` | **error** | BAS-06, REV-04 |
+| CX-10 | resolved `basic` (heading tag) | basic | `::: Field` | **error** | BAS-06 |
 | CX-11 | resolved `cloze` | cloze | `:::r` or `:::t` | **error** | CLZ-10 |
-| CX-12 | resolved `cloze` | cloze | `{{}}` only after `:::` | **skip** | CLZ-11 |
+| CX-12 | resolved `cloze` | cloze | `{{}}` only after `:::` | **error** | CLZ-11 |
 | CX-13 | resolved `cloze` | cloze | valid Text `{{}}` | **sync** | CLZ-01 |
 | CX-14 | resolved `reversible` | reversible | `:::` or `:::r` | **sync** | REV-02 |
 | CX-15 | resolved `reversible` | reversible | no split | **skip** | REV-03 |
@@ -1100,13 +1172,15 @@ Card "Term": unknown field "Definiton"; note type "Vocab" has: Word, Definition,
 | CX-22 | `::: Field` only, no note type, no `anki_customCardDefault` | — | custom layout | **skip** | CUS-03 |
 | CX-23 | `### Unit A cloze` then `## Unit B` sibling | basic (no inherit) | `:::` | **sync** | RES-02 |
 | CX-24 | `{{c1::x}}` only in Back | basic | `:::` | **sync** basic | BAS-05 |
-| CX-25 | resolved `cloze` + `{{c1::}}` in Text + optional `:::` | cloze | valid | **sync** | CLZ-02 |
+| CX-25 | resolved `cloze` + non-empty Text deletion (e.g. `{{c1::mitochondria}}`) + optional `:::` Back Extra | cloze | valid | **sync** | CLZ-02 |
 | CX-26 | two `#anki/cardType/*` on section | — | — | **error** | TAG-01 |
 | CX-27 | resolved `basic` | basic | `{{c1::x}}` in Text, default setting | **sync** + **warn** (literal) | BAS-04 |
 | CX-27a | resolved `basic`, `inferClozeFromManualSyntaxOnBasic: true` | cloze (reclassified) | `{{c1::x}}` in Text | **sync** | BAS-04 |
-| CX-28 | `{{}}` empty | cloze | empty | **skip** | CLZ-09 |
+| CX-28 | `{{}}` or `{{c1::}}` empty deletion | cloze | empty | **skip** | CLZ-09 |
 | CX-29 | section `#biology` + `#anki/cardType/cloze` | cloze | valid | **sync**; tag `biology` only | STR-04 |
 | CX-30 | inherited `cloze` + `:::r` | cloze vs reversible | `:::r` | **error** | RES-05, CLZ-10 |
+| CX-31 | `#anki/cardType/reversible` + `:::t` (or both `:::r` and `:::t`) | — | conflicting | **error** | REV-06 |
+| CX-32 | bare `:::t` / `:::r`, no heading type (even with `anki_cardDefault: basic`) | typed / reversible | split | **sync** | RES-05 |
 
 ---
 
@@ -1115,16 +1189,15 @@ Card "Term": unknown field "Definiton"; note type "Vocab" has: Word, Definition,
 | Outcome | When |
 |---------|------|
 | **sync** | Resolved type matches body layout; all validations pass |
-| **skip** | Missing required delimiter or `{{}}`; orphan custom layout; empty cloze; note type not found |
-| **error** | Conflicting type signals on same card (tag vs delimiter vs layout) |
-| **warn** | Bare `{{word}}` on basic; `{{cN::...}}` literal on basic (default); hint mismatch; informational inheritance |
+| **skip** | Missing required delimiter or Text `{{}}`; orphan custom layout; empty cloze; note type not found; custom + plain `:::` only |
+| **error** | Conflicting type signals on same card (tag vs delimiter vs layout); cloze tagged but deletions only in Back (**CLZ-11**); reversible↔typed mismatch (**REV-06**) |
+| **warn** | Bare `{{word}}` on basic; `{{cN::...}}` literal on basic (default); typed back formatting (**TYP-03b**); hint mismatch; informational inheritance |
 
 ### Canonical skip messages (examples)
 
 ```text
 Card "<title>": basic card missing ::: delimiter — skipped
 Card "<title>": cloze card has no {{}} deletions in Text region — skipped
-Card "<title>": cloze deletions only in Back region — skipped
 Card "<title>": custom field layout but no note type resolved — skipped
 Card "<title>": layout conflicts with resolved type "<type>" — skipped
 Card "<title>": empty cloze deletion — skipped
@@ -1137,6 +1210,8 @@ Card "<title>": conflicting cardType tags on heading — error
 Card "<title>": cardType and noteType tags on same heading — error
 Card "<title>": :::r conflicts with resolved type "basic" — error
 Card "<title>": :::t conflicts with resolved type "cloze" — error
+Card "<title>": cloze deletions only in Back region — error
+Card "<title>": :::t conflicts with resolved type "reversible" — error
 ```
 
 ### Canonical warn messages (examples)
@@ -1144,6 +1219,7 @@ Card "<title>": :::t conflicts with resolved type "cloze" — error
 ```text
 Card "<title>": {{word}} treated as literal on basic card — warning
 Card "<title>": {{cN::...}} treated as literal on basic card (enable inferClozeFromManualSyntaxOnBasic to sync as cloze) — warning
+Card "<title>": typed answer includes formatting; plain text is recommended — warning
 Card "<title>": auto-numbered cloze hint mismatch for "<text>"; using first hint — warning
 Card "<title>": resolved cloze (inherited from ### <section>) — info
 ```
@@ -1153,7 +1229,7 @@ Card "<title>": resolved cloze (inherited from ### <section>) — info
 ## Section 13 — Deferred / out of scope v1
 
 - **CUS-07:** Settings remapping basic `:::` / `:::r` layout → custom note type field names
-- **TYP-05:** Multiple acceptable typed answers (`Paris|Lyon`)
+- **CUS partial / required fields:** Decided later with custom sync (see Decided contract §3)
 - Per-card YAML type blocks
 
 ---
@@ -1163,8 +1239,16 @@ Card "<title>": resolved cloze (inherited from ### <section>) — info
 | ID | Decision |
 |----|----------|
 | **BAS-04 / RES-06 / CX-27** | `{{cN::...}}` on **basic-resolved** cards → **literal + warn** by default; plugin Advanced setting `inferClozeFromManualSyntaxOnBasic` opts into cloze reclassification |
+| **BAS-06 / CX-09 / CX-10** | Heading-resolved `basic` + conflicting `:::r` / `:::t` / `::: Field` → **error**. Bare delimiters promote via **RES-05** (before `anki_cardDefault`). |
+| **CLZ-11 / CX-12** | Cloze type with deletions only after `:::` → **error** (hard-block) |
+| **REV-06 / CX-31** | Conflicting reversible vs typed signals → **error** |
+| **TYP-05** | Pipe-separated multi-answer in v1; trim spaces attached to each pipe |
+| **TYP-03b** | Typed-back formatting → **warn** (code still may emit old id `TYP-05` until Phase 2 rename) |
+| **CUS-04** | Custom + plain `:::` only → **skip** |
+| **CX-25 / CX-28** | CX-25 = non-empty Text cloze + optional Back Extra → **sync**; empty `{{}}` / `{{c1::}}` → **skip** (CLZ-09) |
 | **TAG-04** | Built-in types use `#anki/cardType/*` only; `#anki/noteType/*` is always custom (even if id matches a built-in name) |
 | **TYP-04** | Typed-answer back → **first non-empty line** after strip/trim/decode |
+| **Preview↔sync** | Strict mirror; see [DECIDED-Preview-Sync-Contract-2026-07.md](./DECIDED-Preview-Sync-Contract-2026-07.md) |
 
 ---
 
@@ -1217,7 +1301,7 @@ Energy dispersal measure.
 | Delimiters | DEL-01 … DEL-08 |
 | Basic | BAS-01 … BAS-06 |
 | Cloze | CLZ-01 … CLZ-12 |
-| Reversible | REV-01 … REV-05 |
-| Typed | TYP-01 … TYP-06 |
+| Reversible | REV-01 … REV-06 |
+| Typed | TYP-01 … TYP-06, TYP-03b |
 | Custom | CUS-01 … CUS-07 |
-| Conflicts | CX-01 … CX-30, CX-27a |
+| Conflicts | CX-01 … CX-32, CX-27a |

@@ -75,7 +75,7 @@ Do in parallel with Phase 1–2 or immediately after.
 - **Auto-sync on save** (debounced) — needs conflict handling if user edits during sync
 - **Progress UI** — **Done** — file-level sync progress via `onProgress` + Obsidian Notice
 - **Orphan handling** — **Done** — full-vault detection + confirmation modal (ignore tag / delete; optional suspend); see `Anki-Integration.md` **Vault orphans**
-- **Cloze / custom note types** — engine is `Basic` only today
+- **Custom note types** — Phase 3; engine identifies + warn/hard-skips today (built-in cloze / reversible / typed stock sync landed in Phase 2 — see [DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md))
 - **Community plugin release** — README, screenshots, `versions.json`, GitHub releases
 
 ---
@@ -106,6 +106,8 @@ Do in parallel with Phase 1–2 or immediately after.
 
 ## Related docs
 
-- [Anki-Integration.md](Anki-Integration.md) — AnkiConnect setup, CLI vs plugin
-- [Engine-Architecture.md](Engine-Architecture.md) — pipeline contract
+- [Anki-Integration.md](Anki-Integration.md) — AnkiConnect setup, stock models, CLI vs plugin
+- [Engine-Architecture.md](Engine-Architecture.md) — pipeline contract (preview hard-gate + multi-type)
+- [DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) — locked preview ↔ sync / type rules
+- [DECIDING/Card-Syntax-Spec.md](DECIDING/Card-Syntax-Spec.md) — card grammar rule book
 - [plugin/README.md](../plugin/README.md) — build and deploy

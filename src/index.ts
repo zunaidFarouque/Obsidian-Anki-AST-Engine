@@ -1,6 +1,10 @@
 import { loadConfig } from "./config/configParser";
 import { createAnkiClient } from "./anki/client";
-import { runSync, summarizeSyncActions } from "./syncPipeline";
+import {
+  formatSyncTypeMixLine,
+  runSync,
+  summarizeSyncActions,
+} from "./syncPipeline";
 
 function parseArgs(argv: string[]): {
   dryRun: boolean;
@@ -52,8 +56,16 @@ async function main(): Promise<void> {
   }
 
   const summary = summarizeSyncActions(actions);
+  const typeMixLine = formatSyncTypeMixLine(summary.typeMix);
+  const migrationBits: string[] = [];
+  if (summary.typeMigrated > 0) {
+    migrationBits.push(`type-migrated ${summary.typeMigrated}`);
+  }
+  if (summary.modelMismatchBlocked > 0) {
+    migrationBits.push(`model-mismatch blocked ${summary.modelMismatchBlocked}`);
+  }
   console.error(
-    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}${duplicateWarnings.length > 0 ? `, duplicate warning(s) ${duplicateWarnings.length}` : ""}${mediaWarnings.length > 0 ? `, media warning(s) ${mediaWarnings.length}` : ""}${orphans.length > 0 ? `, vault orphan(s) ${orphans.length}` : ""}`,
+    `Sync complete (${dryRun ? "dry-run" : "live"}): ${actions.length} card(s) — added ${summary.added}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}${migrationBits.length > 0 ? `, ${migrationBits.join(", ")}` : ""}; types: ${typeMixLine}${duplicateWarnings.length > 0 ? `; duplicate warning(s) ${duplicateWarnings.length}` : ""}${mediaWarnings.length > 0 ? `; media warning(s) ${mediaWarnings.length}` : ""}${orphans.length > 0 ? `; vault orphan(s) ${orphans.length}` : ""}`,
   );
 
   if (summary.failed > 0) {

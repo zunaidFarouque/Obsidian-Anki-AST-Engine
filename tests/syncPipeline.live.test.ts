@@ -50,6 +50,12 @@ describe("syncPipeline live mode", () => {
         case "createDeck":
           deckCreates.push(body.params.deck);
           return new Response(JSON.stringify({ result: 1, error: null }));
+        case "modelNames":
+          return new Response(
+            JSON.stringify({ result: ["Basic"], error: null }),
+          );
+        case "createModel":
+          return new Response(JSON.stringify({ result: null, error: null }));
         case "getMediaFilesNames":
           return new Response(JSON.stringify({ result: [], error: null }));
         case "findNotes":

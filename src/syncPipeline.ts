@@ -15,6 +15,13 @@ import { graftTransclusions } from "./ast/transclusionGraft";
 import { collectResolvedMediaPaths, resolveMedia } from "./ast/mediaResolver";
 import { extractCards } from "./parser/stateMachine";
 import { compileCardFields } from "./ast/cardCompiler";
+import { parseCardDocument } from "./cardSyntax/parseCardDocument";
+import {
+  collectPreviewWarnings,
+  effectiveCardOutcome,
+  isAnkiWriteAllowed,
+} from "./cardSyntax/syncEligibility";
+import type { ResolvedCard, SyncOutcome } from "./cardSyntax/types";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
@@ -24,8 +31,11 @@ import {
   createSyncRunContext,
   buildAnkiTags,
   buildObsidianIdTag,
+  assessModelMigration,
   type CardSyncPayload,
+  type TypeMigrationInfo,
 } from "./anki/syncEngine";
+import { planNoteModelForResolvedType } from "./anki/stockNoteModels";
 import { normalizeSyncFieldHtml } from "./anki/frontSearch";
 import {
   cardExclusionKey,
@@ -82,7 +92,17 @@ export type SyncAction = {
   unresolvedEmbeds?: string[];
   transclusionResolved?: boolean;
   syncError?: string;
-  skipReason?: "vault_duplicate_front";
+  skipReason?: "vault_duplicate_front" | "preview_skip" | "preview_error";
+  /** Effective cardSyntax outcome (sync/skip/warn/error) used for the write gate. */
+  previewOutcome?: SyncOutcome;
+  /** Warn-level messages when sync proceeds despite warnings (01 D3). */
+  previewWarnings?: string[];
+  /** Built-in / custom resolved type for type-mix summaries (Phase 2c). */
+  resolvedType?: "basic" | "cloze" | "reversible" | "typed" | "custom";
+  /** Target Anki model name for this card. */
+  modelName?: string;
+  typeMigration?: TypeMigrationInfo;
+  modelMismatchWarning?: string;
 };
 
 export type SyncOptions = {
@@ -107,12 +127,58 @@ export type SyncRunResult = {
   orphans: VaultOrphan[];
 };
 
+export type SyncTypeMixSummary = {
+  basic: number;
+  cloze: number;
+  reversible: number;
+  typed: number;
+  custom: number;
+  total: number;
+};
+
 export type SyncSummary = {
   added: number;
   updated: number;
   skipped: number;
   failed: number;
+  /** Vault type ≠ Anki model; fields updated in place (02 D6). */
+  typeMigrated: number;
+  /** Vault type ≠ Anki model; write blocked (incompatible fields). */
+  modelMismatchBlocked: number;
+  typeMix: SyncTypeMixSummary;
 };
+
+export function summarizeSyncTypeMix(actions: SyncAction[]): SyncTypeMixSummary {
+  const mix: SyncTypeMixSummary = {
+    basic: 0,
+    cloze: 0,
+    reversible: 0,
+    typed: 0,
+    custom: 0,
+    total: 0,
+  };
+
+  for (const action of actions) {
+    const type = action.resolvedType;
+    if (!type) {
+      continue;
+    }
+    mix[type] += 1;
+    mix.total += 1;
+  }
+
+  return mix;
+}
+
+export function formatSyncTypeMixLine(mix: SyncTypeMixSummary): string {
+  const parts: string[] = [];
+  if (mix.basic > 0) parts.push(`basic ${mix.basic}`);
+  if (mix.cloze > 0) parts.push(`cloze ${mix.cloze}`);
+  if (mix.reversible > 0) parts.push(`reversible ${mix.reversible}`);
+  if (mix.typed > 0) parts.push(`typed ${mix.typed}`);
+  if (mix.custom > 0) parts.push(`custom ${mix.custom}`);
+  return parts.length > 0 ? parts.join(", ") : "none";
+}
 
 export function summarizeSyncActions(actions: SyncAction[]): SyncSummary {
   const summary: SyncSummary = {
@@ -120,9 +186,19 @@ export function summarizeSyncActions(actions: SyncAction[]): SyncSummary {
     updated: 0,
     skipped: 0,
     failed: 0,
+    typeMigrated: 0,
+    modelMismatchBlocked: 0,
+    typeMix: summarizeSyncTypeMix(actions),
   };
 
   for (const action of actions) {
+    if (action.typeMigration?.status === "fields_updated_model_unchanged") {
+      summary.typeMigrated += 1;
+    }
+    if (action.typeMigration?.status === "blocked_incompatible_fields") {
+      summary.modelMismatchBlocked += 1;
+    }
+
     if (action.syncError) {
       summary.failed += 1;
       continue;
@@ -210,14 +286,15 @@ function dryRunTagsChanged(currentTags: string[], nextTags: string[]): boolean {
 
 function dryRunFieldsChanged(
   noteFields: Record<string, { value: string; order: number }>,
-  frontHtml: string,
-  backHtml: string,
+  fields: Record<string, string>,
 ): boolean {
-  const currentFront = normalizeSyncFieldHtml(noteFields.Front?.value ?? "");
-  const currentBack = normalizeSyncFieldHtml(noteFields.Back?.value ?? "");
-  const nextFront = normalizeSyncFieldHtml(frontHtml);
-  const nextBack = normalizeSyncFieldHtml(backHtml);
-  return currentFront !== nextFront || currentBack !== nextBack;
+  for (const [key, value] of Object.entries(fields)) {
+    const current = normalizeSyncFieldHtml(noteFields[key]?.value ?? "");
+    if (current !== normalizeSyncFieldHtml(value)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function applyDryRunParity(
@@ -254,11 +331,31 @@ async function applyDryRunParity(
     }
 
     entry.action.ankiNoteId = noteInfo.noteId;
-    entry.action.action = dryRunFieldsChanged(
-      noteInfo.fields,
-      entry.payload.frontHtml,
-      entry.payload.backHtml,
-    ) || dryRunTagsChanged(noteInfo.tags, tags)
+    const fields =
+      entry.payload.fields ??
+      ({
+        Front: entry.payload.frontHtml,
+        Back: entry.payload.backHtml,
+      } satisfies Record<string, string>);
+    const targetModel =
+      entry.payload.modelName ?? config.noteModelName ?? "Basic";
+    const migration = assessModelMigration(noteInfo, targetModel, fields);
+
+    if (migration.kind === "incompatible") {
+      entry.action.action = "skip";
+      entry.action.syncError = migration.error;
+      entry.action.typeMigration = migration.typeMigration;
+      entry.action.modelMismatchWarning = migration.warning;
+      continue;
+    }
+
+    if (migration.kind === "compatible") {
+      entry.action.typeMigration = migration.typeMigration;
+      entry.action.modelMismatchWarning = migration.warning;
+    }
+
+    entry.action.action = dryRunFieldsChanged(noteInfo.fields, fields) ||
+      dryRunTagsChanged(noteInfo.tags, tags)
       ? "update"
       : "skip";
   }
@@ -359,15 +456,27 @@ export async function runSync(
       config.defaultCardDeclarationHeadingLevel,
     );
     const bodyStartOffset = getBodyStartOffset(rawText);
+    const includeParentHeadersAsTags = getIncludeParentHeadersAsTags(
+      rawText,
+      config.includeParentHeadersAsTags,
+    );
     const extractOptions = {
       bodyStartOffset,
       cardDeclarationHeadingLevel: declarationLevel,
-      includeParentHeadersAsTags: getIncludeParentHeadersAsTags(
-        rawText,
-        config.includeParentHeadersAsTags,
-      ),
+      includeParentHeadersAsTags,
     };
     const sourceCards = extractCards(ast, delimiter, extractOptions);
+
+    const previewDocument = parseCardDocument(rawText, {
+      cardDeclarationHeadingLevel: declarationLevel,
+      delimiter,
+      bodyStartOffset,
+      includeParentHeadersAsTags,
+      inferClozeFromManualSyntaxOnBasic:
+        config.inferClozeFromManualSyntaxOnBasic,
+      noteTypeFieldNamesByNoteType: {},
+    });
+    const previewByOrdinal = previewCardsByOrdinal(previewDocument.cards);
 
     await graftTransclusions(ast, {
       vaultPath,
@@ -407,7 +516,7 @@ export async function runSync(
       action: SyncAction;
     }> = [];
 
-    for (const card of cards) {
+    for (const [cardIndex, card] of cards.entries()) {
       const injectionPlan = buildInjectionPlan(card);
       trackVaultBoundUuid(vaultBoundUuids, card.ankiId);
       trackVaultBoundUuid(vaultBoundUuids, injectionPlan?.uuid);
@@ -418,6 +527,36 @@ export async function runSync(
         { inheritedFootnoteDefs },
       );
 
+      const previewCard =
+        previewByOrdinal.get(card.ordinal) ??
+        previewDocument.cards[cardIndex];
+      const previewOutcome = previewCard
+        ? effectiveCardOutcome(previewCard)
+        : undefined;
+      const previewWarnings = previewCard
+        ? collectPreviewWarnings(previewCard)
+        : undefined;
+      const notePlan = planNoteModelForResolvedType(
+        previewCard?.resolvedType,
+        frontHtml,
+        backHtml,
+        config.noteModelName,
+      );
+      const customNotImplemented = notePlan.kind === "custom";
+      const writeBlocked =
+        (previewOutcome !== undefined && !isAnkiWriteAllowed(previewOutcome)) ||
+        customNotImplemented;
+      const previewSkipReason:
+        | "preview_skip"
+        | "preview_error"
+        | undefined = writeBlocked
+        ? customNotImplemented
+          ? "preview_skip"
+          : previewOutcome === "error"
+            ? "preview_error"
+            : "preview_skip"
+        : undefined;
+
       const exclusionKey = cardExclusionKey(
         actionFile,
         card.tag,
@@ -425,11 +564,17 @@ export async function runSync(
         frontHtml,
       );
       const isExcluded = options.excludeCardKeys?.has(exclusionKey) ?? false;
-      const plannedAction: SyncAction["action"] = isExcluded
-        ? "skip"
-        : card.ankiId
-          ? "update"
-          : "add";
+      const plannedAction: SyncAction["action"] =
+        isExcluded || writeBlocked
+          ? "skip"
+          : card.ankiId
+            ? "update"
+            : "add";
+
+      const mergedPreviewWarnings = [
+        ...(previewWarnings ?? []),
+        ...(customNotImplemented ? [notePlan.notImplementedMessage] : []),
+      ];
 
       const fileAction: SyncAction = {
         action: plannedAction,
@@ -437,9 +582,13 @@ export async function runSync(
         deck,
         tag: card.tag,
         frontHtml,
-        backHtml,
+        backHtml:
+          notePlan.kind === "builtin" && notePlan.builtinType === "typed"
+            ? notePlan.fields.Back
+            : backHtml,
         ankiId: card.ankiId,
-        wouldInjectId: injectionPlan?.uuid,
+        wouldInjectId:
+          isExcluded || writeBlocked ? undefined : injectionPlan?.uuid,
         wouldUploadMedia: mediaResult.plans.map((plan) => plan.fileName),
         mediaUploadDetails: mediaResult.plans.map((plan) => ({
           fileName: plan.fileName,
@@ -448,7 +597,25 @@ export async function runSync(
         unresolvedEmbeds:
           unresolvedEmbeds.length > 0 ? [...unresolvedEmbeds] : undefined,
         transclusionResolved: unresolvedEmbeds.length === 0,
-        skipReason: isExcluded ? "vault_duplicate_front" : undefined,
+        skipReason: isExcluded
+          ? "vault_duplicate_front"
+          : previewSkipReason,
+        previewOutcome,
+        previewWarnings:
+          mergedPreviewWarnings.length > 0
+            ? mergedPreviewWarnings
+            : undefined,
+        syncError: customNotImplemented
+          ? notePlan.notImplementedMessage
+          : undefined,
+        resolvedType:
+          notePlan.kind === "custom"
+            ? "custom"
+            : notePlan.kind === "builtin"
+              ? notePlan.builtinType
+              : "basic",
+        modelName:
+          notePlan.kind === "custom" ? undefined : notePlan.modelName,
       };
       fileActions.push(fileAction);
 
@@ -461,7 +628,11 @@ export async function runSync(
         ankiId: card.ankiId,
       });
 
-      if (isExcluded) {
+      if (isExcluded || writeBlocked) {
+        continue;
+      }
+
+      if (notePlan.kind === "custom") {
         continue;
       }
 
@@ -471,6 +642,8 @@ export async function runSync(
           tag: card.tag,
           frontHtml,
           backHtml,
+          modelName: notePlan.modelName,
+          fields: notePlan.fields,
           ankiId: card.ankiId,
           wouldInjectId: injectionPlan?.uuid,
           fileAnkiTags,
@@ -526,7 +699,11 @@ export async function runSync(
 
     let syncResultIndex = 0;
     for (const action of fileActions) {
-      if (action.skipReason === "vault_duplicate_front") {
+      if (
+        action.skipReason === "vault_duplicate_front" ||
+        action.skipReason === "preview_skip" ||
+        action.skipReason === "preview_error"
+      ) {
         continue;
       }
 
@@ -537,6 +714,19 @@ export async function runSync(
         action.ankiNoteId = result.ankiNoteId;
         if (result.error) {
           action.syncError = result.error;
+        }
+        if (result.typeMigration) {
+          action.typeMigration = result.typeMigration;
+        }
+        if (result.modelMismatchWarning) {
+          action.modelMismatchWarning = result.modelMismatchWarning;
+          const warnings = action.previewWarnings ?? [];
+          if (!warnings.includes(result.modelMismatchWarning)) {
+            action.previewWarnings = [
+              ...warnings,
+              result.modelMismatchWarning,
+            ];
+          }
         }
         if (result.duplicateWarning) {
           ankiDuplicateWarnings.push(result.duplicateWarning);
@@ -592,6 +782,16 @@ export async function runSync(
     mediaWarnings,
     orphans,
   };
+}
+
+function previewCardsByOrdinal(
+  cards: ResolvedCard[],
+): Map<number, ResolvedCard> {
+  const byOrdinal = new Map<number, ResolvedCard>();
+  for (const card of cards) {
+    byOrdinal.set(card.ordinal, card);
+  }
+  return byOrdinal;
 }
 
 async function collectVaultMediaPaths(

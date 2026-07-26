@@ -131,6 +131,61 @@ describe("stateMachine", () => {
     expect(cards[0]?.injectionOffset).toBeTypeOf("number");
   });
 
+  test("sets injectionOffset at end of front for front-only cloze (no :::)", () => {
+    const rawText = [
+      "#### Cell #anki/cardType/cloze",
+      "",
+      "The {{c1::mitochondria}} produces ATP.",
+    ].join("\n");
+    const ast = parseMarkdown(rawText, "/vault");
+    const cards = extractCards(ast, DEFAULT_DELIMITER, H4);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.ankiId).toBeUndefined();
+    expect(cards[0]?.backNodes).toHaveLength(0);
+    expect(cards[0]?.injectionOffset).toBeTypeOf("number");
+    const frontEnd = cards[0]!.frontNodes.at(-1)?.position?.end?.offset;
+    expect(frontEnd).toBeTypeOf("number");
+    expect(cards[0]?.injectionOffset).toBe(frontEnd);
+  });
+
+  test("sets injectionOffset from back when cloze has ::: Back Extra", () => {
+    const rawText = [
+      "#### Cell #anki/cardType/cloze",
+      "",
+      "The {{c1::mitochondria}} produces ATP.",
+      "",
+      ":::",
+      "",
+      "Extra diagram link here.",
+    ].join("\n");
+    const ast = parseMarkdown(rawText, "/vault");
+    const cards = extractCards(ast, DEFAULT_DELIMITER, H4);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.ankiId).toBeUndefined();
+    expect(cards[0]?.backNodes.length).toBeGreaterThan(0);
+    expect(cards[0]?.injectionOffset).toBeTypeOf("number");
+    const backEnd = cards[0]!.backNodes.at(-1)?.position?.end?.offset;
+    expect(cards[0]?.injectionOffset).toBe(backEnd);
+  });
+
+  test("parses anki-id from front when card has no back nodes", () => {
+    const uuid = "550e8400-e29b-41d4-a716-446655440000";
+    const rawText = [
+      "#### Cell #anki/cardType/cloze",
+      "",
+      "The {{c1::mitochondria}} produces ATP.",
+      `<!--anki-id: ${uuid}-->`,
+    ].join("\n");
+    const ast = parseMarkdown(rawText, "/vault");
+    const cards = extractCards(ast, DEFAULT_DELIMITER, H4);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.ankiId).toBe(uuid);
+    expect(cards[0]?.injectionOffset).toBeUndefined();
+  });
+
   test("stress-test-nested-complex fixture extracts one card ignoring code delimiter", async () => {
     const cards = await loadFixtureCards("stress-test-nested-complex");
 

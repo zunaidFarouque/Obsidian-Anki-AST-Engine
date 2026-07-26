@@ -159,7 +159,7 @@ Tick what is **out of scope** for first implementation pass (so we don’t slip 
 - [x] **Other (write below):**
   - Custom note type sync + CUS partial-field policy — later (02 D4, 03 D6); v1 may **identify** custom and **warn “not implemented.”**
   - `anki_noteTypeMap` remapping UI — later (02 D2).
-  - Spec cleanup CX-25 / G4 fixture repair — proposed in 03 D4/D8 (confirm); apply in polish / when touching those docs/fixtures.
+  - Spec cleanup CX-25 / G4 fixture repair — **CONFIRMED** in 03 D4/D8; applied in polish / when touching those docs/fixtures (Phase 1 applied the quick fixes).
   - Sync marker “in Anki” presence checks — later only if optimized (04 D4).
 
 ← from 02 D4, 03 D3, 03 D6, 02 D2, 02 D6, 04 D4.

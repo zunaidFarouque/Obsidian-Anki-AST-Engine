@@ -6,6 +6,7 @@ import {
 	type ResolvedCardType,
 	type SyncOutcome,
 } from '../../src/cardSyntax/types';
+import { effectiveCardOutcome } from '../../src/cardSyntax/syncEligibility';
 
 export function shouldRebuildCardPreviewDecorations(input: {
 	docChanged: boolean;
@@ -84,37 +85,8 @@ export function outcomeToBadgeClass(outcome: SyncOutcome): string {
 
 export type CardPreviewStyle = 'subtle' | 'explicit';
 
-function messageLevelToOutcome(level: CardMessage['level']): SyncOutcome | undefined {
-	if (level === 'error') {
-		return 'error';
-	}
-	if (level === 'warn') {
-		return 'warn';
-	}
-	if (level === 'skip') {
-		return 'skip';
-	}
-	return undefined;
-}
-
 export function effectivePreviewOutcome(card: Pick<ResolvedCard, 'outcome' | 'messages'>): SyncOutcome {
-	let effective = card.outcome;
-	for (const message of card.messages) {
-		const mapped = messageLevelToOutcome(message.level);
-		if (!mapped) {
-			continue;
-		}
-		if (mapped === 'error') {
-			return 'error';
-		}
-		if (mapped === 'warn' && effective === 'sync') {
-			effective = 'warn';
-		}
-		if (mapped === 'skip' && effective === 'sync') {
-			effective = 'skip';
-		}
-	}
-	return effective;
+	return effectiveCardOutcome(card);
 }
 
 export function computePreviewOutcomeClass(
