@@ -632,7 +632,7 @@ export async function runSync(
         continue;
       }
 
-      if (notePlan.kind === "custom") {
+      if (customNotImplemented) {
         continue;
       }
 

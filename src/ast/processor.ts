@@ -6,17 +6,17 @@ import wikiLinkPlugin from "remark-wiki-link";
 import type { Root } from "mdast";
 import { remarkObsidianLinks } from "./obsidianLinks";
 
-export function parseMarkdown(rawText: string, _vaultPath: string): Root {
-  const processor = unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkMath)
-    .use(wikiLinkPlugin, {
-      pageResolver: (name: string) => [name.replace(/ /g, "_").toLowerCase()],
-      hrefTemplate: (permalink: string) => `#/page/${permalink}`,
-    })
-    .use(remarkObsidianLinks);
+const processor = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath)
+  .use(wikiLinkPlugin, {
+    pageResolver: (name: string) => [name.replace(/ /g, "_").toLowerCase()],
+    hrefTemplate: (permalink: string) => `#/page/${permalink}`,
+  })
+  .use(remarkObsidianLinks);
 
+export function parseMarkdown(rawText: string, _vaultPath: string): Root {
   const tree = processor.parse(rawText);
   return processor.runSync(tree) as Root;
 }

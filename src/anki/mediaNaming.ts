@@ -44,7 +44,12 @@ export function insertHashBeforeExtension(baseName: string, hash: string): strin
 }
 
 export async function hashFileContent(buffer: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const normalizedBuffer = new Uint8Array(buffer.byteLength);
+  normalizedBuffer.set(buffer);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    normalizedBuffer,
+  );
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")

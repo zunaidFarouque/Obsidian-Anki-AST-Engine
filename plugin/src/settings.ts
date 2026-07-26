@@ -221,6 +221,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.enableCardPreview = value;
 						await this.plugin.saveSettings();
+						await this.plugin.syncCardPreviewRegistration();
 						this.plugin.cardPreview?.onSettingsChanged();
 					}),
 			);

@@ -16,6 +16,7 @@
     "sync": "bun run src/index.ts",
     "build": "bun run scripts/build-dist.ts",
     "build:plugin": "bun run build && cd plugin && bun run build",
+    "deploy:test-vault": "bun run build:plugin && bun run copy:plugin -- \"D:/work_temp/Obsidian_Vaults/Main/.obsidian/plugins/obsidian-anki-ast-sync\"",
     "copy:plugin": "bun run scripts/deploy-plugin.ts",
     "deploy:plugin": "bun run build:plugin && bun run copy:plugin",
     "dev": "bun run src/index.ts",

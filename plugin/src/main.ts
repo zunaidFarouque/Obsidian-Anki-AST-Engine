@@ -1,7 +1,6 @@
 import { Notice, Plugin, addIcon } from 'obsidian';
 import { ANKI_SYNC_STAR_ICON_ID, registerPluginIcons } from './icons';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
-import { registerCardPreview, type CardPreviewManager } from './cardPreview';
 import { formatNoteTypeCacheNotice } from './cardPreviewUtils';
 import { buildPluginConfig } from './configBuilder';
 import { createObsidianFetch } from './obsidianFetch';
@@ -11,7 +10,9 @@ import {
 	type AnkiAstSyncSettings,
 } from './settings';
 import { reloadPlugin, reloadPluginCss } from './devReload';
-import { runSyncFlow, runSyncFlowForActiveFile } from './syncOrchestrator';
+import type { CardPreviewManager } from './cardPreview';
+
+type SyncOrchestratorModule = typeof import('./syncOrchestrator');
 
 export default class AnkiAstSyncPlugin extends Plugin {
 	settings!: AnkiAstSyncSettings;
@@ -93,9 +94,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 
 		this.addSettingTab(new AnkiAstSyncSettingTab(this.app, this));
 
-		this.cardPreview = registerCardPreview(this, () => this.settings, () =>
-			this.fetchNoteTypeFieldMap(),
-		);
+		await this.syncCardPreviewRegistration();
 	}
 
 	onunload() {
@@ -112,6 +111,23 @@ export default class AnkiAstSyncPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	async syncCardPreviewRegistration(): Promise<void> {
+		if (this.settings.enableCardPreview) {
+			if (!this.cardPreview) {
+				const { registerCardPreview } = await import('./cardPreview');
+				this.cardPreview = registerCardPreview(
+					this,
+					() => this.settings,
+					() => this.fetchNoteTypeFieldMap(),
+				);
+			}
+			return;
+		}
+
+		this.cardPreview?.destroy();
+		this.cardPreview = undefined;
 	}
 
 	private createAnkiClient(): AnkiConnectClient {
@@ -136,32 +152,40 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	}
 
 	private syncVaultToAnki(): Promise<void> {
-		return runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
-			dryRun: false,
-		});
+		return this.getSyncOrchestrator().then((module) =>
+			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
+				dryRun: false,
+			}),
+		);
 	}
 
 	private dryRunSyncVaultToAnki(): Promise<void> {
-		return runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
-			dryRun: true,
-		});
+		return this.getSyncOrchestrator().then((module) =>
+			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
+				dryRun: true,
+			}),
+		);
 	}
 
 	private dryRunSyncCurrentFile(): Promise<void> {
-		return runSyncFlowForActiveFile(
-			this.app,
-			this.settings,
-			() => this.createAnkiClient(),
-			{ dryRun: true },
+		return this.getSyncOrchestrator().then((module) =>
+			module.runSyncFlowForActiveFile(
+				this.app,
+				this.settings,
+				() => this.createAnkiClient(),
+				{ dryRun: true },
+			),
 		);
 	}
 
 	private syncCurrentFileToAnki(): Promise<void> {
-		return runSyncFlowForActiveFile(
-			this.app,
-			this.settings,
-			() => this.createAnkiClient(),
-			{ dryRun: false },
+		return this.getSyncOrchestrator().then((module) =>
+			module.runSyncFlowForActiveFile(
+				this.app,
+				this.settings,
+				() => this.createAnkiClient(),
+				{ dryRun: false },
+			),
 		);
 	}
 
@@ -183,6 +207,10 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			};
 		const message = formatNoteTypeCacheNotice(result);
 		new Notice(message, result.ok ? undefined : 12_000);
+	}
+
+	private async getSyncOrchestrator(): Promise<SyncOrchestratorModule> {
+		return import('./syncOrchestrator');
 	}
 
 	private async fetchNoteTypeFieldMap(): Promise<Record<string, string[]>> {
