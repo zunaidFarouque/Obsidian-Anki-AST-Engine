@@ -998,5 +998,54 @@ describe('card preview editor decorations (Live Preview)', () => {
 		});
 		expect(delimiterExtraWidgets).toHaveLength(0);
 	});
+
+	test('field delimiter renders delimiter guide line with field class', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const infoField = StateField.define<{ file: { path: string } | null } | undefined>({
+			create: () => ({ file: { path: 'Notes/custom-vocab.md' } }),
+			update: (value) => value,
+		});
+		const doc = ['#### Vocab Card', '', 'Word', '', '::: Definition', '', 'A meaning'].join('\n');
+		const state = EditorState.create({ doc, extensions: [livePreviewField, infoField] });
+		const fieldDelimiter = doc.indexOf('::: Definition');
+		const cardStart = doc.indexOf('#### Vocab Card');
+
+		const decorations = buildCardPreviewDecorations(
+			{ state } as unknown as EditorView,
+			{
+				getSettings: () => ({ enableCardPreview: true } as any),
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [
+							makeCard({
+								range: { start: cardStart, end: doc.length },
+								regions: {
+									delimiters: [
+										{ kind: 'field', fieldName: 'Definition', range: { start: fieldDelimiter, end: fieldDelimiter + 14 } },
+									],
+								},
+							}),
+						],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+				editorInfoField: infoField as any,
+			},
+		);
+
+		const entries = collectDecorations(decorations, state.doc.length);
+		const fieldGuideEntry = entries.find((entry) =>
+			String(entry.value.spec?.class ?? '').includes('anki-card-preview-delimiter-guide--field'),
+		);
+		expect(fieldGuideEntry).toBeDefined();
+		expect(fieldGuideEntry?.from).toBe(state.doc.lineAt(fieldDelimiter).from);
+	});
 });
+
 

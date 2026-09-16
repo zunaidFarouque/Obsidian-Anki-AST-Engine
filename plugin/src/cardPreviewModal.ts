@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile, type App } from 'obsidian';
+import { MarkdownView, Modal, Notice, TFile, type App } from 'obsidian';
 import {
 	formatResolvedCardType,
 	type ResolvedCard,
@@ -42,11 +42,30 @@ export class CardPreviewModal extends Modal {
 	}
 
 	private async insertStructureTemplate(): Promise<void> {
+		const templateLines = buildStructureTemplateLines(this.card.resolvedType, this.customFields);
+		const templateBlock = `${templateLines.join('\n')}\n`;
+
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView && activeView.file?.path === this.file.path && activeView.editor) {
+			const editor = activeView.editor;
+			const doc = editor.getValue();
+			const lineBreakOffset = doc.indexOf('\n', Math.max(0, this.headingStartOffset));
+			if (lineBreakOffset !== -1) {
+				const pos = editor.offsetToPos(lineBreakOffset + 1);
+				editor.replaceRange(templateBlock, pos);
+			} else {
+				const endPos = editor.offsetToPos(doc.length);
+				editor.replaceRange(`\n${templateBlock}`, endPos);
+			}
+			new Notice('Inserted structure template');
+			return;
+		}
+
 		const content = await this.app.vault.cachedRead(this.file);
 		const nextContent = insertTemplateAfterDeclarationHeading(
 			content,
 			this.headingStartOffset,
-			buildStructureTemplateLines(this.card.resolvedType, this.customFields),
+			templateLines,
 		);
 		await this.app.vault.modify(this.file, nextContent);
 		new Notice('Inserted structure template');

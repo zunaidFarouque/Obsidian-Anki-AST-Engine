@@ -40,7 +40,7 @@ type SplitAtDelimiterResult = {
   delimiter: DelimiterRegion;
 };
 
-export function extractCardRegions(bodyNodes: Content[]): ExtractedCardRegions {
+export function extractCardRegions(bodyNodes: Content[], customDelimiter = ":::"): ExtractedCardRegions {
   const textNodes: Content[] = [];
   const backNodes: Content[] = [];
   const fields: MdastFieldRegion[] = [];
@@ -63,7 +63,7 @@ export function extractCardRegions(bodyNodes: Content[]): ExtractedCardRegions {
 
   for (const child of bodyNodes) {
     if (phase === "text") {
-      const split = splitNodeAtFirstDelimiter(child);
+      const split = splitNodeAtFirstDelimiter(child, customDelimiter);
       if (!split) {
         textNodes.push(child);
         continue;
@@ -97,7 +97,7 @@ export function extractCardRegions(bodyNodes: Content[]): ExtractedCardRegions {
       continue;
     }
 
-    const split = splitNodeAtFirstDelimiter(child);
+    const split = splitNodeAtFirstDelimiter(child, customDelimiter);
     if (split?.delimiter.kind === "field") {
       if (currentField) {
         fields.push(currentField);
@@ -241,7 +241,10 @@ function nodesRange(nodes: Content[]): ReturnType<typeof createSourceRange> | un
   return createSourceRange(start, end);
 }
 
-function splitNodeAtFirstDelimiter(node: Content): SplitAtDelimiterResult | null {
+function splitNodeAtFirstDelimiter(
+  node: Content,
+  customDelimiter = ":::",
+): SplitAtDelimiterResult | null {
   let splitInfo:
     | {
         parent: Parent;
@@ -265,7 +268,7 @@ function splitNodeAtFirstDelimiter(node: Content): SplitAtDelimiterResult | null
     }
 
     const value = String(visited.value);
-    const match = findFirstDelimiterInText(value);
+    const match = findFirstDelimiterInText(value, customDelimiter);
     if (!match) {
       return;
     }
@@ -405,7 +408,10 @@ function classifyTripleColon(
   return { index, length: 3, kind: ":::" };
 }
 
-function findFirstDelimiterInText(value: string): DelimiterMatch | null {
+function findFirstDelimiterInText(
+  value: string,
+  customDelimiter = ":::",
+): DelimiterMatch | null {
   let earliest: DelimiterMatch | null = null;
   let searchFrom = 0;
 
@@ -421,6 +427,37 @@ function findFirstDelimiterInText(value: string): DelimiterMatch | null {
     }
 
     searchFrom = index + 3;
+  }
+
+  if (customDelimiter !== ":::") {
+    if (customDelimiter === "?") {
+      const trimmed = value.trim();
+      if (trimmed === "?") {
+        const idx = value.indexOf("?");
+        if (!earliest || idx < earliest.index) {
+          earliest = { index: idx, length: 1, kind: ":::" };
+        }
+      } else {
+        const inlineSplit = value.match(/\?(?=\s)/);
+        if (inlineSplit?.index !== undefined) {
+          if (!earliest || inlineSplit.index < earliest.index) {
+            earliest = { index: inlineSplit.index, length: 1, kind: ":::" };
+          }
+        }
+      }
+    } else {
+      let custSearch = 0;
+      while (custSearch < value.length) {
+        const idx = value.indexOf(customDelimiter, custSearch);
+        if (idx === -1) break;
+        if (isAtLineStart(value, idx)) {
+          if (!earliest || idx < earliest.index) {
+            earliest = { index: idx, length: customDelimiter.length, kind: ":::" };
+          }
+        }
+        custSearch = idx + customDelimiter.length;
+      }
+    }
   }
 
   return earliest;

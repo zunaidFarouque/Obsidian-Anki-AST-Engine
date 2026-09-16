@@ -1,4 +1,4 @@
-import { RangeSetBuilder } from '@codemirror/state';
+import { RangeSetBuilder, StateEffect } from '@codemirror/state';
 import type { Extension, StateField } from '@codemirror/state';
 import {
 	Decoration,
@@ -53,6 +53,8 @@ function nextBadgeAccessibilityId(prefix: string): string {
 	return `${prefix}-${badgeAccessibilityIdCounter}`;
 }
 
+export const refreshPreviewEffect = StateEffect.define<void>();
+
 function buildDelimiterGuideClasses(garnishText?: string): string {
 	const classes = [DELIMITER_GUIDE_CLASS];
 	if (garnishText === 'ℹ') {
@@ -61,6 +63,8 @@ function buildDelimiterGuideClasses(garnishText?: string): string {
 		classes.push(DELIMITER_GUIDE_TYPED_CLASS);
 	} else if (garnishText === '↑↓') {
 		classes.push(DELIMITER_GUIDE_REVERSIBLE_CLASS);
+	} else if (garnishText) {
+		classes.push('anki-card-preview-delimiter-guide--field');
 	}
 	return classes.join(' ');
 }
@@ -422,11 +426,12 @@ export function buildCardPreviewDecorations(
 	return buildSortedDecorationSet(pending);
 }
 
-class CardPreviewEditorPlugin implements PluginValue {
+export class CardPreviewEditorPlugin implements PluginValue {
 	decorations: DecorationSet;
 	private lastSettingsRevision = -1;
 	private lastLivePreview = false;
 	private lastEditorFilePath: string | undefined;
+	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		private readonly view: EditorView,
@@ -439,6 +444,14 @@ class CardPreviewEditorPlugin implements PluginValue {
 	}
 
 	update(update: ViewUpdate): void {
+		if (update.transactions.some((tr) => tr.effects.some((e) => e.is(refreshPreviewEffect)))) {
+			return;
+		}
+
+		if (update.docChanged) {
+			this.decorations = this.decorations.map(update.changes);
+		}
+
 		const settingsRevision = this.options.getSettingsRevision();
 		const currentLivePreview = resolveLivePreviewMode(
 			update.view,
@@ -450,27 +463,43 @@ class CardPreviewEditorPlugin implements PluginValue {
 		)?.path;
 		const livePreviewChanged = currentLivePreview !== this.lastLivePreview;
 		const editorFileChanged = currentEditorFilePath !== this.lastEditorFilePath;
+		const settingsChanged = settingsRevision !== this.lastSettingsRevision;
 
-		if (
-			!shouldRebuildCardPreviewDecorations({
-				docChanged: update.docChanged,
-				viewportChanged: update.viewportChanged,
-				settingsRevision,
-				lastSettingsRevision: this.lastSettingsRevision,
-				livePreviewChanged,
-				editorFileChanged,
-			})
-		) {
+		if (livePreviewChanged || editorFileChanged || settingsChanged) {
+			this.clearDebounceTimer();
+			this.lastSettingsRevision = settingsRevision;
+			this.lastLivePreview = currentLivePreview;
+			this.lastEditorFilePath = currentEditorFilePath;
+			this.decorations = buildCardPreviewDecorations(update.view, this.options);
 			return;
 		}
 
-		this.lastSettingsRevision = settingsRevision;
-		this.lastLivePreview = currentLivePreview;
-		this.lastEditorFilePath = currentEditorFilePath;
-		this.decorations = buildCardPreviewDecorations(update.view, this.options);
+		if (update.docChanged) {
+			this.scheduleDebouncedRebuild();
+		}
 	}
 
-	destroy(): void {}
+	private scheduleDebouncedRebuild(): void {
+		this.clearDebounceTimer();
+		this.debounceTimer = setTimeout(() => {
+			this.debounceTimer = null;
+			this.decorations = buildCardPreviewDecorations(this.view, this.options);
+			this.view.dispatch({
+				effects: refreshPreviewEffect.of(),
+			});
+		}, 200);
+	}
+
+	private clearDebounceTimer(): void {
+		if (this.debounceTimer !== null) {
+			clearTimeout(this.debounceTimer);
+			this.debounceTimer = null;
+		}
+	}
+
+	destroy(): void {
+		this.clearDebounceTimer();
+	}
 }
 
 export function createCardPreviewEditorExtension(

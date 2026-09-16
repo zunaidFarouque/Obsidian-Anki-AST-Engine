@@ -337,6 +337,30 @@ describe('cardPreviewUtils', () => {
 		).toBeUndefined();
 	});
 
+	test('buildDelimiterLineDecorations marks field delimiters with primary guide and fieldName', () => {
+		const card = makeCard({
+			resolvedType: { kind: 'custom', noteTypeId: 'Vocab' },
+			regions: {
+				delimiters: [
+					{ kind: 'field', fieldName: 'Word', range: { start: 10, end: 18 } },
+					{ kind: 'field', fieldName: 'Definition', range: { start: 30, end: 44 } },
+				],
+			},
+		});
+		const decorations = buildDelimiterLineDecorations(card);
+		expect(decorations).toHaveLength(2);
+		expect(decorations[0]).toMatchObject({
+			isPrimary: true,
+			garnishText: 'Word',
+			fieldName: 'Word',
+		});
+		expect(decorations[1]).toMatchObject({
+			isPrimary: true,
+			garnishText: 'Definition',
+			fieldName: 'Definition',
+		});
+	});
+
 	test('buildClozeTokenDecorations highlights text-region cloze with stable palette index', () => {
 		const content = '#### Card\n{{c1::one}} and {{c5::two}}\n:::\n{{c1::back}}\n';
 		const textEnd = content.indexOf('\n:::');

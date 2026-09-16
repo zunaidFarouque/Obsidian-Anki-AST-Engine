@@ -2,7 +2,6 @@ import {
 	TFile,
 	editorInfoField,
 	editorLivePreviewField,
-	type MarkdownPostProcessorContext,
 	type Plugin,
 } from 'obsidian';
 import {
@@ -15,21 +14,15 @@ import {
 	type ParseCardDocumentResult,
 } from 'obsidian-anki-ast-engine/cardSyntax';
 import type { AnkiAstSyncSettings } from './settings';
-import { createCardPreviewEditorExtension, createCardPreviewBadgeElement } from './cardPreviewEditor';
+import { createCardPreviewEditorExtension } from './cardPreviewEditor';
 import { applyCardPreviewLayoutCssVariables } from './cardPreviewLayout';
 import {
-	CARD_PREVIEW_DEBOUNCE_MS,
-	cardDeclarationHeadingSelector,
-	computePreviewOutcomeClass,
 	computeContentCacheKey,
 	frontmatterFromObsidianMetadata,
 	refreshNoteTypeMapFromHook,
 	type NoteTypeCacheRefreshResult,
-	zipCardsToHeadings,
 } from './cardPreviewUtils';
 
-const BADGE_CLASS = 'anki-card-preview-badge';
-const HEADING_OUTLINE_CLASS = 'anki-card-preview-heading';
 const CACHE_LIMIT = 24;
 
 interface CacheEntry {
@@ -39,9 +32,6 @@ interface CacheEntry {
 
 export class CardPreviewManager {
 	private readonly cache = new Map<string, CacheEntry>();
-	private readonly pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	private readonly pendingContent = new Map<string, string>();
-	private readonly previewElements = new Map<string, WeakRef<HTMLElement>>();
 	private settingsRevision = 0;
 	private noteTypeFieldNamesByNoteType: Record<string, string[]> = {};
 	private noteTypeCacheRevision = 0;
@@ -70,31 +60,13 @@ export class CardPreviewManager {
 	}
 
 	destroy(): void {
-		for (const timer of this.pendingTimers.values()) {
-			clearTimeout(timer);
-		}
-		this.pendingTimers.clear();
-		this.pendingContent.clear();
-		this.previewElements.clear();
 		this.cache.clear();
 	}
 
 	onSettingsChanged(): void {
 		this.settingsRevision += 1;
 		applyCardPreviewLayoutCssVariables(this.getSettings());
-		const activePath = this.plugin.app.workspace.getActiveFile()?.path;
-		if (!activePath) {
-			return;
-		}
-
-		this.cache.delete(activePath);
-		const preview = this.previewElements.get(activePath)?.deref();
-		if (preview?.isConnected) {
-			this.clearDecorations(preview);
-			if (this.getSettings().enableCardPreview) {
-				void this.processPreview(preview, { sourcePath: activePath } as MarkdownPostProcessorContext);
-			}
-		}
+		this.cache.clear();
 	}
 
 	async refreshNoteTypeMap(): Promise<NoteTypeCacheRefreshResult> {
@@ -106,71 +78,6 @@ export class CardPreviewManager {
 		this.noteTypeCacheRevision += 1;
 		this.onSettingsChanged();
 		return result;
-	}
-
-	private async processPreview(
-		element: HTMLElement,
-		context: MarkdownPostProcessorContext,
-	): Promise<void> {
-		if (!this.getSettings().enableCardPreview) {
-			return;
-		}
-
-		const sourcePath = context.sourcePath;
-		if (!sourcePath) {
-			return;
-		}
-
-		const file = this.plugin.app.vault.getAbstractFileByPath(sourcePath);
-		if (!(file instanceof TFile)) {
-			return;
-		}
-
-		this.previewElements.set(sourcePath, new WeakRef(element));
-
-		const content = await this.plugin.app.vault.cachedRead(file);
-		const cacheKey = computeContentCacheKey(sourcePath, content, this.noteTypeCacheRevision);
-		const cached = this.cache.get(sourcePath);
-
-		if (cached?.key === cacheKey) {
-			this.applyDecorations(element, cached.result, sourcePath);
-			return;
-		}
-
-		this.pendingContent.set(sourcePath, content);
-		const existingTimer = this.pendingTimers.get(sourcePath);
-		if (existingTimer) {
-			clearTimeout(existingTimer);
-		}
-
-		const timer = setTimeout(() => {
-			this.pendingTimers.delete(sourcePath);
-			const latestContent = this.pendingContent.get(sourcePath) ?? content;
-			this.pendingContent.delete(sourcePath);
-
-			const latestKey = computeContentCacheKey(
-				sourcePath,
-				latestContent,
-				this.noteTypeCacheRevision,
-			);
-			const latestCached = this.cache.get(sourcePath);
-			if (latestCached?.key === latestKey) {
-				const preview = this.previewElements.get(sourcePath)?.deref();
-				if (preview?.isConnected) {
-					this.applyDecorations(preview, latestCached.result, sourcePath);
-				}
-				return;
-			}
-
-			const result = this.parseContent(latestContent, file);
-
-			const preview = this.previewElements.get(sourcePath)?.deref();
-			if (preview?.isConnected) {
-				this.applyDecorations(preview, result, sourcePath);
-			}
-		}, CARD_PREVIEW_DEBOUNCE_MS);
-
-		this.pendingTimers.set(sourcePath, timer);
 	}
 
 	parseContent(content: string, file?: TFile): ParseCardDocumentResult {
@@ -249,48 +156,6 @@ export class CardPreviewManager {
 		}
 	}
 
-	private clearDecorations(container: HTMLElement): void {
-		container.querySelectorAll('.anki-card-preview-badge-slot').forEach((node) => node.remove());
-		container.querySelectorAll(`.${BADGE_CLASS}`).forEach((node) => node.remove());
-		container.querySelectorAll(`.${HEADING_OUTLINE_CLASS}`).forEach((node) => {
-			node.classList.remove(HEADING_OUTLINE_CLASS);
-			for (const outcome of ['sync', 'skip', 'error', 'warn']) {
-				node.classList.remove(`${HEADING_OUTLINE_CLASS}--${outcome}`);
-			}
-		});
-	}
-
-	private applyDecorations(
-		container: HTMLElement,
-		result: ParseCardDocumentResult,
-		sourcePath: string,
-	): void {
-		this.clearDecorations(container);
-
-		if (!result.syncEligible || result.cards.length === 0) {
-			return;
-		}
-
-		const selector = cardDeclarationHeadingSelector(
-			this.getSettings().defaultCardDeclarationHeadingLevel,
-		);
-		const headings = Array.from(container.querySelectorAll<HTMLElement>(selector));
-		const pairs = zipCardsToHeadings(result.cards, headings);
-
-		for (const { card, heading } of pairs) {
-			const outcomeClass = computePreviewOutcomeClass(
-				card,
-				this.getSettings().cardPreviewStyle ?? 'subtle',
-			);
-			heading.classList.add(HEADING_OUTLINE_CLASS, `${HEADING_OUTLINE_CLASS}--${outcomeClass}`);
-
-			const badgeSlot = createCardPreviewBadgeElement(card, () => {
-				void this.openCardPreviewModal(sourcePath, card);
-			});
-			heading.appendChild(badgeSlot);
-		}
-	}
-
 	private async openCardPreviewModal(
 		sourcePath: string,
 		card: ParseCardDocumentResult['cards'][number],
@@ -300,7 +165,11 @@ export class CardPreviewManager {
 			return;
 		}
 		const { CardPreviewModal } = await import('./cardPreviewModal');
-		new CardPreviewModal(this.plugin.app, card, file, card.range.start).open();
+		const customFields =
+			card.resolvedType.kind === 'custom'
+				? this.noteTypeFieldNamesByNoteType[card.resolvedType.noteTypeId]
+				: undefined;
+		new CardPreviewModal(this.plugin.app, card, file, card.range.start, customFields).open();
 	}
 }
 

@@ -1,11 +1,19 @@
 import type { Content, Heading, Root } from "mdast";
 import { parseMarkdown } from "../ast/processor";
-import { contentEndOffsetFromNodes } from "../ast/stripAuthoringContent";
 import {
+  contentEndOffsetFromNodes,
+  stripTrailingAuthoringNodes,
+} from "../ast/stripAuthoringContent";
+import { visit } from "unist-util-visit";
+import {
+  getCardDeclarationHeadingLevelFromFrontmatter,
+  getDelimiterFromFrontmatter,
+  getIncludeParentHeadersAsTagsFromFrontmatter,
   parseFrontmatter,
   shouldSync,
   type Frontmatter,
 } from "../io/frontmatterFilter";
+import { stripTrailingSectionSeparators } from "../parser/stripTrailingSectionSeparators";
 import { nodesToPreview, nodesToRawText } from "../utils/textPreview";
 import { processClozeDeletions } from "./clozeProcessor";
 import { crossCuttingMessages } from "./crossCuttingRules";
@@ -76,10 +84,30 @@ export function parseCardDocument(
     };
   }
 
-  const ast = parseMarkdown(rawText, "");
+  const declarationLevel = getCardDeclarationHeadingLevelFromFrontmatter(
+    effectiveFrontmatter,
+    resolvedOptions.cardDeclarationHeadingLevel,
+  );
+  const delimiter = getDelimiterFromFrontmatter(
+    effectiveFrontmatter,
+    resolvedOptions.delimiter,
+  );
+  const includeParentHeadersAsTags =
+    getIncludeParentHeadersAsTagsFromFrontmatter(
+      effectiveFrontmatter,
+      resolvedOptions.includeParentHeadersAsTags,
+    );
+  const effectiveOptions: ParseCardDocumentOptions = {
+    ...resolvedOptions,
+    cardDeclarationHeadingLevel: declarationLevel,
+    delimiter,
+    includeParentHeadersAsTags,
+  };
+
+  const ast = effectiveOptions.ast ?? parseMarkdown(rawText, "");
   const outline = buildOutlineFromAst(
     ast,
-    resolvedOptions.cardDeclarationHeadingLevel,
+    effectiveOptions.cardDeclarationHeadingLevel,
   );
 
   const cards = outline.cardHeadings.map((cardHeading, ordinal) =>
@@ -89,7 +117,7 @@ export function parseCardDocument(
       cardHeading,
       ordinal,
       outline,
-      resolvedOptions,
+      effectiveOptions,
       fileDefaults,
     ),
   );
@@ -125,7 +153,7 @@ function resolveCard(
     outline,
     options.bodyStartOffset,
   );
-  const extracted = extractCardRegions(bodyNodes);
+  const extracted = extractCardRegions(bodyNodes, options.delimiter);
   const layoutRegions = buildLayoutRegions(title, extracted);
 
   const cardHeadingDecl = toHeadingDeclaration(
@@ -267,22 +295,69 @@ function resolveCard(
     }
   }
 
+  const tag =
+    buildAnkiTagPath(ancestors, title, options.includeParentHeadersAsTags) ??
+    title;
+  const sectionDepths = new Map(
+    ancestors.map((ancestor) => [ancestor.depth, stripAllHashtags(ancestor.text)]),
+  );
+
+  const rawFrontNodes =
+    extracted.textNodes.length > 0
+      ? extracted.textNodes
+      : title.length > 0
+        ? [createTextParagraph(title)]
+        : [];
+  const frontNodes = stripTrailingAuthoringNodes(
+    stripTrailingSectionSeparators(rawFrontNodes),
+  );
+  const backNodes = stripTrailingAuthoringNodes(
+    stripTrailingSectionSeparators(extracted.backNodes),
+  );
+
+  const range = cardRange(cardHeading, bodyNodes, rawText.length);
+  const primaryDelimiter = extracted.regions.delimiters[0];
+
+  const ankiId =
+    extractAnkiId(backNodes) ??
+    extractAnkiId(frontNodes) ??
+    extractAnkiId(bodyNodes);
+
+  let injectionOffset = ankiId ? undefined : getInjectionOffset(backNodes);
+  if (injectionOffset === undefined && !ankiId && primaryDelimiter) {
+    injectionOffset = primaryDelimiter.range.end;
+  }
+  if (injectionOffset === undefined && !ankiId) {
+    injectionOffset = getInjectionOffset(frontNodes);
+  }
+  if (injectionOffset === undefined && !ankiId) {
+    injectionOffset = range.end;
+  }
+
   return {
     title,
     ordinal,
-    range: cardRange(cardHeading, bodyNodes, rawText.length),
+    range,
     resolvedType: effectiveResolved,
     resolvedFrom: resolved.resolvedFrom,
     outcome,
     messages,
     regions: extracted.regions,
     hashtags: collectCardHashtags(cardHashtags, ancestorHashtagResults),
-    ankiTagPath: buildAnkiTagPath(
-      ancestors,
-      title,
-      options.includeParentHeadersAsTags,
-    ),
-    ankiId: extractAnkiId(extracted.backNodes),
+    ankiTagPath: tag,
+    ankiId,
+    tag,
+    frontNodes,
+    backNodes,
+    sectionDepths,
+    injectionOffset,
+  };
+}
+
+function createTextParagraph(text: string): Content {
+  return {
+    type: "paragraph",
+    children: [{ type: "text", value: text }],
   };
 }
 
@@ -383,6 +458,35 @@ function collectCardBodyNodes(
   bodyStartOffset: number,
 ): Content[] {
   const declarationLevel = outline.cardDeclarationLevel;
+  let startIndex = ast.children.indexOf(cardHeading.node);
+
+  if (startIndex === -1) {
+    startIndex = ast.children.findIndex(
+      (child) =>
+        child.type === "heading" &&
+        child.position?.start?.offset !== undefined &&
+        child.position.start.offset === cardHeading.node.position?.start?.offset,
+    );
+  }
+
+  if (startIndex !== -1) {
+    const nodes: Content[] = [];
+    for (let i = startIndex + 1; i < ast.children.length; i++) {
+      const child = ast.children[i]!;
+      if (
+        child.type === "heading" &&
+        (child as Heading).depth <= declarationLevel
+      ) {
+        break;
+      }
+      if (!isWithinBody(child, bodyStartOffset)) {
+        continue;
+      }
+      nodes.push(child);
+    }
+    return nodes;
+  }
+
   const cardStart = cardHeading.node.position?.start?.offset ?? 0;
   const cardEnd = findCardEndOffset(ast, cardStart, declarationLevel);
 
@@ -550,10 +654,54 @@ function cardRange(
   return createSourceRange(start, end);
 }
 
-function extractAnkiId(backNodes: Content[]): string | undefined {
-  const backText = nodesToPreview(backNodes);
-  const match = backText.match(ANKI_ID_REGEX);
-  return match?.[1];
+const ANKI_ID_COMMENT_HINT = /<!--\s*anki-id\s*-->/i;
+
+function isRemovableAnkiIdHtmlNode(node: Content): boolean {
+  if (node.type !== "html" || !("value" in node)) {
+    return false;
+  }
+
+  const value = String(node.value);
+  return ANKI_ID_REGEX.test(value) || ANKI_ID_COMMENT_HINT.test(value);
+}
+
+function getInjectionOffset(nodes: Content[]): number | undefined {
+  const list = [...nodes];
+
+  while (list.length > 0) {
+    const last = list[list.length - 1];
+    if (last && isRemovableAnkiIdHtmlNode(last)) {
+      list.pop();
+      continue;
+    }
+    break;
+  }
+
+  const lastNode = list[list.length - 1];
+  return lastNode?.position?.end?.offset;
+}
+
+function extractAnkiId(nodes: Content[]): string | undefined {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (!node) continue;
+    let foundId: string | undefined;
+    visit(node, (visited: any) => {
+      if (foundId) return;
+      if (
+        (visited.type === "html" || visited.type === "text") &&
+        "value" in visited
+      ) {
+        const match = String(visited.value).match(ANKI_ID_REGEX);
+        if (match?.[1]) {
+          foundId = match[1];
+        }
+      }
+    });
+    if (foundId) return foundId;
+  }
+
+  return undefined;
 }
 
 function resolveEffectiveFrontmatter(

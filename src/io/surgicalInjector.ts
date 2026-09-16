@@ -37,10 +37,10 @@ export function isOffsetInsideHtmlComment(
   return false;
 }
 
-export function mergeInjectionMetadata(
-  graftedCards: ExtractedCard[],
-  sourceCards: ExtractedCard[],
-): ExtractedCard[] {
+export function mergeInjectionMetadata<T extends { ankiId?: string; injectionOffset?: number }>(
+  graftedCards: T[],
+  sourceCards: T[],
+): T[] {
   if (graftedCards.length !== sourceCards.length) {
     throw new Error(
       `Card count mismatch after grafting (${sourceCards.length} source vs ${graftedCards.length} grafted)`,
@@ -51,8 +51,8 @@ export function mergeInjectionMetadata(
     const source = sourceCards[index]!;
     return {
       ...card,
-      ankiId: source.ankiId,
-      injectionOffset: source.injectionOffset,
+      ankiId: source.ankiId ?? card.ankiId,
+      injectionOffset: source.injectionOffset ?? card.injectionOffset,
     };
   });
 }
@@ -66,7 +66,9 @@ export function spliceIdAtOffset(
   return rawText.slice(0, offset) + injection + rawText.slice(offset);
 }
 
-export function buildInjectionPlan(card: ExtractedCard): InjectionPlan | undefined {
+export function buildInjectionPlan(
+  card: { ankiId?: string; injectionOffset?: number },
+): InjectionPlan | undefined {
   if (card.ankiId || card.injectionOffset === undefined) {
     return undefined;
   }

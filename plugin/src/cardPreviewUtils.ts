@@ -229,6 +229,7 @@ export interface DelimiterLineDecorationModel {
 	isPrimary: boolean;
 	garnishText?: string;
 	discouragementText?: string;
+	fieldName?: string;
 }
 
 export interface ClozeTokenDecorationModel {
@@ -323,14 +324,38 @@ function isStructuralDelimiter(kind: DelimiterKind): boolean {
 }
 
 export function buildDelimiterLineDecorations(card: ResolvedCard): DelimiterLineDecorationModel[] {
-	const structural = card.regions.delimiters.filter((delimiter) => isStructuralDelimiter(delimiter.kind));
-	return structural.map((delimiter, index) => ({
-		start: delimiter.range.start,
-		end: delimiter.range.end,
-		isPrimary: index === 0,
-		garnishText: index === 0 ? delimiterGarnish(card, delimiter.kind) : undefined,
-		discouragementText: index > 0 ? 'Extra delimiter ignored (still Back region)' : undefined,
-	}));
+	let structuralCount = 0;
+	return card.regions.delimiters
+		.map((delimiter) => {
+			if (delimiter.kind === 'field') {
+				return {
+					start: delimiter.range.start,
+					end: delimiter.range.end,
+					isPrimary: true,
+					garnishText: delimiter.fieldName,
+					fieldName: delimiter.fieldName,
+				};
+			}
+
+			if (isStructuralDelimiter(delimiter.kind)) {
+				const isPrimary = structuralCount === 0;
+				structuralCount += 1;
+				return {
+					start: delimiter.range.start,
+					end: delimiter.range.end,
+					isPrimary,
+					garnishText: isPrimary ? delimiterGarnish(card, delimiter.kind) : undefined,
+					discouragementText: !isPrimary ? 'Extra delimiter ignored (still Back region)' : undefined,
+				};
+			}
+
+			return {
+				start: delimiter.range.start,
+				end: delimiter.range.end,
+				isPrimary: false,
+			};
+		})
+		.filter((model) => model.isPrimary || model.discouragementText !== undefined);
 }
 
 function clozeGroupToPaletteClass(groupId: string): string {

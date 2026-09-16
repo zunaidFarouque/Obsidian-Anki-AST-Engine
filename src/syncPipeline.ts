@@ -13,7 +13,6 @@ import { batchInjectIdsIntoFile, buildInjectionPlan, mergeInjectionMetadata } fr
 import { parseMarkdown } from "./ast/processor";
 import { graftTransclusions } from "./ast/transclusionGraft";
 import { collectResolvedMediaPaths, resolveMedia } from "./ast/mediaResolver";
-import { extractCards } from "./parser/stateMachine";
 import { compileCardFields } from "./ast/cardCompiler";
 import { parseCardDocument } from "./cardSyntax/parseCardDocument";
 import {
@@ -460,14 +459,7 @@ export async function runSync(
       rawText,
       config.includeParentHeadersAsTags,
     );
-    const extractOptions = {
-      bodyStartOffset,
-      cardDeclarationHeadingLevel: declarationLevel,
-      includeParentHeadersAsTags,
-    };
-    const sourceCards = extractCards(ast, delimiter, extractOptions);
-
-    const previewDocument = parseCardDocument(rawText, {
+    const parseDocOptions = {
       cardDeclarationHeadingLevel: declarationLevel,
       delimiter,
       bodyStartOffset,
@@ -475,8 +467,9 @@ export async function runSync(
       inferClozeFromManualSyntaxOnBasic:
         config.inferClozeFromManualSyntaxOnBasic,
       noteTypeFieldNamesByNoteType: {},
-    });
-    const previewByOrdinal = previewCardsByOrdinal(previewDocument.cards);
+      ast,
+    };
+    const sourceCards = parseCardDocument(rawText, parseDocOptions).cards;
 
     await graftTransclusions(ast, {
       vaultPath,
@@ -499,10 +492,8 @@ export async function runSync(
       forceBase64Media: options.forceBase64Media,
     });
 
-    const cards = mergeInjectionMetadata(
-      extractCards(ast, delimiter, extractOptions),
-      sourceCards,
-    );
+    const graftedCards = parseCardDocument(rawText, parseDocOptions).cards;
+    const cards = mergeInjectionMetadata(graftedCards, sourceCards);
 
     const footnoteScopeIndex =
       declarationLevel !== undefined
@@ -516,7 +507,7 @@ export async function runSync(
       action: SyncAction;
     }> = [];
 
-    for (const [cardIndex, card] of cards.entries()) {
+    for (const card of cards) {
       const injectionPlan = buildInjectionPlan(card);
       trackVaultBoundUuid(vaultBoundUuids, card.ankiId);
       trackVaultBoundUuid(vaultBoundUuids, injectionPlan?.uuid);
@@ -527,17 +518,10 @@ export async function runSync(
         { inheritedFootnoteDefs },
       );
 
-      const previewCard =
-        previewByOrdinal.get(card.ordinal) ??
-        previewDocument.cards[cardIndex];
-      const previewOutcome = previewCard
-        ? effectiveCardOutcome(previewCard)
-        : undefined;
-      const previewWarnings = previewCard
-        ? collectPreviewWarnings(previewCard)
-        : undefined;
+      const previewOutcome = effectiveCardOutcome(card);
+      const previewWarnings = collectPreviewWarnings(card);
       const notePlan = planNoteModelForResolvedType(
-        previewCard?.resolvedType,
+        card.resolvedType,
         frontHtml,
         backHtml,
         config.noteModelName,
@@ -782,16 +766,6 @@ export async function runSync(
     mediaWarnings,
     orphans,
   };
-}
-
-function previewCardsByOrdinal(
-  cards: ResolvedCard[],
-): Map<number, ResolvedCard> {
-  const byOrdinal = new Map<number, ResolvedCard>();
-  for (const card of cards) {
-    byOrdinal.set(card.ordinal, card);
-  }
-  return byOrdinal;
 }
 
 async function collectVaultMediaPaths(

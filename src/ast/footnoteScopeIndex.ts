@@ -72,7 +72,7 @@ function buildPrefixPaths(contextByDepth: Map<number, string>): string[] {
 }
 
 export type FootnoteScopeIndex = {
-  resolveForCard(card: ExtractedCard): Map<string, FootnoteDefinition>;
+  resolveForCard(card: { sectionDepths: Map<number, string> }): Map<string, FootnoteDefinition>;
 };
 
 export function buildFootnoteScopeIndex(
@@ -156,7 +156,7 @@ export function buildFootnoteScopeIndex(
   }
 
   return {
-    resolveForCard(card: ExtractedCard): Map<string, FootnoteDefinition> {
+    resolveForCard(card: { sectionDepths: Map<number, string> }): Map<string, FootnoteDefinition> {
       const inherited = new Map<string, FootnoteDefinition>();
 
       mergeDefs(inherited, preambleDefs);

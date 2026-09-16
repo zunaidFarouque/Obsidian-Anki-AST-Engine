@@ -1,4 +1,5 @@
 /** Shared types for card-syntax v1 (Card-Syntax-Spec Section 0). */
+import type { Content, Root } from "mdast";
 
 export const BUILT_IN_CARD_TYPES = [
   "basic",
@@ -67,6 +68,11 @@ export interface ResolvedCard {
   hashtags: CardHashtags;
   ankiTagPath?: string;
   ankiId?: string;
+  tag: string;
+  frontNodes: Content[];
+  backNodes: Content[];
+  sectionDepths: Map<number, string>;
+  injectionOffset?: number;
 }
 
 export interface FileDefaults {
@@ -75,14 +81,15 @@ export interface FileDefaults {
 }
 
 export interface ParseCardDocumentOptions {
-  inferClozeFromManualSyntaxOnBasic: boolean;
   cardDeclarationHeadingLevel: number;
   delimiter: string;
-  includeParentHeadersAsTags: boolean;
   bodyStartOffset: number;
+  includeParentHeadersAsTags: boolean;
+  inferClozeFromManualSyntaxOnBasic: boolean;
   noteTypeFieldNamesByNoteType: Record<string, string[]>;
   /** Obsidian Properties / metadata when the editor body omits the YAML block. */
   externalFrontmatter?: import("../io/frontmatterFilter").Frontmatter | null;
+  ast?: Root;
 }
 
 export const DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS: ParseCardDocumentOptions = {

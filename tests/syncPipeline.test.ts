@@ -942,4 +942,53 @@ describe("syncPipeline", () => {
 
     await rm(root, { recursive: true, force: true });
   });
+
+  test("empty and whitespace-only headings maintain exact card ordinals and compile correctly", async () => {
+    const root = await mkdtemp(join(tmpdir(), "anki-empty-headings-"));
+    const vaultPath = join(root, "vault");
+    const notesDir = join(vaultPath, "Notes");
+    await mkdir(notesDir, { recursive: true });
+
+    const notePath = join(notesDir, "test.md");
+    const noteContent = [
+      "---",
+      "AnkiSync: on",
+      "cardDeclarationHeadingLevel: 4",
+      "---",
+      "",
+      "#### Card 1",
+      "Front 1",
+      ":::",
+      "Back 1",
+      "",
+      "####",
+      "Front 2 with empty heading",
+      ":::",
+      "Back 2",
+      "",
+      "#### Card 3",
+      "Front 3",
+      ":::",
+      "Back 3",
+    ].join("\n");
+    await writeFile(notePath, noteContent, "utf8");
+
+    const config: Config = {
+      vaultPath,
+      delimiter: ":::",
+      scanFolders: ["Notes"],
+      defaultAnkiDeck: "Science",
+      ...baseConfig,
+    };
+
+    const { actions } = await runSync(config, { dryRun: true });
+
+    expect(actions).toHaveLength(3);
+    expect(actions[0]?.frontHtml).toContain("Front 1");
+    expect(actions[1]?.frontHtml).toContain("Front 2 with empty heading");
+    expect(actions[2]?.frontHtml).toContain("Front 3");
+
+    await rm(root, { recursive: true, force: true });
+  });
 });
+
