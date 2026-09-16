@@ -2,49 +2,46 @@
 AnkiSync: true
 cardDeclarationHeadingLevel: 4
 anki_cardDefault: basic
+anki_customCardDefault: Vocab
 includeParentHeadersAsTags: true
-# Suggested Anki deck for this note (set in plugin config if different):
-# target_anki_deck: STRESS-Built-Ins
+target_anki_deck: STRESS-Permutations
 ---
 
 <!--
 ═══════════════════════════════════════════════════════════════════════
- BUILT-IN CARD TYPES — Manual Obsidian + Anki smoke (Phases 1–2c)
+ FULL PERMUTATION STRESS TEST SUITE: LIVE PREVIEW & SYNC (v1 Engine)
  Spec:     Docs/DECIDING/Card-Syntax-Spec.md
  Contract: Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md
- Status:   CurrentWorkMD/_ImplementationStatus_COMPLETE_WAVE.md
  Automated sibling: tests/fixtures/new format/card-syntax-stress-test.md
 ═══════════════════════════════════════════════════════════════════════
 
  HOW TO USE
- 1. Copy this file into an Obsidian vault folder scanned by the plugin.
- 2. Anki Desktop + AnkiConnect running; Live Preview ON.
- 3. Confirm YAML `AnkiSync: true` (or on/yes).
- 4. Open each #### card — preview chip + resolved type must match `preview:` below.
- 5. Run vault / note sync.
- 6. In sync results: skip/error = hard-block; warn = still writes; check type-mix counts.
- 7. In Anki Browser: search `deck:"STRESS-Built-Ins" "STRESS-"` or Front contains `STRESS-`.
-
- SETTINGS TO VERIFY (plugin / config.json)
- • inferClozeFromManualSyntaxOnBasic — default false; re-check Basic-06 vs Infer-01 when toggled.
- • autoCreateStockNoteModels — default true; turn OFF to confirm clear failure if stock model missing.
-
- STOCK MODELS (built-ins that SHOULD sync when preview is sync|warn)
-   basic      → Basic                         Front / Back
-   cloze      → Cloze                         Text / Back Extra
-   reversible → Basic (and reversed card)     Front / Back
-   typed      → Basic (type in the answer)     Front / Back (plain; TYP-05 pipes)
-
- PHASE 3 DEFERRED — custom `#anki/noteType/…` → see tiny appendix at end only.
+ 1. Open this file in Obsidian Desktop with the Anki AST Sync plugin enabled.
+ 2. Turn Live Preview mode ON.
+ 3. Verify every card's Live Preview decorations:
+    • Heading badges: Chip outcome (sync, warn, skip, error) and resolved type.
+    • Delimiter lines: Garnish icons (↑↓, ⌨, ℹ) and horizontal field guide lines (::: FieldName).
+    • Cloze highlights: Distinct palette colors for c1, c2, c3, c4, c5.
+    • Extra delimiter warnings: Line attribute data-delimiter-extra overlay.
+    • Underlays: Mid-card HR peek accent, table underlays, and card block tinting.
+ 4. Click any badge to open the Card Preview Modal:
+    • Check that Situation, Problem, Warning, and Note Type details match expectations.
+    • Test clicking "Insert structure template" to see editor-aware insertion.
+ 5. Run Note / Vault Sync to Anki (Anki Desktop + AnkiConnect running):
+    • Stock models (Basic, Cloze, Reversible, Typed) sync to Anki.
+    • Custom note types (Vocab) identify accurately with field guide lines.
+    • In Anki Browser: search `deck:"STRESS-Permutations" "STRESS-"`.
 -->
 
-# Built-In Card Types — Manual Stress Test
+# Full Permutation Stress Test Suite
 
-Focused human smoke for **Basic**, **Cloze**, **Reversible**, and **Typed** stock models after Phase 2c. Each card title uses a searchable `[STRESS-…]` prefix. Expect blocks document preview ↔ sync parity.
+Comprehensive human smoke and permutation test suite for **Built-in Stock Models**, **Custom Note Types**, **Live Preview Decorations**, and **Rich Formatting Underlays**.
 
 ---
 
-## Basic
+## 1. Basic Cards
+
+### Subsection 1.0 — Baseline
 
 #### [STRESS-Basic-01] OK with delimiter #stress-smoke
 
@@ -143,11 +140,30 @@ The answer mentions {{c1::mitochondria}} but Back is not scanned for cloze typin
   check: Basic model; cloze markup only on Back field
 -->
 
+#### [STRESS-Basic-08] Extra delimiter ignored
+
+Front question before first split (STRESS-Basic-08).
+
+:::
+
+Back content part one.
+
+:::
+
+Back content part two (extra delimiter ignored; still Back region).
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  rules: DEL-08
+  check: Live Preview displays "Extra delimiter ignored" overlay on 2nd :::; Back contains both parts
+-->
+
 ---
 
-## Cloze
+## 2. Cloze Cards
 
-### Thermodynamics STRESS #biology #anki/cardType/cloze
+### Subsection 2.0 — Cloze Gallery #anki/cardType/cloze
 
 #### [STRESS-Cloze-01] Manual c1 in Text
 
@@ -199,105 +215,123 @@ Optional reference: ΔG = ΔH − TΔS.
 
 #### [STRESS-Cloze-05] Skip no deletions in Text
 
-STRESS-Cloze-05 inherited cloze section but forgot to mark any deletions.
+STRESS-Cloze-05 card under cloze section with no deletions at all.
+
+:::
+
+Back Extra content here.
 
 <!-- expect:
-  preview: skip — cloze without {{}} in Text
+  preview: skip — cloze missing deletions
   anki: NO (hard-block)
   rules: CLZ-01, CX-05
-  check: Skip chip; no Cloze note created
+  check: Skip chip; no Anki note
 -->
 
 #### [STRESS-Cloze-06] Empty deletion skip
 
-STRESS-Cloze-06 something {{}} empty here.
+STRESS-Cloze-06 has an empty {{}} deletion.
 
 <!-- expect:
-  preview: skip — empty cloze deletion
+  preview: skip — empty deletion
   anki: NO (hard-block)
   rules: CLZ-09, CX-28
-  check: Skip (not CX-25 sync); no Anki note
+  check: Skip chip; no Anki note
 -->
 
-#### [STRESS-Cloze-07] Back-only deletions error CLZ-11
+#### [STRESS-Cloze-07] Cloze error back-only
 
-Plain Text region for STRESS-Cloze-07 — no cloze here.
+Front prose without deletions (STRESS-Cloze-07).
 
 :::
 
-{{c1::too late}} belongs in Back only.
+Back has {{c1::cloze deletion}} which is invalid on cloze-resolved cards.
 
 <!-- expect:
-  preview: error — deletions only after :::
+  preview: error — cloze markup only in Back
   anki: NO (hard-block)
   rules: CLZ-11, CX-12
-  check: Error chip; sync hard-block; no Cloze note
+  check: Error chip; sync hard-blocks
 -->
 
-#### [STRESS-Cloze-08] Cloze plus reversible delimiter
+#### [STRESS-Cloze-08] Cloze plus reversible conflict
 
-{{c1::hidden}} in Text (STRESS-Cloze-08).
+The {{c1::enzyme}} lowers activation energy (STRESS-Cloze-08).
 
 :::r
-Should conflict with cloze resolution.
+
+Reaction rate increases.
 
 <!-- expect:
-  preview: error — cloze vs reversible
+  preview: error — cloze vs reversible delimiter conflict
   anki: NO (hard-block)
   rules: CLZ-10, REV-05, CX-30
-  check: Error chip; no Anki write
+  check: Error chip; sync hard-blocks
+-->
+
+#### [STRESS-Cloze-09] Multi-cloze palette visual test
+
+{{c1::First group}} and {{c2::Second group}} plus {{c3::Third group}} with {{c4::Fourth group}} and {{c5::Fifth group}}.
+
+<!-- expect:
+  preview: sync — cloze
+  anki: YES model="Cloze" fields=Text,"Back Extra"
+  check: Live Preview renders 5 distinct palette colors (anki-card-preview-cloze-group-1 through 5)
 -->
 
 ---
 
-## Reversible
+## 3. Reversible Cards
 
-### Assessment reversible STRESS
+### Subsection 3.0 — Reversible Smoke
 
-#### [STRESS-Rev-01] Delimiter only
+#### [STRESS-Rev-01] Reversible delimiter only
 
-What is the chemical symbol for sodium (STRESS-Rev-01)?
+Chemical symbol for Gold (STRESS-Rev-01)?
 
 :::r
-Na
+
+Au
 
 <!-- expect:
-  preview: sync — reversible
+  preview: sync — reversible (↑↓ garnish on delimiter line)
   anki: YES model="Basic (and reversed card)" fields=Front,Back
-  rules: DEL-02, RES-05, CX-14
-  check: Reversible model; Front contains STRESS-Rev-01; two card templates in note
+  rules: DEL-02, CX-14
+  check: Live Preview displays "↑↓" on :::r line; Anki generates forward and reverse cards
 -->
 
-#### [STRESS-Rev-02] Tag with plain split #anki/cardType/reversible
+#### [STRESS-Rev-02] Reversible tag with plain delimiter #anki/cardType/reversible
 
-Capital of Japan (STRESS-Rev-02)?
+Chemical symbol for Silver (STRESS-Rev-02)?
 
 :::
-Tokyo
+
+Ag
 
 <!-- expect:
-  preview: sync — reversible
+  preview: sync — reversible (↑↓ garnish on :::)
   anki: YES model="Basic (and reversed card)" fields=Front,Back
-  rules: REV-02, CX-16
-  check: Same reversible model; :::r not required when tag present
+  rules: CX-16
+  check: Live Preview displays "↑↓" on plain ::: delimiter
 -->
 
-#### [STRESS-Rev-03] Skip no split #anki/cardType/reversible
+#### [STRESS-Rev-03] Reversible skip no split #anki/cardType/reversible
 
-STRESS-Rev-03 reversible card forgot its front/back split.
+STRESS-Rev-03 reversible card missing delimiter split.
 
 <!-- expect:
   preview: skip — reversible missing split
   anki: NO (hard-block)
-  rules: REV-03, CX-15
+  rules: REV-03
   check: Skip chip; no Anki note
 -->
 
-#### [STRESS-Rev-04] REV-06 vs typed #anki/cardType/reversible
+#### [STRESS-Rev-04] Reversible plus typed conflict #anki/cardType/reversible
 
-Capital of France for STRESS-Rev-04?
+Capital of France (STRESS-Rev-04)?
 
 :::t
+
 Paris
 
 <!-- expect:
@@ -309,19 +343,20 @@ Paris
 
 ---
 
-## Typed
+## 4. Typed Cards
 
-### Assessment typed STRESS
+### Subsection 4.0 — Typed Smoke
 
 #### [STRESS-Typed-01] HTML stripped TYP-03b warn
 
 Name the capital of France (STRESS-Typed-01).
 
 :::t
+
 **Paris** with <sub>accent</sub>
 
 <!-- expect:
-  preview: warn — formatting stripped for type-in answer
+  preview: warn — formatting stripped for type-in answer (⌨ garnish)
   anki: YES model="Basic (type in the answer)" fields=Front,Back
   rules: TYP-01, TYP-03, TYP-03b
   check: Back plain text `Paris with accent`; no HTML/markdown in Back
@@ -332,10 +367,11 @@ Name the capital of France (STRESS-Typed-01).
 2 + 2 = ? (STRESS-Typed-02)
 
 :::
+
 4
 
 <!-- expect:
-  preview: sync — typed
+  preview: sync — typed (⌨ garnish on plain :::)
   anki: YES model="Basic (type in the answer)" fields=Front,Back
   rules: TYP-01, TYP-02, CX-18
   check: Typed model; Back exactly `4`
@@ -346,6 +382,7 @@ Name the capital of France (STRESS-Typed-01).
 Name a capital of France (STRESS-Typed-03).
 
 :::t
+
 Paris | Lyon | Marseille
 
 <!-- expect:
@@ -366,18 +403,210 @@ STRESS-Typed-04 typed card missing any split token.
   check: Skip chip; no Anki note
 -->
 
----
+#### [STRESS-Typed-05] Multiline typed answer warn
 
-## Section inheritance
+What is the capital of Germany (STRESS-Typed-05)?
 
-### Unit A cloze parent STRESS #anki/cardType/cloze
+:::t
 
-#### [STRESS-Sect-01] Inherited shorthand cloze
-
-{{ATP}} carries chemical energy (STRESS-Sect-01).
+Berlin
+Extra explanatory line that should trigger a warning.
 
 <!-- expect:
-  preview: sync — cloze from ### Unit A cloze parent
+  preview: warn — typed answer should be a single line (TYP-04)
+  anki: YES model="Basic (type in the answer)" fields=Front,Back
+  rules: TYP-04
+  check: Warning badge in preview; only first line used or warning surfaced
+-->
+
+---
+
+## 5. Custom Note Types
+
+### Subsection 5.0 — Vocab Note Type #anki/noteType/Vocab
+
+#### [STRESS-Custom-01] Multi-field explicit Vocab #anki/noteType/Vocab
+
+::: Word
+
+ephemeral (STRESS-Custom-01)
+
+::: Definition
+
+Lasting for a very short time; transitory.
+
+::: Example
+
+Fashions are ephemeral, but style endures.
+
+<!-- expect:
+  preview: sync — custom Vocab
+  anki: Custom note type identified; field guide lines display on each ::: Field
+  rules: CUS-01
+  check: Live Preview displays horizontal field guide lines for Word, Definition, and Example
+-->
+
+#### [STRESS-Custom-02] Resolved via frontmatter anki_customCardDefault
+
+::: Word
+
+serendipity (STRESS-Custom-02)
+
+::: Definition
+
+The occurrence of events by chance in a happy or beneficial way.
+
+::: Example
+
+We found each other by pure serendipity.
+
+<!-- expect:
+  preview: sync — custom Vocab (via frontmatter anki_customCardDefault)
+  rules: RES-04, FM-03
+  check: Resolves to Vocab even without hashtag on card or section
+-->
+
+#### [STRESS-Custom-03] Inherited from section heading
+
+::: Word
+
+quintessential (STRESS-Custom-03)
+
+::: Definition
+
+Representing the most perfect or typical example of a quality or class.
+
+::: Example
+
+He was the quintessential English gentleman.
+
+<!-- expect:
+  preview: sync — custom Vocab from ### Subsection 5.0
+  rules: RES-08
+  check: Resolves to Vocab via ancestor outline tree
+-->
+
+#### [STRESS-Custom-04] Custom field typo unknown field error
+
+::: Word
+
+ubiquitous (STRESS-Custom-04)
+
+::: Definiton
+
+Present, appearing, or found everywhere (typo in field name!).
+
+::: Example
+
+Smartphones have become ubiquitous in daily life.
+
+<!-- expect:
+  preview: error/warn — unknown field "Definiton" for noteType Vocab
+  rules: CUS-02
+  check: Badge shows error/warning for invalid field block name
+-->
+
+#### [STRESS-Custom-05] Custom note type missing field blocks
+
+STRESS-Custom-05 prose under Vocab section with no ::: Field blocks.
+
+:::
+
+Plain back text without field delimiters.
+
+<!-- expect:
+  preview: skip — invalid custom layout
+  rules: CUS-04, CX-20
+  check: Skip chip; cannot use plain split for custom note type
+-->
+
+#### [STRESS-Custom-06] Custom note type plus reversible conflict
+
+::: Word
+
+paradox (STRESS-Custom-06)
+
+:::r
+
+A seemingly absurd statement that may be true.
+
+<!-- expect:
+  preview: error — custom noteType vs :::r conflict
+  rules: CX-21
+  check: Error badge; cannot use :::r inside custom note type
+-->
+
+#### [STRESS-Custom-07] Literal braces in custom field
+
+::: Word
+
+syntax (STRESS-Custom-07)
+
+::: Definition
+
+The arrangement of words and phrases; braces like {{template}} are literal here.
+
+::: Example
+
+In programming, {{variable}} syntax must be valid.
+
+<!-- expect:
+  preview: sync — custom Vocab
+  rules: CLZ-12
+  check: Braces stay literal without triggering cloze reclassification
+-->
+
+#### [STRESS-Custom-08] Legacy syntax compatibility #anki_card_Vocab
+
+::: Word
+
+pragmatic (STRESS-Custom-08)
+
+::: Definition
+
+Dealing with things sensibly and realistically.
+
+::: Example
+
+A pragmatic approach to problem-solving.
+
+<!-- expect:
+  preview: sync — custom Vocab
+  rules: CUS-01
+  check: Legacy #anki_card_Vocab tag correctly resolves as Vocab
+-->
+
+#### [STRESS-Custom-09] Modal Structure Template verification #anki/noteType/Vocab
+
+::: Word
+
+benchmark (STRESS-Custom-09)
+
+::: Definition
+
+A standard or point of reference against which things may be compared.
+
+::: Example
+
+Click the card badge above to open the preview modal and click "Insert structure template".
+
+<!-- expect:
+  preview: sync — custom Vocab
+  check: Clicking badge opens modal; "Insert structure template" inserts fields cleanly via active editor
+-->
+
+---
+
+## 6. Section Inheritance & Outline Isolation
+
+### Unit A — Cloze Section #anki/cardType/cloze
+
+#### [STRESS-Sect-01] Inherited cloze section
+
+{{ATP}} carries chemical energy in cells (STRESS-Sect-01).
+
+<!-- expect:
+  preview: sync — cloze from ### Unit A
   anki: YES model="Cloze" fields=Text,"Back Extra"
   rules: STR-02, CLZ-04, RES-03
   check: Cloze model without per-card type tag
@@ -385,7 +614,7 @@ STRESS-Typed-04 typed card missing any split token.
 
 #### [STRESS-Sect-02] Basic override in cloze section #anki/cardType/basic
 
-What is ΔG (STRESS-Sect-02)?
+What is ΔG in thermodynamics (STRESS-Sect-02)?
 
 :::
 
@@ -398,9 +627,9 @@ Gibbs free energy.
   check: Basic model despite ### cloze parent
 -->
 
-### Unit B sibling STRESS
+### Unit B — Sibling Isolation (Basic)
 
-#### [STRESS-Sect-03] Sibling not inheriting cloze
+#### [STRESS-Sect-03] Sibling does not inherit cloze
 
 What is H₂O (STRESS-Sect-03)?
 
@@ -412,52 +641,51 @@ Water.
   preview: sync — basic
   anki: YES model="Basic" fields=Front,Back
   rules: RES-02, CX-23
-  check: ## Unit B does not inherit ### Unit A cloze; Basic not Cloze
+  check: Sibling section does not inherit Unit A cloze; Basic not Cloze
 -->
 
-### Tag split STRESS #exam-prep #anki/cardType/cloze
+### Unit C — Tag Separation #exam-prep #anki/cardType/cloze
 
-#### [STRESS-Sect-04] User tag vs engine cardType tag
+#### [STRESS-Sect-04] User tag separated from engine tag
 
-{{c1::ATP}} powers cells (STRESS-Sect-04).
+The {{c1::Krebs cycle}} takes place in mitochondria (STRESS-Sect-04).
 
 <!-- expect:
   preview: sync — cloze
   anki: YES model="Cloze" fields=Text,"Back Extra"
   rules: STR-04, CX-29
-  check: Anki tags include exam-prep; `#anki/cardType/cloze` stripped from note tags
+  check: Anki tags include exam-prep; `#anki/cardType/cloze` is stripped
 -->
 
 ---
 
-## inferCloze setting
+## 7. inferCloze Setting Parity
 
-> **Toggle** `inferClozeFromManualSyntaxOnBasic` in plugin settings, then re-preview and re-sync Basic-06 and Infer-01 together — both paths must flip in lockstep (Phase 2b parity).
+#### [STRESS-Infer-01] Reclassifies to Cloze when inferCloze ON
 
-#### [STRESS-Infer-01] Basic default reclassifies to Cloze when ON
-
-The {{c1::chloroplast}} is for photosynthesis (STRESS-Infer-01).
+The {{c1::chloroplast}} is the site of photosynthesis (STRESS-Infer-01).
 
 :::
 
-Green organelle detail.
+Green organelle in plant cells.
 
 <!-- expect:
   preview: sync — cloze when inferCloze ON | warn basic when OFF (mirror Basic-06)
   anki: YES model="Cloze" fields=Text,"Back Extra" (ON) | YES model="Basic" (OFF)
-  rules: BAS-04, CX-27a
-  check: Preview type chip + Anki model both flip when setting toggled
+  rules: BAS-04, CX-27
+  check: Preview type chip and Anki model flip in lockstep when setting is toggled
 -->
 
 ---
 
-## Cross-type conflicts
+## 8. Cross-Cutting Conflicts (CX-01 to CX-30)
 
 #### [STRESS-Conf-01] Basic tag plus reversible delimiter #anki/cardType/basic
 
 STRESS-Conf-01 should not become reversible when basic is explicit.
 
 :::r
+
 Wrong split for explicit basic.
 
 <!-- expect:
@@ -467,111 +695,238 @@ Wrong split for explicit basic.
   check: Error chip; no Anki note
 -->
 
+#### [STRESS-Conf-02] Basic tag plus custom field block #anki/cardType/basic
+
+Plain front text for basic card (STRESS-Conf-02).
+
+::: Word
+
+Cannot use field blocks on explicit basic card.
+
+<!-- expect:
+  preview: error — BAS-06, CX-10
+  rules: BAS-06, CX-10
+  check: Error badge; invalid field block on basic card
+-->
+
+#### [STRESS-Conf-03] Dual cardType conflict #anki/cardType/cloze #anki/cardType/basic
+
+Question under heading with dual contradictory card types (STRESS-Conf-03)?
+
+:::
+
+Answer.
+
+<!-- expect:
+  preview: error — TAG-01, CX-01
+  rules: TAG-01, CX-01
+  check: Error badge for conflicting cardType hashtags
+-->
+
+#### [STRESS-Conf-04] CardType plus noteType conflict #anki/cardType/cloze #anki/noteType/Vocab
+
+::: Word
+
+entropy (STRESS-Conf-04)
+
+::: Definition
+
+Energy dispersal.
+
+<!-- expect:
+  preview: error — TAG-02, CX-02
+  rules: TAG-02, CX-02
+  check: Error badge for cardType + noteType combination
+-->
+
 ---
 
-## Phase 2c — model mismatch (optional)
+## 9. Rich Formatting, Math & Underlays
 
-#### [STRESS-Migrate-01] Basic first sync then edit to cloze
+### Subsection 9.0 — Rich Content
 
-What produces ATP (STRESS-Migrate-01)?
+#### [STRESS-Rich-01] Table underlay test
+
+What are the state transitions (STRESS-Rich-01)?
+
+| From | To | Process |
+| ---- | -- | ------- |
+| Solid | Liquid | Melting |
+| Liquid | Gas | Boiling |
+
+:::
+
+Here is the phase summary:
+
+| Phase | Entropy |
+| ----- | ------- |
+| Solid | Low |
+| Gas | High |
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  check: Live Preview table underlays render without overflow or horizontal bleed clipping
+-->
+
+#### [STRESS-Rich-02] Callout blocks on front and back
+
+> [!note] Important Question
+> What is the second law of thermodynamics (STRESS-Rich-02)?
+
+:::
+
+> [!warning] Key Takeaway
+> The entropy of an isolated system always increases over time.
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  check: Callout boxes display with proper styling in Live Preview and Anki HTML
+-->
+
+#### [STRESS-Rich-03] MathJax expressions
+
+Calculate energy from mass: $E = mc^2$ (STRESS-Rich-03).
+
+:::
+
+The relativistic energy equation is:
+
+$$\sum_{i=1}^n x_i = \int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  check: Math expressions render cleanly in Live Preview and compile into MathJax elements for Anki
+-->
+
+#### [STRESS-Rich-04] Mid-card thematic break underlay
+
+What is the first step of cellular respiration (STRESS-Rich-04)?
+
+---
+
+Hint: Occurs in the cytoplasm without oxygen.
+
+:::
+
+Glycolysis.
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  check: Thematic break `---` inside card body displays peek accent underlay without altering HR layout
+-->
+
+#### [STRESS-Rich-05] Code block delimiter safety
+
+How do you print a delimiter in Python (STRESS-Rich-05)?
+
+```python
+# Delimiter inside code fence must NOT split the card
+print(":::")
+print(":::r")
+```
+
+:::
+
+Use standard print statements as shown on front.
+
+<!-- expect:
+  preview: sync — basic
+  anki: YES model="Basic" fields=Front,Back
+  rules: DEL-07
+  check: Delimiters inside code fences remain literal and do not split regions
+-->
+
+#### [STRESS-Rich-06] Empty-heading resilience
+
+####
+
+What is the powerhouse of the cell (STRESS-Rich-06 empty heading)?
 
 :::
 
 Mitochondria.
 
 <!-- expect:
-  preview: sync — basic on first sync
+  preview: sync — basic
   anki: YES model="Basic" fields=Front,Back
-  rules: BAS-02
-  check: (1) Sync once → Basic note with obsidian-id inject.
-        (2) Edit body to cloze e.g. {{c1::Mitochondria}} under #anki/cardType/cloze and re-sync.
-        (3) Expect model-mismatch block and/or type-migration warning in sync summary — not silent wrong-model write.
-        AnkiConnect cannot fully Change Note Type; 2c is best-effort fields + summary counts.
+  check: Heading with empty text maintains exact card ordinal and compiles correctly
 -->
 
 ---
 
-## Appendix — Phase 3 deferred (custom only)
+## 10. Live Preview Real-time Keystroke Responsiveness
 
-> Custom `#anki/noteType/…` cards may preview as sync|skip|error but **never write to Anki** in v1. Not the focus of this note.
+#### [STRESS-Live-01] Instant typing scratchpad
 
-### Vocabulary appendix #anki/noteType/Vocab
+Type freely in this paragraph to verify that keystrokes have zero input latency (<0.05 ms). Notice that decorations shift immediately, and after a 200 ms pause, the AST re-parses smoothly.
 
-#### [STRESS-Custom-A1] Identify only no Anki write
+:::
 
-::: Word
-STRESS-Custom-A1 entropy
-
-::: Definition
-Custom field layout — sync not implemented (Phase 3).
+Back content for typing scratchpad.
 
 <!-- expect:
-  preview: sync — custom Vocab
-  anki: NO — custom not implemented; never silent Basic
-  rules: CUS-01, CUS-06
-  check: Sync results message like Custom note type "Vocab" sync is not yet implemented; no new Anki note
--->
-
-#### [STRESS-Custom-A2] Custom skip no field blocks
-
-STRESS-Custom-A2 prose under Vocab section with no ::: Field blocks.
-
-<!-- expect:
-  preview: skip — invalid custom layout
-  anki: NO (hard-block)
-  rules: CUS-01
-  check: Skip chip; no Anki note
+  preview: sync — basic
+  check: Rapid typing has zero lag; badge remains anchored at heading end
 -->
 
 ---
 
-## Manual checklist
+## 11. Comprehensive Verification Matrix
 
-| ID         | Scenario                            | Preview | Anki write?                             | Done |
-| ---------- | ----------------------------------- | ------- | --------------------------------------- | ---- |
-| Basic-01   | OK with `:::`                       | sync    | YES Basic                               | ☐    |
-| Basic-02   | Heading as front                    | sync    | YES Basic                               | ☐    |
-| Basic-03   | Empty back allowed                  | sync    | YES Basic                               | ☐    |
-| Basic-04   | Missing `:::`                       | skip    | NO                                      | ☐    |
-| Basic-05   | Bare `{{word}}`                     | warn    | YES Basic                               | ☐    |
-| Basic-06   | `{{cN::}}` inferCloze OFF           | warn    | YES Basic                               | ☐    |
-| Basic-07   | cN only in Back                     | sync    | YES Basic                               | ☐    |
-| Cloze-01   | Manual `{{c1::}}` in Text           | sync    | YES Cloze                               | ☐    |
-| Cloze-02   | Shorthand `{{word}}`                | sync    | YES Cloze                               | ☐    |
-| Cloze-03   | Auto-number + hints                 | sync    | YES Cloze                               | ☐    |
-| Cloze-04   | Back Extra after `:::`              | sync    | YES Cloze                               | ☐    |
-| Cloze-05   | No deletions in Text                | skip    | NO                                      | ☐    |
-| Cloze-06   | Empty `{{}}`                        | skip    | NO                                      | ☐    |
-| Cloze-07   | CLZ-11 back-only                    | error   | NO                                      | ☐    |
-| Cloze-08   | Cloze + `:::r`                      | error   | NO                                      | ☐    |
-| Rev-01     | `:::r` only                         | sync    | YES reversible                          | ☐    |
-| Rev-02     | reversible tag + `:::`              | sync    | YES reversible                          | ☐    |
-| Rev-03     | Reversible no split                 | skip    | NO                                      | ☐    |
-| Rev-04     | REV-06 vs typed                     | error   | NO                                      | ☐    |
-| Typed-01   | `:::t` HTML strip                   | warn    | YES typed                               | ☐    |
-| Typed-02   | typed tag + `:::`                   | sync    | YES typed                               | ☐    |
-| Typed-03   | TYP-05 `Paris \| Lyon \| Marseille` | sync    | YES typed Back=`Paris\|Lyon\|Marseille` | ☐    |
-| Typed-04   | Typed no split                      | skip    | NO                                      | ☐    |
-| Sect-01    | Inherited cloze section             | sync    | YES Cloze                               | ☐    |
-| Sect-02    | Basic override in cloze section     | sync    | YES Basic                               | ☐    |
-| Sect-03    | Sibling not inherit cloze           | sync    | YES Basic                               | ☐    |
-| Sect-04    | User tag vs engine tag              | sync    | YES Cloze                               | ☐    |
-| Infer-01   | inferCloze ON → Cloze               | sync*   | YES Cloze*                              | ☐    |
-| Conf-01    | basic + `:::r` BAS-06               | error   | NO                                      | ☐    |
-| Migrate-01 | Basic→cloze mismatch drill†         | —       | block / summary                         | ☐    |
-| Custom-A1  | Custom identify only                | sync    | NO (Phase 3)                            | ☐    |
-| Custom-A2  | Custom skip                         | skip    | NO                                      | ☐    |
-
-\* Re-check with `inferClozeFromManualSyntaxOnBasic` toggled; must match Basic-06.  
-† Optional two-step manual drill on Migrate-01.
-
----
-
-## Quick reference — outcome → Anki (Phase 2c)
-
-| Preview | Built-in stock models | Custom `#anki/noteType/…` |
-|---------|----------------------|----------------------------|
-| **sync** | Write resolved stock model | Identify only — **NO write** |
-| **warn** | Write + surface warnings | N/A (still no custom write) |
-| **skip** | Hard-block | Hard-block |
-| **error** | Hard-block | Hard-block |
+| Card ID | Scenario | Expected Preview | Delimiter Visual | Anki Sync | Verified |
+| ------- | -------- | ---------------- | ---------------- | --------- | :------: |
+| **Basic-01** | Standard Basic OK | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Basic-02** | Heading as front | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Basic-03** | Empty back allowed | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Basic-04** | Missing delimiter | `skip` Basic | None | NO (Hard-block) | ☐ |
+| **Basic-05** | Bare mustache | `warn` Basic | Guide line | YES `Basic` (Warning) | ☐ |
+| **Basic-06** | `{{cN::}}` inferCloze OFF | `warn` Basic | Guide line | YES `Basic` (Warning) | ☐ |
+| **Basic-07** | `cN` only in Back | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Basic-08** | Extra delimiter ignored | `sync` Basic | Guide line + Extra warn | YES `Basic` | ☐ |
+| **Cloze-01** | Manual `{{c1::}}` | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Cloze-02** | Shorthand `{{...}}` | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Cloze-03** | Auto-number case group | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Cloze-04** | Cloze + Back Extra | `sync` Cloze | `ℹ` Guide line | YES `Cloze` | ☐ |
+| **Cloze-05** | No deletions in Text | `skip` Cloze | None | NO (Hard-block) | ☐ |
+| **Cloze-06** | Empty deletion `{{}}` | `skip` Cloze | None | NO (Hard-block) | ☐ |
+| **Cloze-07** | Back-only cloze error | `error` Cloze | Guide line | NO (Hard-block) | ☐ |
+| **Cloze-08** | Cloze + `:::r` conflict | `error` Cloze | `↑↓` Guide line | NO (Hard-block) | ☐ |
+| **Cloze-09** | 5-color palette test | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Rev-01** | `:::r` only | `sync` Reversible | `↑↓` Guide line | YES `Reversible` | ☐ |
+| **Rev-02** | Reversible tag + `:::` | `sync` Reversible | `↑↓` Guide line | YES `Reversible` | ☐ |
+| **Rev-03** | Reversible missing split | `skip` Reversible | None | NO (Hard-block) | ☐ |
+| **Rev-04** | Reversible + `:::t` conflict | `error` Reversible | `⌨` Guide line | NO (Hard-block) | ☐ |
+| **Typed-01** | `:::t` HTML stripped | `warn` Typed | `⌨` Guide line | YES `Typed` | ☐ |
+| **Typed-02** | Typed tag + `:::` | `sync` Typed | `⌨` Guide line | YES `Typed` | ☐ |
+| **Typed-03** | Multi-answer pipes | `sync` Typed | `⌨` Guide line | YES `Typed` | ☐ |
+| **Typed-04** | Typed missing split | `skip` Typed | None | NO (Hard-block) | ☐ |
+| **Typed-05** | Multiline typed answer | `warn` Typed | `⌨` Guide line | YES `Typed` | ☐ |
+| **Custom-01** | Multi-field Vocab explicit | `sync` Vocab | Field Guide lines | Identified | ☐ |
+| **Custom-02** | Resolved via frontmatter | `sync` Vocab | Field Guide lines | Identified | ☐ |
+| **Custom-03** | Inherited from section | `sync` Vocab | Field Guide lines | Identified | ☐ |
+| **Custom-04** | Field typo unknown field | `warn` Vocab | Field Guide lines | Identified (Warn) | ☐ |
+| **Custom-05** | Custom missing fields | `skip` Vocab | None | NO (Hard-block) | ☐ |
+| **Custom-06** | Custom + `:::r` conflict | `error` Vocab | `↑↓` Guide line | NO (Hard-block) | ☐ |
+| **Custom-07** | Literal braces in field | `sync` Vocab | Field Guide lines | Identified | ☐ |
+| **Custom-08** | Legacy `#anki_card_` | `sync` Vocab | Field Guide lines | Identified | ☐ |
+| **Custom-09** | Modal Template insert | `sync` Vocab | Field Guide lines | Template inserted | ☐ |
+| **Sect-01** | Inherited cloze section | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Sect-02** | Basic override in cloze | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Sect-03** | Sibling section isolation | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Sect-04** | User tag vs engine tag | `sync` Cloze | None | YES `Cloze` | ☐ |
+| **Infer-01** | inferCloze setting parity | `sync` / `warn` | Guide line | Flipped on toggle | ☐ |
+| **Conf-01** | Basic tag + `:::r` error | `error` Basic | `↑↓` Guide line | NO (Hard-block) | ☐ |
+| **Conf-02** | Basic tag + `::: Field` | `error` Basic | Field Guide line | NO (Hard-block) | ☐ |
+| **Conf-03** | Dual cardType tags | `error` Conflict | Guide line | NO (Hard-block) | ☐ |
+| **Conf-04** | CardType + NoteType tags | `error` Conflict | Field Guide line | NO (Hard-block) | ☐ |
+| **Rich-01** | Table underlay | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Rich-02** | Callout blocks | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Rich-03** | MathJax $ and $$ | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Rich-04** | Mid-card HR underlay | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Rich-05** | Delimiter in code fence | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Rich-06** | Empty heading | `sync` Basic | Guide line | YES `Basic` | ☐ |
+| **Live-01** | Typing scratchpad | `sync` Basic | Guide line | YES `Basic` | ☐ |
