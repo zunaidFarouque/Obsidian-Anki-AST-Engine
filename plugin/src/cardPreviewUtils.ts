@@ -10,13 +10,13 @@ import { effectiveCardOutcome } from '../../src/cardSyntax/syncEligibility';
 
 export function shouldRebuildCardPreviewDecorations(input: {
 	docChanged: boolean;
-	viewportChanged: boolean;
+	viewportChanged?: boolean;
 	settingsRevision: number;
 	lastSettingsRevision: number;
 	livePreviewChanged: boolean;
 	editorFileChanged: boolean;
 }): boolean {
-	if (input.docChanged || input.viewportChanged) {
+	if (input.docChanged) {
 		return true;
 	}
 	if (input.settingsRevision !== input.lastSettingsRevision) {

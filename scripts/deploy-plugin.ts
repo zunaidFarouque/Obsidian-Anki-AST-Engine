@@ -1,4 +1,4 @@
-import { copyFile, mkdir, access } from "node:fs/promises";
+import { copyFile, mkdir, access, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dir, "..");
@@ -54,6 +54,14 @@ async function assertArtifactsExist(): Promise<void> {
         `Missing ${name}. Run: bun run build:plugin`,
       );
     }
+  }
+
+  const mainJsPath = join(PLUGIN_DIR, "main.js");
+  const mainJsStat = await stat(mainJsPath);
+  if (mainJsStat.size > 3 * 1024 * 1024) {
+    throw new Error(
+      `main.js is ${(mainJsStat.size / (1024 * 1024)).toFixed(1)} MB, indicating an unminified development bundle with inline sourcemaps. Run 'bun run build:plugin' to produce a production build before deploying.`,
+    );
   }
 }
 

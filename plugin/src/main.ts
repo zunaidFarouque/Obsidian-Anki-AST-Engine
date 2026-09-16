@@ -2,7 +2,6 @@ import { Notice, Plugin, addIcon } from 'obsidian';
 import { ANKI_SYNC_STAR_ICON_ID, registerPluginIcons } from './icons';
 import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import { formatNoteTypeCacheNotice } from './cardPreviewUtils';
-import { buildPluginConfig } from './configBuilder';
 import { createObsidianFetch } from './obsidianFetch';
 import {
 	AnkiAstSyncSettingTab,
@@ -94,7 +93,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 
 		this.addSettingTab(new AnkiAstSyncSettingTab(this.app, this));
 
-		await this.syncCardPreviewRegistration();
+		this.app.workspace.onLayoutReady(() => {
+			void this.syncCardPreviewRegistration();
+		});
 	}
 
 	onunload() {

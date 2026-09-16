@@ -408,6 +408,19 @@ describe('cardPreviewUtils', () => {
 		).toBe(true);
 	});
 
+	test('shouldRebuildCardPreviewDecorations skips when only viewportChanged is true (scrolling)', () => {
+		expect(
+			shouldRebuildCardPreviewDecorations({
+				docChanged: false,
+				viewportChanged: true,
+				settingsRevision: 2,
+				lastSettingsRevision: 2,
+				livePreviewChanged: false,
+				editorFileChanged: false,
+			}),
+		).toBe(false);
+	});
+
 	test('shouldRebuildCardPreviewDecorations skips when nothing changed', () => {
 		expect(
 			shouldRebuildCardPreviewDecorations({

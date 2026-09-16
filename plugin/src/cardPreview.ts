@@ -162,8 +162,7 @@ export class CardPreviewManager {
 				return;
 			}
 
-			const result = this.parseContent(latestContent);
-			this.setCache(sourcePath, latestKey, result);
+			const result = this.parseContent(latestContent, file);
 
 			const preview = this.previewElements.get(sourcePath)?.deref();
 			if (preview?.isConnected) {
@@ -175,7 +174,21 @@ export class CardPreviewManager {
 	}
 
 	parseContent(content: string, file?: TFile): ParseCardDocumentResult {
-		return parseCardDocument(content, this.buildParseOptions(content, file));
+		const sourcePath = file?.path ?? '__ephemeral__';
+		const cacheKey = `${computeContentCacheKey(
+			sourcePath,
+			content,
+			this.noteTypeCacheRevision,
+		)}:${this.settingsRevision}`;
+
+		const cached = this.cache.get(sourcePath);
+		if (cached?.key === cacheKey) {
+			return cached.result;
+		}
+
+		const result = parseCardDocument(content, this.buildParseOptions(content, file));
+		this.setCache(sourcePath, cacheKey, result);
+		return result;
 	}
 
 	getCardDeclarationHeadingLevel(content: string, file?: TFile): number {
