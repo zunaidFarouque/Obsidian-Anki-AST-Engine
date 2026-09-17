@@ -8,6 +8,9 @@ import {
 } from '../../src/cardSyntax/types';
 import { effectiveCardOutcome } from '../../src/cardSyntax/syncEligibility';
 import { processClozeDeletions } from '../../src/cardSyntax/clozeProcessor';
+import type { EditorView } from '@codemirror/view';
+import type { StateField } from '@codemirror/state';
+import type { TFile } from 'obsidian';
 
 export function shouldRebuildCardPreviewDecorations(input: {
 	docChanged: boolean;
@@ -479,3 +482,86 @@ export async function refreshNoteTypeMapFromHook(
 	}
 	return performNoteTypeCacheRefresh(hook);
 }
+
+export function isCardDeclarationHeadingLine(line: string, headingLevel: number): boolean {
+	const clampedLevel = Math.min(6, Math.max(1, headingLevel));
+	const markPrefix = '#'.repeat(clampedLevel);
+	const requiredPrefix = `${markPrefix} `;
+	if (line === markPrefix || line.startsWith(requiredPrefix)) {
+		return !(line.length > requiredPrefix.length && line[requiredPrefix.length] === '#');
+	}
+	return false;
+}
+
+export function mapCardsToHeadingLines(
+	cards: ResolvedCard[],
+	lines: DocumentLine[],
+	headingLevel: number,
+	fallbackHeadings: CardHeadingLinePosition[],
+): Array<{ card: ResolvedCard; heading: CardHeadingLinePosition }> {
+	const pairs: Array<{ card: ResolvedCard; heading: CardHeadingLinePosition }> = [];
+	const usedFallbackIndices = new Set<number>();
+
+	for (const card of cards) {
+		const declarationHeading = findLineRangeForOffset(lines, card.range.start);
+		if (declarationHeading) {
+			const declarationLineText =
+				lines.find((line) => line.from === declarationHeading.from)?.text ?? '';
+			if (isCardDeclarationHeadingLine(declarationLineText, headingLevel)) {
+				pairs.push({ card, heading: declarationHeading });
+				continue;
+			}
+		}
+
+		const fallbackIndex = fallbackHeadings.findIndex(
+			(heading, index) =>
+				!usedFallbackIndices.has(index) &&
+				heading.from >= card.range.start,
+		);
+		if (fallbackIndex >= 0) {
+			usedFallbackIndices.add(fallbackIndex);
+			pairs.push({ card, heading: fallbackHeadings[fallbackIndex]! });
+		}
+	}
+
+	return pairs;
+}
+
+export function resolveCardBlockEndOffset(
+	lines: DocumentLine[],
+	card: ResolvedCard,
+	nextHeadingStart: number,
+): number {
+	const probeOffset = Math.max(card.range.start, card.range.end - 1);
+	const endLine = findLineRangeForOffset(lines, probeOffset);
+	if (!endLine) {
+		return nextHeadingStart;
+	}
+	return Math.min(nextHeadingStart, endLine.to + 1);
+}
+
+export function resolveLivePreviewMode(
+	view: EditorView,
+	livePreviewField?: StateField<boolean>,
+): boolean {
+	if (livePreviewField) {
+		const fieldValue = view.state.field(livePreviewField, false);
+		if (typeof fieldValue === 'boolean') {
+			return fieldValue;
+		}
+	}
+
+	const sourceView = view.dom?.closest?.('.markdown-source-view');
+	return sourceView?.classList.contains('is-live-preview') ?? false;
+}
+
+export function resolveEditorFile(
+	view: EditorView,
+	infoField?: StateField<{ file: TFile | null } | undefined>,
+): TFile | undefined {
+	if (!infoField) {
+		return undefined;
+	}
+	return view.state.field(infoField, false)?.file ?? undefined;
+}
+

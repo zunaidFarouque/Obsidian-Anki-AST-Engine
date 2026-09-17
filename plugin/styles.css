@@ -108,258 +108,42 @@
  * declared on each paint host — custom props inherit *computed* values, so a
  * content-level color-mix would bake sync colors and break outcome overrides.
  */
-.markdown-source-view.is-live-preview .cm-content {
-	position: relative;
+/*
+ * CodeMirror 6 Unified Card Envelope Background Layer
+ * Single continuous envelope per card rendered at z-index: -1 behind .cm-content.
+ */
+.cm-layer-anki-envelope {
+	position: absolute;
+	pointer-events: none;
+	z-index: -1;
+}
+
+.anki-card-envelope {
+	position: absolute;
+	pointer-events: none;
+	border-radius: 4px;
+	box-sizing: border-box;
+	z-index: -1;
 	--anki-cardblock-tint: var(--background-modifier-hover);
 	--anki-cardblock-body-opacity: 38%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
-}
-
-/* One formula site for all envelope paint hosts (line / table / math / mid-card HR). */
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.cm-table-widget,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(.math),
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(mjx-container),
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
-	--anki-cardblock-heading-opacity: calc(var(--anki-cardblock-body-opacity) + 20%);
 	--anki-cardblock-bg: color-mix(
 		in srgb,
 		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
 		transparent
 	);
-	--anki-cardblock-heading-bg: color-mix(
-		in srgb,
-		var(--anki-cardblock-tint) var(--anki-cardblock-heading-opacity),
-		transparent
-	);
 	--anki-cardblock-paint: var(--anki-cardblock-bg);
-	/* Opaque stand-in for HR box-shadow peek (translucent + full-size border shadow = blob) */
-	--anki-cardblock-paint-solid: color-mix(
-		in srgb,
-		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
-		var(--background-primary)
-	);
-}
-
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock {
-	position: relative;
-	overflow: visible;
-	box-sizing: border-box;
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock::before {
-	content: '';
-	position: absolute;
-	z-index: 0;
-	pointer-events: none;
-	left: calc(-1 * var(--anki-card-preview-block-bleed-x));
-	right: calc(-1 * var(--anki-card-preview-block-bleed-x));
-	top: 0;
-	bottom: 0;
 	background: var(--anki-cardblock-paint);
 	border-left: 2px solid var(--anki-cardblock-border-color);
 }
 
-/*
- * Card-block tables, math blocks, and embeds: .cm-embed-block is a sibling of .cm-line.
- * Logs: widget ~732, cm-line ~700 (≈ +2×16px padding), line underlay bleeds 8px
- * outside the line → visual paint ≈ 716. Painting with left/right: -8px overflows
- * overflow-x:auto (scrollWidth 740). Painting on .table-wrapper shrink-wraps with
- * the table (e.g. 619) and disconnects from the card envelope.
- * Fix: paint on the embed widget with +bleed inset (inside the box) so width matches
- * card-line underlay and scrollWidth stays equal to clientWidth.
- */
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(.math),
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(mjx-container),
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.cm-table-widget {
-	position: relative;
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.math-block::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(.math)::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block:has(mjx-container)::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block
-	+ .cm-embed-block::before,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock
-	+ .cm-embed-block.cm-table-widget::before {
-	content: '';
-	position: absolute;
-	z-index: 0;
-	pointer-events: none;
-	/* inset by bleed (not negative) — stays inside overflow:auto box */
-	left: var(--anki-card-preview-block-bleed-x);
-	right: var(--anki-card-preview-block-bleed-x);
-	top: 0;
-	bottom: 0;
-	background: var(--anki-cardblock-paint);
-	border-left: 2px solid var(--anki-cardblock-border-color);
-}
-
-/*
- * Mid-card thematic breaks: .hr.cm-line sibling (pseudos clip outside content box).
- * Paint via solid + 3 box-shadows. Gate with decorator class on previous cardblock
- * line (trailing --- excluded from covered offsets — no :has() needed).
- */
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
-	position: relative;
-	overflow: visible !important;
-	box-sizing: border-box;
-	background-color: var(--anki-cardblock-paint-solid);
-	box-shadow:
-		/* Top: solid from bleed-2 — covers border except leftmost 2px */
-		calc(-1 * var(--anki-card-preview-block-bleed-x) + 2px) 0 0 0
-			var(--anki-cardblock-paint-solid),
-		/* Peek accent at left edge of BG (-bleed) */
-		calc(-1 * var(--anki-card-preview-block-bleed-x)) 0 0 0
-			var(--anki-cardblock-border-color),
-		/* Right bleed (same outer extent as before) */
-		calc(1 * var(--anki-card-preview-block-bleed-x)) 0 0 0
-			var(--anki-cardblock-paint-solid);
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading {
-	--anki-cardblock-paint: var(--anki-cardblock-heading-bg);
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock.anki-card-preview-heading--section-start::before {
-	top: calc(-1 * var(--anki-card-preview-section-top-extend));
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--tail::after {
-	content: '';
-	position: absolute;
-	z-index: 1;
-	pointer-events: none;
-	left: calc(-1 * var(--anki-card-preview-block-bleed-x));
-	right: calc(-1 * var(--anki-card-preview-block-bleed-x));
-	bottom: calc(-1 * var(--anki-card-preview-inter-card-gap));
-	height: var(--anki-card-preview-inter-card-gap);
-	background: var(--background-primary);
-}
-
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--sync,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--sync
-	+ .cm-embed-block.cm-table-widget,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--sync
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--sync
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--sync
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--sync.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
+.anki-card-envelope--sync {
+	--anki-cardblock-tint: var(--background-modifier-hover);
+	--anki-cardblock-body-opacity: 38%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
 }
 
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--warn,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--warn
-	+ .cm-embed-block.cm-table-widget,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--warn
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--warn
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--warn
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--warn.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
+.anki-card-envelope--warn {
 	--anki-cardblock-tint: var(--color-yellow, #d29922);
 	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: color-mix(
@@ -369,59 +153,33 @@
 	);
 }
 
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--skip,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--skip
-	+ .cm-embed-block.cm-table-widget,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--skip
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--skip
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--skip
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--skip.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
+.anki-card-envelope--skip {
 	--anki-cardblock-tint: var(--background-modifier-hover);
 	--anki-cardblock-body-opacity: 19%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
 }
 
-.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock--error,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--error
-	+ .cm-embed-block.cm-table-widget,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--error
-	+ .cm-embed-block.math-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--error
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--error
-	+ .cm-embed-block
-	+ .cm-embed-block,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.cm-line.anki-card-preview-cardblock--error.anki-card-preview-before-mid-hr
-	+ .hr.cm-line {
+.anki-card-envelope--error {
 	--anki-cardblock-tint: var(--color-red, #f85149);
 	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: var(--color-red, #f85149);
 }
+
+.markdown-source-view.is-live-preview .cm-content {
+	position: relative;
+}
+
+.markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock {
+	position: relative;
+	box-sizing: border-box;
+}
+
+/* Embedded blocks and thematic breaks sit naturally on top of the unified envelope */
+.markdown-source-view.is-live-preview .cm-content .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview .cm-content .cm-embed-block.cm-table-widget {
+	position: relative;
+}
+
 
 :root {
 	--anki-card-preview-inter-card-gap: 0.28em;
