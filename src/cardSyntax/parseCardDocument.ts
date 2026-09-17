@@ -15,7 +15,11 @@ import {
 } from "../io/frontmatterFilter";
 import { stripTrailingSectionSeparators } from "../parser/stripTrailingSectionSeparators";
 import { nodesToPreview, nodesToRawText } from "../utils/textPreview";
-import { processClozeDeletions } from "./clozeProcessor";
+import {
+  processClozeDeletions,
+  transformShorthandClozesInNodes,
+  type ProcessedClozeToken,
+} from "./clozeProcessor";
 import { crossCuttingMessages } from "./crossCuttingRules";
 import { resolveFileDefaults } from "./frontmatterDefaults";
 import { parseHeadingHashtags, type HashtagParseResult } from "./hashtagParser";
@@ -241,12 +245,13 @@ function resolveCard(
     ),
   );
 
+  let clozeResult: ReturnType<typeof processClozeDeletions> | undefined;
   if (
     effectiveResolved.kind === "builtin" &&
     effectiveResolved.type === "cloze" &&
     outcome === "sync"
   ) {
-    const clozeResult = processClozeDeletions(layoutRegions.textRegion, {
+    clozeResult = processClozeDeletions(layoutRegions.textRegion, {
       allowShorthand: true,
     });
     for (const warning of clozeResult.warnings) {
@@ -264,9 +269,10 @@ function resolveCard(
     outcome === "sync"
   ) {
     const typedBackRaw = layoutRegions.backRegion ?? "";
-    const typedBackSource = extracted.regions.back
+    const rawBackSource = extracted.regions.back
       ? rawText.slice(extracted.regions.back.start, extracted.regions.back.end)
       : typedBackRaw;
+    const typedBackSource = rawBackSource.replace(/<!--[\s\S]*?-->/g, "");
     const typedBackLines = typedBackRaw
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -280,12 +286,8 @@ function resolveCard(
     }
 
     const hasTypedFormatting =
-      /`[^`]+`/.test(typedBackSource) ||
-      /\*\*[^*\n]+\*\*/.test(typedBackSource) ||
-      /__[^_\n]+__/.test(typedBackSource) ||
-      /\*[^*\n]+\*/.test(typedBackSource) ||
-      /_[^_\n]+_/.test(typedBackSource) ||
-      /\[[^\]]+\]\([^)]+\)/.test(typedBackSource);
+      /[*_`~\[\]$]/.test(typedBackSource) ||
+      /<[a-zA-Z][\s\S]*?>/.test(typedBackSource);
     if (hasTypedFormatting) {
       messages.push({
         level: "warn",
@@ -308,9 +310,12 @@ function resolveCard(
       : title.length > 0
         ? [createTextParagraph(title)]
         : [];
-  const frontNodes = stripTrailingAuthoringNodes(
+  let frontNodes = stripTrailingAuthoringNodes(
     stripTrailingSectionSeparators(rawFrontNodes),
   );
+  if (clozeResult?.valid && clozeResult.tokens.length > 0) {
+    frontNodes = transformShorthandClozesInNodes(frontNodes, clozeResult.tokens);
+  }
   const backNodes = stripTrailingAuthoringNodes(
     stripTrailingSectionSeparators(extracted.backNodes),
   );
@@ -351,6 +356,7 @@ function resolveCard(
     backNodes,
     sectionDepths,
     injectionOffset,
+    clozeTokens: clozeResult?.tokens,
   };
 }
 

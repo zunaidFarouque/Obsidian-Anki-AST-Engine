@@ -1,11 +1,25 @@
+import type { Content } from "mdast";
+import { visit } from "unist-util-visit";
+
 export type ClozeProcessOptions = {
   allowShorthand: boolean;
+};
+
+export type ProcessedClozeToken = {
+  start: number;
+  end: number;
+  number: number;
+  text: string;
+  hint?: string;
+  isShorthand: boolean;
+  raw: string;
 };
 
 export type ClozeProcessResult = {
   text: string;
   valid: boolean;
   warnings: string[];
+  tokens: ProcessedClozeToken[];
 };
 
 type ParsedCloze =
@@ -198,6 +212,7 @@ export function processClozeDeletions(
       text,
       valid: false,
       warnings: [],
+      tokens: [],
     };
   }
 
@@ -206,6 +221,7 @@ export function processClozeDeletions(
       text,
       valid: true,
       warnings: [],
+      tokens: [],
     };
   }
 
@@ -213,9 +229,19 @@ export function processClozeDeletions(
 
   let cursor = 0;
   let output = "";
+  const tokens: ProcessedClozeToken[] = [];
 
   for (const match of matches) {
     const assignment = assignments.get(match)!;
+    tokens.push({
+      start: match.start,
+      end: match.end,
+      number: assignment.number,
+      text: match.text,
+      hint: assignment.hint,
+      isShorthand: match.kind === "auto",
+      raw: match.raw,
+    });
     output += text.slice(cursor, match.start);
     output += formatCloze(assignment.number, match.text, assignment.hint);
     cursor = match.end;
@@ -227,5 +253,51 @@ export function processClozeDeletions(
     text: output,
     valid: true,
     warnings,
+    tokens,
   };
+}
+
+export function transformShorthandClozesInNodes(
+  nodes: Content[],
+  tokens: ProcessedClozeToken[],
+): Content[] {
+  const shorthandTokens = tokens.filter((t) => t.isShorthand);
+  if (shorthandTokens.length === 0) {
+    return nodes;
+  }
+
+  const assignmentByNormalized = new Map<string, { number: number; hint?: string }>();
+  for (const token of shorthandTokens) {
+    const key = normalizeText(token.text);
+    if (!assignmentByNormalized.has(key)) {
+      assignmentByNormalized.set(key, {
+        number: token.number,
+        hint: token.hint,
+      });
+    }
+  }
+
+  for (const node of nodes) {
+    visit(node, "text", (textNode: { value: string }) => {
+      if (!textNode.value.includes("{{")) {
+        return;
+      }
+      textNode.value = textNode.value.replace(
+        CLOZE_PATTERN,
+        (fullMatch, inner: string) => {
+          if (/^c\d+::/.test(inner)) {
+            return fullMatch;
+          }
+          const { text, hint } = splitTextAndHint(inner);
+          const assignment = assignmentByNormalized.get(normalizeText(text));
+          if (!assignment) {
+            return fullMatch;
+          }
+          return formatCloze(assignment.number, text, assignment.hint ?? hint);
+        },
+      );
+    });
+  }
+
+  return nodes;
 }

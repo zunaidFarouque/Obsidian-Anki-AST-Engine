@@ -377,7 +377,36 @@ describe('cardPreviewUtils', () => {
 		expect(tokens[0]?.groupId).toBe('c1');
 		expect(tokens[1]?.groupId).toBe('c5');
 		expect(tokens[0]?.paletteClass).toBe('anki-card-preview-cloze-group-1');
+		expect(tokens[1]?.paletteClass).toBe('anki-card-preview-cloze-group-5');
+	});
+
+	test('buildClozeTokenDecorations groups shorthand clozes case-insensitively and attaches inferred labels', () => {
+		const content = '#### Card\n{{Java}} runs on a JVM. {{java}} is same group. {{Python}} is new.\n:::\n';
+		const textEnd = content.indexOf('\n:::');
+		const card = makeCard({
+			resolvedType: builtinCardType('cloze'),
+			regions: {
+				text: { start: 10, end: textEnd },
+				back: { start: textEnd + 4, end: content.length },
+				delimiters: [{ kind: ':::', range: { start: textEnd + 1, end: textEnd + 4 } }],
+			},
+		});
+		const tokens = buildClozeTokenDecorations(card, content);
+		expect(tokens).toHaveLength(3);
+		expect(tokens[0]?.groupId).toBe('c1');
+		expect(tokens[0]?.isShorthand).toBe(true);
+		expect(tokens[0]?.inferredLabel).toBe('c1');
+		expect(tokens[0]?.paletteClass).toBe('anki-card-preview-cloze-group-1');
+
+		expect(tokens[1]?.groupId).toBe('c1');
+		expect(tokens[1]?.isShorthand).toBe(true);
+		expect(tokens[1]?.inferredLabel).toBe('c1');
 		expect(tokens[1]?.paletteClass).toBe('anki-card-preview-cloze-group-1');
+
+		expect(tokens[2]?.groupId).toBe('c2');
+		expect(tokens[2]?.isShorthand).toBe(true);
+		expect(tokens[2]?.inferredLabel).toBe('c2');
+		expect(tokens[2]?.paletteClass).toBe('anki-card-preview-cloze-group-2');
 	});
 
 	test('buildClozeTokenDecorations skips custom noteTypes and basic cards', () => {

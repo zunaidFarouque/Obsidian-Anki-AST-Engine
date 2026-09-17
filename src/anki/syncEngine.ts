@@ -31,6 +31,7 @@ export type CardSyncPayload = {
   wouldInjectId?: string;
   fileAnkiTags?: string[];
   sourceFile?: string;
+  userTags?: string[];
 };
 
 export type CardSyncResult = {
@@ -162,6 +163,7 @@ export type BuildAnkiTagsInput = {
   headingTag: string;
   syncTagPrefix: string;
   uuid: string;
+  userTags?: string[];
 };
 
 export function buildObsidianIdTag(prefix: string, uuid: string): string {
@@ -170,6 +172,15 @@ export function buildObsidianIdTag(prefix: string, uuid: string): string {
 
 export function buildAnkiTags(input: BuildAnkiTagsInput): string[] {
   const tags: string[] = [input.engineTag, ...input.fileTags];
+
+  if (input.userTags && input.userTags.length > 0) {
+    for (const tag of input.userTags) {
+      const clean = tag.replace(/^#+/, "").trim();
+      if (clean.length > 0) {
+        tags.push(clean);
+      }
+    }
+  }
 
   if (input.headingTag.length > 0) {
     tags.push(input.headingTag);
@@ -371,6 +382,7 @@ async function linkExistingNoteByFront(
     headingTag: payload.tag,
     syncTagPrefix: config.syncTagPrefix,
     uuid: linkUuid,
+    userTags: payload.userTags,
   });
 
   const modelName = resolvePayloadModelName(payload, config);
@@ -453,6 +465,7 @@ export async function syncCard(
     headingTag: payload.tag,
     syncTagPrefix: config.syncTagPrefix,
     uuid,
+    userTags: payload.userTags,
   });
   const fields = resolvePayloadFields(payload);
   const modelName = resolvePayloadModelName(payload, config);
@@ -567,6 +580,7 @@ function prepareCardItemsWithConfig(
         headingTag: item.payload.tag,
         syncTagPrefix: config.syncTagPrefix,
         uuid,
+        userTags: item.payload.userTags,
       }),
       fields: resolvePayloadFields(item.payload),
     };

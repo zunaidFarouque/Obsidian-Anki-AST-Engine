@@ -326,6 +326,46 @@ describe('cardPreviewLayout', () => {
 			}
 			expect(tableRules[0]).not.toMatch(/\bborder(-left|-right|-top|-bottom)?\s*:/);
 		});
+
+		test('math block underlay matches .cm-embed-block.math-block as sibling of cardblock', () => {
+			const stylesheet = css();
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.math-block\b/s,
+			);
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock\s*\+\s*\.cm-embed-block\.math-block::before\b/s,
+			);
+		});
+
+		test('formula site and outcome variants cover math block embeds', () => {
+			const stylesheet = css();
+			expect(stylesheet).toMatch(
+				/\.cm-line\.anki-card-preview-cardblock[\s\S]*?\+ \.cm-embed-block\.math-block[\s\S]*?--anki-cardblock-paint:/s,
+			);
+			for (const variant of ['sync', 'warn', 'skip', 'error'] as const) {
+				expect(stylesheet).toMatch(
+					new RegExp(
+						`\\.cm-line\\.anki-card-preview-cardblock--${variant}[\\s\\S]*?\\+ \\.cm-embed-block\\.math-block`,
+						's',
+					),
+				);
+			}
+		});
+
+		test('cloze palette defines 5 distinct visual groups', () => {
+			const stylesheet = css();
+			const colorValues = new Set<string>();
+			for (let i = 1; i <= 5; i++) {
+				const rule = stylesheet.match(
+					new RegExp(`\\.anki-card-preview-cloze-group-${i}\\s*\\{[^}]+\\}`, 's'),
+				)?.[0];
+				expect(rule).toBeDefined();
+				const colorMatch = rule!.match(/color:\s*([^;]+);/);
+				expect(colorMatch).toBeDefined();
+				colorValues.add(colorMatch![1].trim().toLowerCase());
+			}
+			expect(colorValues.size).toBe(5);
+		});
 	});
 
 	describe('card-block thematic-break underlay', () => {

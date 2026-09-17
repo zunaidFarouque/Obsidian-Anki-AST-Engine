@@ -556,7 +556,7 @@ Line before inner delimiter.
 
 This line should remain Back content with the inner ::: marker.
 
-<!-- expect: sync; rules: DEL-08,BAS-01; resolved: basic; back_contains: inner ::: marker -->
+<!-- expect: sync; rules: DEL-08; resolved: basic; back_contains: inner ::: marker -->
 
 ---
 

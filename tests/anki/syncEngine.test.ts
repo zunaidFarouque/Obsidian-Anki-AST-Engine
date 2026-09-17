@@ -77,6 +77,26 @@ describe("syncEngine", () => {
     ]);
   });
 
+  test("buildAnkiTags includes and cleans userTags from headings", () => {
+    expect(
+      buildAnkiTags({
+        engineTag: "Obsidian-Anki-AST",
+        fileTags: ["biology"],
+        headingTag: "Feature Stress Test",
+        syncTagPrefix: "obsidian-id",
+        uuid: "uuid-2",
+        userTags: ["#exam-prep", "review::daily"],
+      }),
+    ).toEqual([
+      "Obsidian-Anki-AST",
+      "biology",
+      "exam-prep",
+      "review::daily",
+      "Feature_Stress_Test",
+      "obsidian-id::uuid-2",
+    ]);
+  });
+
   test("syncCard adds note when no ankiId", async () => {
     let addedTags: string[] = [];
     const client = createMockClient({

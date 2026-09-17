@@ -7,6 +7,7 @@ import {
 	type SyncOutcome,
 } from '../../src/cardSyntax/types';
 import { effectiveCardOutcome } from '../../src/cardSyntax/syncEligibility';
+import { processClozeDeletions } from '../../src/cardSyntax/clozeProcessor';
 
 export function shouldRebuildCardPreviewDecorations(input: {
 	docChanged: boolean;
@@ -237,6 +238,8 @@ export interface ClozeTokenDecorationModel {
 	end: number;
 	groupId: string;
 	paletteClass: string;
+	isShorthand?: boolean;
+	inferredLabel?: string;
 }
 
 export interface BackOnlyClozeWarningMeta {
@@ -250,7 +253,7 @@ const OUTCOME_SUFFIX: Partial<Record<SyncOutcome, string>> = {
 	error: '❌',
 };
 
-const CLOZE_GROUP_PALETTE_SIZE = 4;
+const CLOZE_GROUP_PALETTE_SIZE = 5;
 
 export function buildHeadingBadgeModel(card: ResolvedCard): HeadingBadgeModel {
 	const displayOutcome = effectivePreviewOutcome(card);
@@ -288,7 +291,7 @@ export function findCardHeadingLinePositions(
 			continue;
 		}
 
-		if (!line.text.startsWith(requiredPrefix)) {
+		if (line.text !== markPrefix && !line.text.startsWith(requiredPrefix)) {
 			continue;
 		}
 
@@ -378,6 +381,18 @@ export function buildClozeTokenDecorations(
 	}
 
 	const source = content.slice(textRegion.start, textRegion.end);
+	const clozeResult = processClozeDeletions(source, { allowShorthand: true });
+	if (clozeResult.tokens.length > 0) {
+		return clozeResult.tokens.map((token) => ({
+			start: textRegion.start + token.start,
+			end: textRegion.start + token.end,
+			groupId: `c${token.number}`,
+			paletteClass: clozeGroupToPaletteClass(`c${token.number}`),
+			isShorthand: token.isShorthand,
+			inferredLabel: token.isShorthand ? `c${token.number}` : undefined,
+		}));
+	}
+
 	const tokenPattern = /\{\{(?:(c\d+)::)?[^{}]*\}\}/g;
 	const tokens: ClozeTokenDecorationModel[] = [];
 	let match: RegExpExecArray | null;

@@ -1046,6 +1046,93 @@ describe('card preview editor decorations (Live Preview)', () => {
 		expect(fieldGuideEntry).toBeDefined();
 		expect(fieldGuideEntry?.from).toBe(state.doc.lineAt(fieldDelimiter).from);
 	});
+
+	test('bare heading #### matches and decorates line and card block', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const doc = '####\nFront text\n:::\nBack text\n';
+		const state = EditorState.create({
+			doc,
+			extensions: [livePreviewField],
+		});
+		const card = makeCard({
+			title: '',
+			range: { start: 0, end: doc.length },
+			regions: {
+				front: { start: 5, end: 15 },
+				back: { start: 20, end: doc.length },
+				delimiters: [{ kind: ':::', range: { start: 16, end: 19 } }],
+			},
+		});
+
+		const decorations = buildCardPreviewDecorations(
+			{ state } as unknown as EditorView,
+			{
+				getSettings: () => ({ enableCardPreview: true } as any),
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [card],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+			},
+		);
+
+		const entries = collectDecorations(decorations, state.doc.length);
+		const headingLineEntry = entries.find((entry) =>
+			String(entry.value.spec?.class ?? '').includes('anki-card-preview-heading'),
+		);
+		expect(headingLineEntry).toBeDefined();
+		expect(headingLineEntry?.from).toBe(0);
+	});
+
+	test('shorthand cloze decorations attach data-cloze-number and shorthand class', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const doc = '#### Cloze Card\n{{Java}} runs on JVM.\n:::\n';
+		const state = EditorState.create({
+			doc,
+			extensions: [livePreviewField],
+		});
+		const card = makeCard({
+			resolvedType: builtinCardType('cloze'),
+			range: { start: 0, end: doc.length },
+			regions: {
+				text: { start: 16, end: 37 },
+				delimiters: [{ kind: ':::', range: { start: 38, end: 41 } }],
+			},
+		});
+
+		const decorations = buildCardPreviewDecorations(
+			{ state } as unknown as EditorView,
+			{
+				getSettings: () => ({ enableCardPreview: true } as any),
+				parseContent: () =>
+					({
+						syncEligible: true,
+						cards: [card],
+						messages: [],
+					}) as any,
+				getCardDeclarationHeadingLevel: () => 4,
+				getSettingsRevision: () => 0,
+				editorLivePreviewField: livePreviewField as any,
+			},
+		);
+
+		const entries = collectDecorations(decorations, state.doc.length);
+		const clozeEntry = entries.find((entry) =>
+			String(entry.value.spec?.class ?? '').includes('anki-card-preview-cloze-shorthand'),
+		);
+		expect(clozeEntry).toBeDefined();
+		expect(clozeEntry?.value.spec?.attributes?.['data-cloze-number']).toBe('c1');
+	});
 });
 
 

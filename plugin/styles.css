@@ -115,12 +115,33 @@
 	--anki-cardblock-border-color: var(--background-modifier-border);
 }
 
-/* One formula site for all envelope paint hosts (line / table / mid-card HR). */
+/* One formula site for all envelope paint hosts (line / table / math / mid-card HR). */
 .markdown-source-view.is-live-preview .cm-content .cm-line.anki-card-preview-cardblock,
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock
 	+ .cm-embed-block.cm-table-widget,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(.math),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(mjx-container),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block
+	+ .cm-embed-block,
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock.anki-card-preview-before-mid-hr
@@ -167,7 +188,7 @@
 }
 
 /*
- * Card-block tables: .cm-table-widget is a sibling of .cm-line.
+ * Card-block tables, math blocks, and embeds: .cm-embed-block is a sibling of .cm-line.
  * Logs: widget ~732, cm-line ~700 (≈ +2×16px padding), line underlay bleeds 8px
  * outside the line → visual paint ≈ 716. Painting with left/right: -8px overflows
  * overflow-x:auto (scrollWidth 740). Painting on .table-wrapper shrink-wraps with
@@ -178,10 +199,52 @@
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(.math),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(mjx-container),
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
 	+ .cm-embed-block.cm-table-widget {
 	position: relative;
 }
 
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block.math-block::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(.math)::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block:has(mjx-container)::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block::before,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock
+	+ .cm-embed-block
+	+ .cm-embed-block::before,
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock
@@ -257,6 +320,19 @@
 	+ .cm-embed-block.cm-table-widget,
 .markdown-source-view.is-live-preview
 	.cm-content
+	.cm-line.anki-card-preview-cardblock--sync
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--sync
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--sync
+	+ .cm-embed-block
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
 	.cm-line.anki-card-preview-cardblock--sync.anki-card-preview-before-mid-hr
 	+ .hr.cm-line {
 	--anki-cardblock-border-color: var(--background-modifier-border);
@@ -267,6 +343,19 @@
 	.cm-content
 	.cm-line.anki-card-preview-cardblock--warn
 	+ .cm-embed-block.cm-table-widget,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--warn
+	+ .cm-embed-block
+	+ .cm-embed-block,
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock--warn.anki-card-preview-before-mid-hr
@@ -287,6 +376,19 @@
 	+ .cm-embed-block.cm-table-widget,
 .markdown-source-view.is-live-preview
 	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--skip
+	+ .cm-embed-block
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
 	.cm-line.anki-card-preview-cardblock--skip.anki-card-preview-before-mid-hr
 	+ .hr.cm-line {
 	--anki-cardblock-tint: var(--background-modifier-hover);
@@ -299,6 +401,19 @@
 	.cm-content
 	.cm-line.anki-card-preview-cardblock--error
 	+ .cm-embed-block.cm-table-widget,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .cm-embed-block.math-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .cm-embed-block,
+.markdown-source-view.is-live-preview
+	.cm-content
+	.cm-line.anki-card-preview-cardblock--error
+	+ .cm-embed-block
+	+ .cm-embed-block,
 .markdown-source-view.is-live-preview
 	.cm-content
 	.cm-line.anki-card-preview-cardblock--error.anki-card-preview-before-mid-hr
@@ -621,19 +736,37 @@
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-group-1 {
-	color: #c47f00;
+	color: #d97706;
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-group-2 {
-	color: #0071a8;
+	color: #0284c7;
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-group-3 {
-	color: #6f56cf;
+	color: #7c3aed;
 }
 
 .markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-group-4 {
-	color: #8a5b1f;
+	color: #db2777;
+}
+
+.markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-group-5 {
+	color: #059669;
+}
+
+.markdown-source-view.is-live-preview .cm-content .anki-card-preview-cloze-token.anki-card-preview-cloze-shorthand::before {
+	content: attr(data-cloze-number);
+	display: inline-block;
+	font-size: 0.72em;
+	line-height: 1.1;
+	padding: 0 3px;
+	margin-right: 3px;
+	border-radius: 3px;
+	border: 1px solid currentColor;
+	opacity: 0.85;
+	font-weight: 600;
+	vertical-align: 1px;
 }
 
 .markdown-preview-view .anki-card-preview-heading {

@@ -316,6 +316,7 @@ async function applyDryRunParity(
       headingTag: entry.payload.tag,
       syncTagPrefix,
       uuid,
+      userTags: entry.payload.userTags,
     });
     const noteIds = await client.findNotes(
       `tag:"${buildObsidianIdTag(syncTagPrefix, uuid)}"`,
@@ -632,6 +633,7 @@ export async function runSync(
           wouldInjectId: injectionPlan?.uuid,
           fileAnkiTags,
           sourceFile: actionFile,
+          userTags: card.hashtags?.user,
         },
         injectionOffset: injectionPlan?.offset,
         action: fileAction,

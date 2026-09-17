@@ -53,7 +53,7 @@ function nextBadgeAccessibilityId(prefix: string): string {
 	return `${prefix}-${badgeAccessibilityIdCounter}`;
 }
 
-export const refreshPreviewEffect = StateEffect.define<void>();
+export const refreshPreviewEffect = StateEffect.define<DecorationSet>();
 
 function buildDelimiterGuideClasses(garnishText?: string): string {
 	const classes = [DELIMITER_GUIDE_CLASS];
@@ -114,6 +114,32 @@ class CardPreviewBadgeWidget extends WidgetType {
 	toDOM(): HTMLElement {
 		return createCardPreviewBadgeElement(this.card, this.onMoreAction);
 	}
+
+	updateDOM(dom: HTMLElement): boolean {
+		const badge = dom.querySelector(`.${BADGE_CLASS}`);
+		if (!badge) {
+			return false;
+		}
+		const badgeModel = buildHeadingBadgeModel(this.card);
+		const tooltip = formatCardPreviewTooltip(this.card);
+		const actionClass = this.onMoreAction ? ` ${BADGE_CLASS}--action` : '';
+		badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`;
+		const label = badge.querySelector('.anki-card-preview-badge-label');
+		if (label) {
+			label.textContent = badgeModel.label;
+		}
+		const tooltipElement = badge.querySelector('.anki-card-preview-tooltip');
+		if (tooltipElement) {
+			tooltipElement.textContent = tooltip;
+		}
+		const backOnlyMeta = buildBackOnlyClozeWarningMeta(this.card);
+		if (backOnlyMeta.hasBackOnlyWarning) {
+			(badge as HTMLElement).dataset.backOnlyClozeWarning = backOnlyMeta.ruleId ?? 'true';
+		} else {
+			delete (badge as HTMLElement).dataset.backOnlyClozeWarning;
+		}
+		return true;
+	}
 }
 
 export function createCardPreviewBadgeElement(
@@ -173,14 +199,14 @@ export interface CardPreviewEditorOptions {
 	editorInfoField?: StateField<{ file: TFile | null } | undefined>;
 }
 
-function isCardDeclarationHeadingLine(line: string, headingLevel: number): boolean {
+export function isCardDeclarationHeadingLine(line: string, headingLevel: number): boolean {
 	const clampedLevel = Math.min(6, Math.max(1, headingLevel));
 	const markPrefix = '#'.repeat(clampedLevel);
 	const requiredPrefix = `${markPrefix} `;
-	if (!line.startsWith(requiredPrefix)) {
-		return false;
+	if (line === markPrefix || line.startsWith(requiredPrefix)) {
+		return !(line.length > requiredPrefix.length && line[requiredPrefix.length] === '#');
 	}
-	return !(line.length > requiredPrefix.length && line[requiredPrefix.length] === '#');
+	return false;
 }
 
 function mapCardsToHeadingLines(
@@ -376,9 +402,9 @@ export function buildCardPreviewDecorations(
 						options.openCardPreviewDetails?.(card, file.path);
 					}
 				}),
-				side: 1,
+				side: -1,
 			}),
-			startSide: 1,
+			startSide: -1,
 		});
 
 		for (const delimiterModel of buildDelimiterLineDecorations(card)) {
@@ -412,11 +438,18 @@ export function buildCardPreviewDecorations(
 		}
 
 		for (const token of buildClozeTokenDecorations(card, content)) {
+			const classes = [CLOZE_TOKEN_CLASS, token.paletteClass];
+			if (token.isShorthand && token.inferredLabel) {
+				classes.push('anki-card-preview-cloze-shorthand');
+			}
 			pending.push({
 				from: token.start,
 				to: token.end,
 				decoration: Decoration.mark({
-					class: `${CLOZE_TOKEN_CLASS} ${token.paletteClass}`,
+					class: classes.join(' '),
+					attributes: token.inferredLabel
+						? { 'data-cloze-number': token.inferredLabel }
+						: undefined,
 				}),
 				startSide: 0,
 			});
@@ -444,8 +477,13 @@ export class CardPreviewEditorPlugin implements PluginValue {
 	}
 
 	update(update: ViewUpdate): void {
-		if (update.transactions.some((tr) => tr.effects.some((e) => e.is(refreshPreviewEffect)))) {
-			return;
+		for (const tr of update.transactions) {
+			for (const effect of tr.effects) {
+				if (effect.is(refreshPreviewEffect)) {
+					this.decorations = effect.value;
+					return;
+				}
+			}
 		}
 
 		if (update.docChanged) {
@@ -483,9 +521,9 @@ export class CardPreviewEditorPlugin implements PluginValue {
 		this.clearDebounceTimer();
 		this.debounceTimer = setTimeout(() => {
 			this.debounceTimer = null;
-			this.decorations = buildCardPreviewDecorations(this.view, this.options);
+			const decorations = buildCardPreviewDecorations(this.view, this.options);
 			this.view.dispatch({
-				effects: refreshPreviewEffect.of(),
+				effects: refreshPreviewEffect.of(decorations),
 			});
 		}, 200);
 	}
