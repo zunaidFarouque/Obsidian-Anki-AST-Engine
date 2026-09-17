@@ -22,6 +22,8 @@ export interface AnkiAstSyncSettings {
 	orphanAllowSuspend: boolean;
 	enableCardPreview: boolean;
 	cardPreviewStyle: 'subtle' | 'explicit';
+	/** Visual emphasis on the card declaration heading line: uniform with body (off), slightly heavier tint (shaded), or heavier tint with hairline separator (divided). */
+	cardPreviewHeadingStyle: 'off' | 'shaded' | 'divided';
 	cardPreviewSyncMarker: 'none' | 'card-emoji' | 'anki-icon';
 	/** Fraction of one line height (0–1) to extend card background above section-start headings. */
 	cardPreviewSectionTopExtend: number;
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	orphanAllowSuspend: false,
 	enableCardPreview: false,
 	cardPreviewStyle: 'subtle',
+	cardPreviewHeadingStyle: 'off',
 	cardPreviewSyncMarker: 'none',
 	cardPreviewSectionTopExtend: 0.5,
 	cardPreviewInterCardGapEm: 0.28,
@@ -252,6 +255,25 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.cardPreviewStyle =
 							value as AnkiAstSyncSettings['cardPreviewStyle'];
+						await this.plugin.saveSettings();
+						this.plugin.cardPreview?.onSettingsChanged();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Card heading line style')
+			.setDesc(
+				'Visual emphasis on the card declaration heading line: uniform with body (off), slightly heavier tint (shaded), or heavier tint with hairline separator (divided).',
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption('off', 'Off (uniform)')
+					.addOption('shaded', 'Shaded (Option 1)')
+					.addOption('divided', 'Shaded with divider (Option 2)')
+					.setValue(this.plugin.settings.cardPreviewHeadingStyle ?? 'off')
+					.onChange(async (value) => {
+						this.plugin.settings.cardPreviewHeadingStyle =
+							value as AnkiAstSyncSettings['cardPreviewHeadingStyle'];
 						await this.plugin.saveSettings();
 						this.plugin.cardPreview?.onSettingsChanged();
 					}),

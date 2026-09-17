@@ -21,6 +21,8 @@ import {
 } from './cardPreviewUtils';
 import { cardFollowsSectionHeading } from './cardPreviewLayout';
 
+export type CardPreviewHeadingStyle = 'off' | 'shaded' | 'divided';
+
 export class CardEnvelopeMarker implements LayerMarker {
 	constructor(
 		public readonly cardId: string,
@@ -29,6 +31,8 @@ export class CardEnvelopeMarker implements LayerMarker {
 		public readonly height: number,
 		public readonly left: number,
 		public readonly width: number,
+		public readonly headingHeight: number = 0,
+		public readonly headingStyle: CardPreviewHeadingStyle = 'off',
 	) {}
 
 	eq(other: LayerMarker): boolean {
@@ -38,6 +42,8 @@ export class CardEnvelopeMarker implements LayerMarker {
 		return (
 			this.cardId === other.cardId &&
 			this.outcome === other.outcome &&
+			this.headingStyle === other.headingStyle &&
+			Math.abs(this.headingHeight - other.headingHeight) < 0.5 &&
 			Math.abs(this.top - other.top) < 0.5 &&
 			Math.abs(this.height - other.height) < 0.5 &&
 			Math.abs(this.left - other.left) < 0.5 &&
@@ -48,6 +54,12 @@ export class CardEnvelopeMarker implements LayerMarker {
 	draw(): HTMLElement {
 		const elt = document.createElement('div');
 		elt.className = `anki-card-envelope anki-card-envelope--${this.outcome}`;
+		if (this.headingStyle !== 'off' && this.headingHeight > 0) {
+			const header = document.createElement('div');
+			header.className = `anki-card-envelope-header anki-card-envelope-header--${this.headingStyle}`;
+			header.style.height = `${this.headingHeight}px`;
+			elt.appendChild(header);
+		}
 		this.adjust(elt);
 		return elt;
 	}
@@ -56,8 +68,21 @@ export class CardEnvelopeMarker implements LayerMarker {
 		if (!(prev instanceof CardEnvelopeMarker)) {
 			return false;
 		}
-		if (this.cardId !== prev.cardId || this.outcome !== prev.outcome) {
+		if (
+			this.cardId !== prev.cardId ||
+			this.outcome !== prev.outcome ||
+			this.headingStyle !== prev.headingStyle
+		) {
 			return false;
+		}
+		if (this.headingStyle !== 'off' && this.headingHeight > 0) {
+			const headerEl = (typeof dom.querySelector === 'function'
+				? dom.querySelector('.anki-card-envelope-header')
+				: null) as HTMLElement | null;
+			if (!headerEl) {
+				return false;
+			}
+			headerEl.style.height = `${this.headingHeight}px`;
 		}
 		this.adjust(dom);
 		return true;
@@ -135,6 +160,7 @@ export function calculateCardEnvelopeMarkers(
 	const viewport = view.viewport ?? { from: 0, to: doc.length };
 	const previewSettings = options.getSettings();
 	const sectionTopExtend = previewSettings.cardPreviewSectionTopExtend ?? 0;
+	const headingStyle = previewSettings.cardPreviewHeadingStyle ?? 'off';
 
 	// Calculate base coordinates matching .cm-scroller plane
 	const scrollDOM = view.scrollDOM;
@@ -201,6 +227,10 @@ export function calculateCardEnvelopeMarkers(
 		const top = docTop + startBlock.top - topExtendPx;
 		const bottom = docTop + endBlock.bottom;
 		const height = Math.max(0, bottom - top);
+		const headingHeight = Math.min(
+			height,
+			(startBlock.height || view.defaultLineHeight || 20) + topExtendPx,
+		);
 		const cardId = card.ankiId ?? `${card.ordinal}:${heading.from}:${card.title}`;
 
 		markers.push(
@@ -211,6 +241,8 @@ export function calculateCardEnvelopeMarkers(
 				height,
 				envelopeLeft,
 				envelopeWidth,
+				headingHeight,
+				headingStyle,
 			),
 		);
 	}

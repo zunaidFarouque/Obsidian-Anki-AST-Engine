@@ -31,7 +31,25 @@ class FakeDOMElement {
 	className = '';
 	style: Record<string, string> = {};
 	dataset: Record<string, string> = {};
+	children: FakeDOMElement[] = [];
 	constructor(public readonly tagName: string) {}
+
+	appendChild(child: FakeDOMElement): FakeDOMElement {
+		this.children.push(child);
+		return child;
+	}
+
+	querySelector(selector: string): FakeDOMElement | null {
+		const targetClass = selector.startsWith('.') ? selector.slice(1) : selector;
+		for (const child of this.children) {
+			if (child.className.split(/\s+/).includes(targetClass)) {
+				return child;
+			}
+			const found = child.querySelector(selector);
+			if (found) return found;
+		}
+		return null;
+	}
 }
 
 function withFakeDocument<T>(callback: () => T): T {
@@ -48,17 +66,20 @@ function withFakeDocument<T>(callback: () => T): T {
 
 describe('CardEnvelopeMarker', () => {
 	test('eq returns true when all properties match within 0.5px tolerance', () => {
-		const m1 = new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500);
-		const m2 = new CardEnvelopeMarker('card-1', 'sync', 100.2, 199.8, 10.1, 500.3);
+		const m1 = new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500, 24, 'shaded');
+		const m2 = new CardEnvelopeMarker('card-1', 'sync', 100.2, 199.8, 10.1, 500.3, 24.2, 'shaded');
 		expect(m1.eq(m2)).toBe(true);
 	});
 
-	test('eq returns false when outcome, cardId, or dimensions differ beyond tolerance', () => {
-		const base = new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500);
-		expect(base.eq(new CardEnvelopeMarker('card-2', 'sync', 100, 200, 10, 500))).toBe(false);
-		expect(base.eq(new CardEnvelopeMarker('card-1', 'warn', 100, 200, 10, 500))).toBe(false);
-		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 101, 200, 10, 500))).toBe(false);
-		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 100, 201, 10, 500))).toBe(false);
+	test('eq returns false when outcome, cardId, headingStyle, or dimensions differ beyond tolerance', () => {
+		const base = new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500, 24, 'shaded');
+		expect(base.eq(new CardEnvelopeMarker('card-2', 'sync', 100, 200, 10, 500, 24, 'shaded'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'warn', 100, 200, 10, 500, 24, 'shaded'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 101, 200, 10, 500, 24, 'shaded'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 100, 201, 10, 500, 24, 'shaded'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500, 24, 'divided'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500, 24, 'off'))).toBe(false);
+		expect(base.eq(new CardEnvelopeMarker('card-1', 'sync', 100, 200, 10, 500, 26, 'shaded'))).toBe(false);
 	});
 
 	test('draw creates div element with correct class and inline coordinates', () => {
@@ -70,21 +91,60 @@ describe('CardEnvelopeMarker', () => {
 			expect(dom.style.height).toBe('150px');
 			expect(dom.style.left).toBe('8px');
 			expect(dom.style.width).toBe('600px');
+			expect(dom.children).toHaveLength(0);
 		});
 	});
 
-	test('update modifies existing element in-place when dimensions change for same card and outcome', () => {
+	test('draw creates shaded header child element when headingStyle is shaded', () => {
 		withFakeDocument(() => {
-			const initial = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600);
-			const dom = initial.draw();
+			const marker = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'shaded');
+			const dom = marker.draw();
+			expect(dom.children).toHaveLength(1);
+			const header = dom.children[0]!;
+			expect(header.className).toBe('anki-card-envelope-header anki-card-envelope-header--shaded');
+			expect(header.style.height).toBe('24px');
+		});
+	});
 
-			const next = new CardEnvelopeMarker('card-1', 'sync', 60, 160, 12, 620);
+	test('draw creates divided header child element when headingStyle is divided', () => {
+		withFakeDocument(() => {
+			const marker = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'divided');
+			const dom = marker.draw();
+			expect(dom.children).toHaveLength(1);
+			const header = dom.children[0]!;
+			expect(header.className).toBe('anki-card-envelope-header anki-card-envelope-header--divided');
+			expect(header.style.height).toBe('24px');
+		});
+	});
+
+	test('update modifies existing element and header height in-place for same card and style', () => {
+		withFakeDocument(() => {
+			const initial = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'divided');
+			const dom = initial.draw();
+			expect(dom.children).toHaveLength(1);
+			expect(dom.children[0]!.style.height).toBe('24px');
+
+			const next = new CardEnvelopeMarker('card-1', 'sync', 60, 160, 12, 620, 28, 'divided');
 			const reused = next.update(dom as unknown as HTMLElement, initial);
 			expect(reused).toBe(true);
 			expect(dom.style.top).toBe('60px');
 			expect(dom.style.height).toBe('160px');
 			expect(dom.style.left).toBe('12px');
 			expect(dom.style.width).toBe('620px');
+			expect(dom.children[0]!.style.height).toBe('28px');
+		});
+	});
+
+	test('update returns false when headingStyle changes so element is cleanly recreated', () => {
+		withFakeDocument(() => {
+			const initial = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'off');
+			const dom = initial.draw();
+
+			const next = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'shaded');
+			expect(next.update(dom as unknown as HTMLElement, initial)).toBe(false);
+
+			const divided = new CardEnvelopeMarker('card-1', 'sync', 50, 150, 8, 600, 24, 'divided');
+			expect(divided.update(dom as unknown as HTMLElement, next)).toBe(false);
 		});
 	});
 
@@ -340,6 +400,62 @@ describe('calculateCardEnvelopeMarkers', () => {
 		expect(markerA.top).toBe(50);
 		// Bottom encompasses full Front A line (line 4 bottom at 80 + docTop 20 = 100)
 		expect(markerA.top + markerA.height).toBe(100);
+	});
+
+	test('passes headingStyle and calculates headingHeight including sectionTopExtend', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const doc = [
+			'### Section',
+			'',
+			'#### Card 1',
+			'Front',
+			':::',
+			'Back',
+		].join('\n');
+		const state = EditorState.create({ doc, extensions: [livePreviewField] });
+		const view = {
+			state,
+			scrollDOM: {
+				getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600 }),
+				scrollLeft: 0,
+				scrollTop: 0,
+				clientWidth: 800,
+			},
+			contentDOM: {
+				getBoundingClientRect: () => ({ left: 50, top: 20, width: 700, right: 750, bottom: 500 }),
+			},
+			defaultLineHeight: 20,
+			viewport: { from: 0, to: doc.length },
+		} as unknown as EditorView;
+
+		const card = makeCard({
+			title: 'Card 1',
+			range: { start: doc.indexOf('#### Card 1'), end: doc.length },
+			outcome: 'sync',
+		});
+
+		const markers = calculateCardEnvelopeMarkers(view, {
+			getSettings: () =>
+				({
+					enableCardPreview: true,
+					cardPreviewHeadingStyle: 'divided',
+					cardPreviewSectionTopExtend: 0.5,
+					cardPreviewInterCardGapEm: 0.28,
+				}) as any,
+			parseContent: () => ({ syncEligible: true, cards: [card] }) as any,
+			getCardDeclarationHeadingLevel: () => 4,
+			getSettingsRevision: () => 0,
+			editorLivePreviewField: livePreviewField as any,
+		});
+
+		expect(markers).toHaveLength(1);
+		const marker = markers[0]!;
+		expect(marker.headingStyle).toBe('divided');
+		// heading line height is 20 + sectionTopExtend (0.5 * 20 = 10) = 30
+		expect(marker.headingHeight).toBe(30);
 	});
 });
 

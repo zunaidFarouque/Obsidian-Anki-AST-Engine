@@ -124,6 +124,7 @@
 	border-radius: 4px;
 	box-sizing: border-box;
 	z-index: -1;
+	overflow: hidden;
 	--anki-cardblock-tint: var(--background-modifier-hover);
 	--anki-cardblock-body-opacity: 38%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
@@ -163,6 +164,31 @@
 	--anki-cardblock-tint: var(--color-red, #f85149);
 	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: var(--color-red, #f85149);
+}
+
+/*
+ * Card declaration heading line visual distinction:
+ * Option 1 ('shaded'): slightly heavier tint on the heading line.
+ * Option 2 ('divided'): heavier tint + hairline separator line at bottom of heading line.
+ */
+.anki-card-envelope-header {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	box-sizing: border-box;
+	pointer-events: none;
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	background: color-mix(
+		in srgb,
+		var(--anki-cardblock-tint) 14%,
+		transparent
+	);
+}
+
+.anki-card-envelope-header--divided {
+	border-bottom: 1px solid var(--anki-cardblock-border-color);
 }
 
 .markdown-source-view.is-live-preview .cm-content {
