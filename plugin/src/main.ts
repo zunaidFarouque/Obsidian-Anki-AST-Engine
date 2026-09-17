@@ -10,6 +10,7 @@ import {
 } from './settings';
 import { reloadPlugin, reloadPluginCss } from './devReload';
 import type { CardPreviewManager } from './cardPreview';
+import { removeAnkiSyncCommentsFromActiveNote } from './commentCleaner';
 
 type SyncOrchestratorModule = typeof import('./syncOrchestrator');
 
@@ -64,6 +65,14 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Sync current note to Anki',
 			callback: () => {
 				void this.syncCurrentFileToAnki();
+			},
+		});
+
+		this.addCommand({
+			id: 'remove-anki-sync-comments-current-note',
+			name: 'Remove all Anki sync comments from current Obsidian note',
+			callback: () => {
+				void removeAnkiSyncCommentsFromActiveNote(this.app);
 			},
 		});
 

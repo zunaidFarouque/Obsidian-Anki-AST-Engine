@@ -209,7 +209,7 @@ entropy
 
 ### STR-05 — Binding UUID comment
 
-**Rule:** Each synced card may contain an HTML comment `<!--anki-id: <uuid>-->` for vault↔Anki binding. Unchanged from current engine behavior.
+**Rule:** Each synced card may contain an HTML comment `<!--anki-id: <uuid>-->` for vault↔Anki binding. For cards with a split delimiter, the comment is placed at the end of the Back region. For cards without a split delimiter (e.g. Text-only cloze without `:::`), the comment is placed at the end of the Text/Front region.
 
 **Authoring-only HTML:** Other `<!-- … -->` lines (e.g. `<!-- expect: … -->` in fixtures) are not card content — stripped before Anki compile and excluded from preview envelope. See [Card-Rendering.md](../Card-Rendering.md#html-authoring-comments--).
 
@@ -1040,7 +1040,7 @@ Capital of France?
 
 **Rule:** When the typed Back region contains markdown/HTML formatting (bold, italic, links, etc.) before stripping → **warn**; still sync after **TYP-03** plain-text strip.
 
-**Code TODO (Phase 2):** `parseCardDocument` currently emits this warn under rule id `TYP-05`. Rename the runtime `ruleId` to `TYP-03b` when touching that code; do not leave the id collision with multi-answer **TYP-05**.
+**Landed (Phase 2b):** Runtime `ruleId` emits `TYP-03b` for typed-back formatting warnings; `TYP-05` is reserved and active for multi-answer pipe splitting.
 
 ---
 
@@ -1243,7 +1243,7 @@ Card "<title>": resolved cloze (inherited from ### <section>) — info
 | **CLZ-11 / CX-12** | Cloze type with deletions only after `:::` → **error** (hard-block) |
 | **REV-06 / CX-31** | Conflicting reversible vs typed signals → **error** |
 | **TYP-05** | Pipe-separated multi-answer in v1; trim spaces attached to each pipe |
-| **TYP-03b** | Typed-back formatting → **warn** (code still may emit old id `TYP-05` until Phase 2 rename) |
+| **TYP-03b** | Typed-back formatting → **warn** (landed Phase 2b; separates formatting warn from multi-answer TYP-05) |
 | **CUS-04** | Custom + plain `:::` only → **skip** |
 | **CX-25 / CX-28** | CX-25 = non-empty Text cloze + optional Back Extra → **sync**; empty `{{}}` / `{{c1::}}` → **skip** (CLZ-09) |
 | **TAG-04** | Built-in types use `#anki/cardType/*` only; `#anki/noteType/*` is always custom (even if id matches a built-in name) |

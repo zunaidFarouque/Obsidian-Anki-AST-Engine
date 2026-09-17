@@ -149,7 +149,7 @@ Sync complete (live): 37 card(s) — added 0, updated 4, skipped 33, failed 0, d
 
 | Location | Role |
 |----------|------|
-| Markdown `<!--anki-id: uuid-->` | Source of truth in the vault; parsed at card back |
+| Markdown `<!--anki-id: uuid-->` | Source of truth in the vault; parsed at card back (or at the end of the Text/Front region for delimiter-less cards like text-only cloze) |
 | Anki tag `obsidian-id::<uuid>` | Lookup key in Anki (configurable via `syncTagPrefix`) |
 | Engine tag e.g. `Obsidian-Anki-AST` | Universal tag on every synced note |
 | Heading tag e.g. `CS101::Week_2::Entropy` | Organizational tag; normalized and updated each sync |
@@ -158,11 +158,11 @@ Sync complete (live): 37 card(s) — added 0, updated 4, skipped 33, failed 0, d
 
 1. Engine compiles HTML.
 2. Live sync adds the card via batched `addNotes` (or per-card `addNote` on batch failure) with `obsidian-id::<uuid>` tag.
-3. On success, splices `<!--anki-id: uuid-->` into the markdown file at the AST-derived back offset.
+3. On success, splices `<!--anki-id: uuid-->` into the markdown file at the AST-derived back offset (or end-of-front offset when the card has no delimiter, e.g. Text-only cloze).
 
 ### Update flow
 
-1. Read `<!--anki-id: uuid-->` from card back.
+1. Read `<!--anki-id: uuid-->` from card back or end of Text/Front.
 2. Live sync prefetches all obsidian-id lookups for the file in one `multi` request; re-sync uses `findNotes` with `tag:"obsidian-id::<uuid>"` when resolving a single card via `syncCard`.
 3. Compare model fields (Basic: `Front`/`Back`; Cloze: `Text`/`Back Extra`; typed: plain-text Back — with code-block line-ending normalization — see below); call `updateNoteFields` only when content truly changed. Field-change detection is model-agnostic.
 4. `updateNoteTags` when tag set differs (engine, file, heading, or binding tags).

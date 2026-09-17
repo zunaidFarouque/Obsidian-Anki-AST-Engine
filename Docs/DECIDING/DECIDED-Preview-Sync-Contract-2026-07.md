@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Sources (filled):** | [01](../../CurrentWorkMD/_DecisionsNeeded_01_PreviewSyncAlignment.md) · [02](../../CurrentWorkMD/_DecisionsNeeded_02_CardTypesAnkiSync.md) · [03](../../CurrentWorkMD/_DecisionsNeeded_03_RuleBookAmbiguities.md) · [04](../../CurrentWorkMD/_DecisionsNeeded_04_CSSCosmeticVsBehavioral.md) · [05](../../CurrentWorkMD/_DecisionsNeeded_05_PriorityAndPhasing.md) |
+| **Sources:** | Reconciled & locked from decision worksheets (01 Preview Sync, 02 Card Types, 03 Rule Ambiguities, 04 CSS, 05 Phasing) |
 | **Related specs:** | [Card-Syntax-Spec.md](./Card-Syntax-Spec.md) · [Card-Preview-Design-Guidelines.md](./Card-Preview-Design-Guidelines.md) |
-| **Index:** | [CurrentWorkMD/_DECIDED_INDEX.md](../../CurrentWorkMD/_DECIDED_INDEX.md) |
+| **Status:** | Landed (Phases 1–2c completed and tested) |
 
 ---
 
@@ -35,7 +35,7 @@ Preview outcome chips and resolved types are **authoritative**. Sync must honor 
 
 **`:::r` / `:::t` (01 D5 + 01 notes / 05 D1):** Do **not** ship a Basic-only stopgap (strip suffix / block-then-unblock). Implement reversible + typed sync in the same pass as other built-ins so garnish and Anki type match.
 
-**Pre-sync UI (01 D6):** Pre-sync summary dialog counting mismatched / type-migrated cards before run (plus migration counts in results — see §2).
+**Pre-sync UI & Summaries (01 D6):** Type mix and migration counts are reported in the CLI output and plugin sync results modal. An interactive pre-sync confirmation dialog remains deferred beyond v1.
 
 ---
 
@@ -183,11 +183,12 @@ Do **not** pull these into the shared-pipeline + built-ins pass unless a later d
 | Source mode decorations | Later |
 | `anki_noteTypeMap` remapping UI | Later (stock names first) |
 | Sync marker “in Anki” presence checks | Later only if cheap/optimized |
+| Pre-sync interactive confirmation modal gate | Later (counts in results modal & CLI sufficient for v1) |
 | Full A1–O2 stress-matrix as **pre-merge** gate | Never (stretch / Phase 4) |
 | Intentional long preview↔sync mismatch period | **Forbidden** |
 | Basic-only `:::r`/`:::t` stopgap then unblock | **Forbidden** — ship typed/reversible with built-ins |
 
-**In v1 (do not defer):** TYP-05 multi-answer; model migration best-effort + summary; pre-sync mismatch/migration summary; behavioral CSS outcomes/types/garnish alignment via shared engine.
+**In v1 (do not defer):** TYP-05 multi-answer; model migration best-effort + summary; post-sync / CLI mismatch and migration counts; behavioral CSS outcomes/types/garnish alignment via shared engine.
 
 ---
 
