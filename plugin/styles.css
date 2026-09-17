@@ -133,6 +133,11 @@
 		var(--anki-cardblock-tint) var(--anki-cardblock-body-opacity),
 		transparent
 	);
+	--anki-cardblock-header-bg: var(--anki-card-preview-header-tint, color-mix(
+		in srgb,
+		var(--text-normal) 10%,
+		transparent
+	));
 	--anki-cardblock-paint: var(--anki-cardblock-bg);
 	background: var(--anki-cardblock-paint);
 	border-left: 2px solid var(--anki-cardblock-border-color);
@@ -142,6 +147,11 @@
 	--anki-cardblock-tint: var(--background-modifier-hover);
 	--anki-cardblock-body-opacity: 38%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
+	--anki-cardblock-header-bg: var(--anki-card-preview-header-tint, color-mix(
+		in srgb,
+		var(--text-normal) 10%,
+		transparent
+	));
 }
 
 .anki-card-envelope--warn {
@@ -152,18 +162,33 @@
 		var(--color-yellow, #d29922) 55%,
 		var(--background-modifier-border)
 	);
+	--anki-cardblock-header-bg: color-mix(
+		in srgb,
+		var(--color-yellow, #d29922) 14%,
+		transparent
+	);
 }
 
 .anki-card-envelope--skip {
 	--anki-cardblock-tint: var(--background-modifier-hover);
 	--anki-cardblock-body-opacity: 19%;
 	--anki-cardblock-border-color: var(--background-modifier-border);
+	--anki-cardblock-header-bg: color-mix(
+		in srgb,
+		var(--text-normal) 7%,
+		transparent
+	);
 }
 
 .anki-card-envelope--error {
 	--anki-cardblock-tint: var(--color-red, #f85149);
 	--anki-cardblock-body-opacity: 14%;
 	--anki-cardblock-border-color: var(--color-red, #f85149);
+	--anki-cardblock-header-bg: color-mix(
+		in srgb,
+		var(--color-red, #f85149) 14%,
+		transparent
+	);
 }
 
 /*
@@ -180,11 +205,7 @@
 	pointer-events: none;
 	border-top-left-radius: 4px;
 	border-top-right-radius: 4px;
-	background: color-mix(
-		in srgb,
-		var(--anki-cardblock-tint) 14%,
-		transparent
-	);
+	background: var(--anki-cardblock-header-bg);
 }
 
 .anki-card-envelope-header--divided {
@@ -211,6 +232,7 @@
 	--anki-card-preview-inter-card-gap: 0.28em;
 	--anki-card-preview-section-top-extend: calc(0.5 * 1lh);
 	--anki-card-preview-block-bleed-x: 8px;
+	--anki-card-preview-header-tint: color-mix(in srgb, var(--text-normal) 10%, transparent);
 	/* Card badge size — override in a snippet or here while tuning */
 	--anki-card-preview-badge-font-size: 0.8em;
 	--anki-card-preview-badge-padding: 0.02em 0.28em;
