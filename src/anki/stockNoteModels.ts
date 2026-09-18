@@ -159,7 +159,8 @@ export type SyncNoteModelPlan =
   | {
       kind: "custom";
       noteTypeId: string;
-      notImplementedMessage: string;
+      modelName: string;
+      fields: AnkiNoteFields;
     }
   | {
       kind: "fallback";
@@ -169,13 +170,13 @@ export type SyncNoteModelPlan =
 
 /**
  * Resolve Anki model + fields from cardSyntax `resolvedType`.
- * Custom types are identified but not synced (Phase 3).
  */
 export function planNoteModelForResolvedType(
   resolvedType: ResolvedCardType | undefined,
   frontHtml: string,
   backHtml: string,
   fallbackModelName: string,
+  customFields?: Record<string, string>,
 ): SyncNoteModelPlan {
   if (!resolvedType) {
     return {
@@ -189,7 +190,8 @@ export function planNoteModelForResolvedType(
     return {
       kind: "custom",
       noteTypeId: resolvedType.noteTypeId,
-      notImplementedMessage: `Custom note type "${resolvedType.noteTypeId}" sync is not yet implemented`,
+      modelName: resolvedType.noteTypeId,
+      fields: customFields ?? {},
     };
   }
 
@@ -203,4 +205,48 @@ export function planNoteModelForResolvedType(
       backHtml,
     ),
   };
+}
+
+/**
+ * Normalizes author-written custom field names to the canonical field casing
+ * of the Anki note model (CUS-06 / case-insensitive mapping).
+ */
+export function canonicalizeCustomFieldMap(
+  customFields: Record<string, string>,
+  knownModelFields?: string[],
+): Record<string, string> {
+  if (!knownModelFields || knownModelFields.length === 0) {
+    return { ...customFields };
+  }
+
+  const lookup = new Map<string, string>();
+  for (const name of knownModelFields) {
+    lookup.set(name.toLowerCase(), name);
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    const canonicalKey = lookup.get(key.toLowerCase()) ?? key;
+    result[canonicalKey] = value;
+  }
+  return result;
+}
+
+/**
+ * Queries AnkiConnect for all available note types and their field names.
+ */
+export async function fetchNoteTypeFieldMap(
+  client: import("./client").AnkiConnectClient,
+): Promise<Record<string, string[]>> {
+  const modelNames = await client.modelNames();
+  const map: Record<string, string[]> = {};
+  for (const modelName of modelNames) {
+    try {
+      const fields = await client.modelFieldNames(modelName);
+      map[modelName] = fields;
+    } catch (error) {
+      console.warn(`Unable to fetch fields for note type "${modelName}"`, error);
+    }
+  }
+  return map;
 }

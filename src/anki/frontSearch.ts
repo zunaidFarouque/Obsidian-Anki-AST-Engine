@@ -249,13 +249,25 @@ export function buildFrontDuplicateSearchQuery(
   );
 }
 
+export function getNoteFrontValue(note: NoteInfo): string {
+  if (note.fields.Front?.value !== undefined) {
+    return note.fields.Front.value;
+  }
+  if (note.fields.Text?.value !== undefined) {
+    return note.fields.Text.value;
+  }
+  const entries = Object.values(note.fields);
+  const sortField = entries.find((f) => f.order === 0) ?? entries[0];
+  return sortField?.value ?? "";
+}
+
 function pickSingleFrontMatch(
   notes: NoteInfo[],
   frontHtml: string,
   deck: string,
 ): NoteInfo | undefined {
   const matches = notes.filter((note) =>
-    frontsMatchForRecovery(note.fields.Front?.value ?? "", frontHtml),
+    frontsMatchForRecovery(getNoteFrontValue(note), frontHtml),
   );
 
   if (matches.length === 1) {

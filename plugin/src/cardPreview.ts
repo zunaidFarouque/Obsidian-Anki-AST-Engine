@@ -80,6 +80,10 @@ export class CardPreviewManager {
 		return result;
 	}
 
+	getNoteTypeFieldMap(): Record<string, string[]> {
+		return this.noteTypeFieldNamesByNoteType;
+	}
+
 	parseContent(content: string, file?: TFile): ParseCardDocumentResult {
 		const sourcePath = file?.path ?? '__ephemeral__';
 		const cacheKey = `${computeContentCacheKey(

@@ -320,6 +320,16 @@ function resolveCard(
     stripTrailingSectionSeparators(extracted.backNodes),
   );
 
+  const customFields =
+    extracted.fields.length > 0
+      ? extracted.fields.map((f) => ({
+          name: f.name.trim(),
+          nodes: stripTrailingAuthoringNodes(
+            stripTrailingSectionSeparators(f.nodes),
+          ),
+        }))
+      : undefined;
+
   const range = cardRange(cardHeading, bodyNodes, rawText.length);
   const primaryDelimiter = extracted.regions.delimiters[0];
 
@@ -329,6 +339,23 @@ function resolveCard(
     extractAnkiId(bodyNodes);
 
   let injectionOffset = ankiId ? undefined : getInjectionOffset(backNodes);
+  if (
+    injectionOffset === undefined &&
+    !ankiId &&
+    customFields &&
+    customFields.length > 0
+  ) {
+    const lastField = customFields[customFields.length - 1];
+    if (lastField && lastField.nodes.length > 0) {
+      injectionOffset = getInjectionOffset(lastField.nodes);
+    } else {
+      const lastDelimiter =
+        extracted.regions.delimiters[extracted.regions.delimiters.length - 1];
+      if (lastDelimiter) {
+        injectionOffset = lastDelimiter.range.end;
+      }
+    }
+  }
   if (injectionOffset === undefined && !ankiId && primaryDelimiter) {
     injectionOffset = primaryDelimiter.range.end;
   }
@@ -357,6 +384,7 @@ function resolveCard(
     sectionDepths,
     injectionOffset,
     clozeTokens: clozeResult?.tokens,
+    customFields,
   };
 }
 

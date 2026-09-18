@@ -13,7 +13,7 @@ import { batchInjectIdsIntoFile, buildInjectionPlan, mergeInjectionMetadata } fr
 import { parseMarkdown } from "./ast/processor";
 import { graftTransclusions } from "./ast/transclusionGraft";
 import { collectResolvedMediaPaths, resolveMedia } from "./ast/mediaResolver";
-import { compileCardFields } from "./ast/cardCompiler";
+import { compileCardFields, compileCustomCardFields } from "./ast/cardCompiler";
 import { parseCardDocument } from "./cardSyntax/parseCardDocument";
 import {
   collectPreviewWarnings,
@@ -34,7 +34,11 @@ import {
   type CardSyncPayload,
   type TypeMigrationInfo,
 } from "./anki/syncEngine";
-import { planNoteModelForResolvedType } from "./anki/stockNoteModels";
+import {
+  planNoteModelForResolvedType,
+  canonicalizeCustomFieldMap,
+  fetchNoteTypeFieldMap,
+} from "./anki/stockNoteModels";
 import { normalizeSyncFieldHtml } from "./anki/frontSearch";
 import {
   cardExclusionKey,
@@ -117,6 +121,8 @@ export type SyncOptions = {
   onProgress?: (event: SyncProgressEvent) => void;
   /** Full-vault orphan detection (requires AnkiConnect). Skipped when `files` is set. */
   detectOrphans?: boolean;
+  /** Pre-fetched / cached note type field names map to avoid redundant AnkiConnect queries. */
+  noteTypeFieldNamesByNoteType?: Record<string, string[]>;
 };
 
 export type SyncRunResult = {
@@ -423,6 +429,15 @@ export async function runSync(
     syncContext = createSyncRunContext(client, config);
   }
 
+  let noteTypeFieldNamesByNoteType = options.noteTypeFieldNamesByNoteType;
+  if (!noteTypeFieldNamesByNoteType && client) {
+    try {
+      noteTypeFieldNamesByNoteType = await fetchNoteTypeFieldMap(client);
+    } catch {
+      noteTypeFieldNamesByNoteType = {};
+    }
+  }
+
   options.onProgress?.({ phase: "media", message: "Preparing media…" });
 
   const phase1MediaEntries = await collectVaultMediaPaths(
@@ -467,7 +482,7 @@ export async function runSync(
       includeParentHeadersAsTags,
       inferClozeFromManualSyntaxOnBasic:
         config.inferClozeFromManualSyntaxOnBasic,
-      noteTypeFieldNamesByNoteType: {},
+      noteTypeFieldNamesByNoteType: noteTypeFieldNamesByNoteType ?? {},
       ast,
     };
     const sourceCards = parseCardDocument(rawText, parseDocOptions).cards;
@@ -513,11 +528,53 @@ export async function runSync(
       trackVaultBoundUuid(vaultBoundUuids, card.ankiId);
       trackVaultBoundUuid(vaultBoundUuids, injectionPlan?.uuid);
       const inheritedFootnoteDefs = footnoteScopeIndex?.resolveForCard(card);
-      const { frontHtml, backHtml } = compileCardFields(
-        card.frontNodes,
-        card.backNodes,
-        { inheritedFootnoteDefs },
-      );
+
+      let frontHtml: string;
+      let backHtml: string;
+      let customFieldsMap: Record<string, string> | undefined;
+
+      if (card.resolvedType.kind === "custom") {
+        const rawCustomFields =
+          card.customFields && card.customFields.length > 0
+            ? compileCustomCardFields(card.customFields, {
+                inheritedFootnoteDefs,
+              })
+            : {};
+        const knownModelFields =
+          noteTypeFieldNamesByNoteType?.[card.resolvedType.noteTypeId];
+        customFieldsMap = canonicalizeCustomFieldMap(
+          rawCustomFields,
+          knownModelFields,
+        );
+
+        if (card.customFields && card.customFields.length > 0) {
+          const firstFieldKey = card.customFields[0].name;
+          frontHtml = rawCustomFields[firstFieldKey] || `<p>${card.title}</p>`;
+          const remainingVals: string[] = [];
+          const seenKeys = new Set<string>([firstFieldKey]);
+          for (let i = 1; i < card.customFields.length; i++) {
+            const name = card.customFields[i].name;
+            if (!seenKeys.has(name)) {
+              seenKeys.add(name);
+              if (rawCustomFields[name]) {
+                remainingVals.push(rawCustomFields[name]);
+              }
+            }
+          }
+          backHtml = remainingVals.join("<hr>\n");
+        } else {
+          frontHtml = `<p>${card.title}</p>`;
+          backHtml = "";
+        }
+      } else {
+        const compiled = compileCardFields(
+          card.frontNodes,
+          card.backNodes,
+          { inheritedFootnoteDefs },
+        );
+        frontHtml = compiled.frontHtml;
+        backHtml = compiled.backHtml;
+      }
 
       const previewOutcome = effectiveCardOutcome(card);
       const previewWarnings = collectPreviewWarnings(card);
@@ -526,20 +583,17 @@ export async function runSync(
         frontHtml,
         backHtml,
         config.noteModelName,
+        customFieldsMap,
       );
-      const customNotImplemented = notePlan.kind === "custom";
       const writeBlocked =
-        (previewOutcome !== undefined && !isAnkiWriteAllowed(previewOutcome)) ||
-        customNotImplemented;
+        previewOutcome !== undefined && !isAnkiWriteAllowed(previewOutcome);
       const previewSkipReason:
         | "preview_skip"
         | "preview_error"
         | undefined = writeBlocked
-        ? customNotImplemented
-          ? "preview_skip"
-          : previewOutcome === "error"
-            ? "preview_error"
-            : "preview_skip"
+        ? previewOutcome === "error"
+          ? "preview_error"
+          : "preview_skip"
         : undefined;
 
       const exclusionKey = cardExclusionKey(
@@ -556,10 +610,7 @@ export async function runSync(
             ? "update"
             : "add";
 
-      const mergedPreviewWarnings = [
-        ...(previewWarnings ?? []),
-        ...(customNotImplemented ? [notePlan.notImplementedMessage] : []),
-      ];
+      const mergedPreviewWarnings = previewWarnings ?? [];
 
       const fileAction: SyncAction = {
         action: plannedAction,
@@ -590,17 +641,13 @@ export async function runSync(
           mergedPreviewWarnings.length > 0
             ? mergedPreviewWarnings
             : undefined,
-        syncError: customNotImplemented
-          ? notePlan.notImplementedMessage
-          : undefined,
         resolvedType:
           notePlan.kind === "custom"
             ? "custom"
             : notePlan.kind === "builtin"
               ? notePlan.builtinType
               : "basic",
-        modelName:
-          notePlan.kind === "custom" ? undefined : notePlan.modelName,
+        modelName: notePlan.modelName,
       };
       fileActions.push(fileAction);
 
@@ -614,10 +661,6 @@ export async function runSync(
       });
 
       if (isExcluded || writeBlocked) {
-        continue;
-      }
-
-      if (customNotImplemented) {
         continue;
       }
 

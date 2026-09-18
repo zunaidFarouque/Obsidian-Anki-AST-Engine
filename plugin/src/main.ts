@@ -165,6 +165,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		return this.getSyncOrchestrator().then((module) =>
 			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
 				dryRun: false,
+				noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
 			}),
 		);
 	}
@@ -173,6 +174,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		return this.getSyncOrchestrator().then((module) =>
 			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
 				dryRun: true,
+				noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
 			}),
 		);
 	}
@@ -183,7 +185,10 @@ export default class AnkiAstSyncPlugin extends Plugin {
 				this.app,
 				this.settings,
 				() => this.createAnkiClient(),
-				{ dryRun: true },
+				{
+					dryRun: true,
+					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+				},
 			),
 		);
 	}
@@ -194,7 +199,10 @@ export default class AnkiAstSyncPlugin extends Plugin {
 				this.app,
 				this.settings,
 				() => this.createAnkiClient(),
-				{ dryRun: false },
+				{
+					dryRun: false,
+					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+				},
 			),
 		);
 	}

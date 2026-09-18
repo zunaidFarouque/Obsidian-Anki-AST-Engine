@@ -213,6 +213,10 @@ export class AnkiConnectClient {
     return this.invoke<string[]>("modelNames");
   }
 
+  async modelFieldNames(modelName: string): Promise<string[]> {
+    return this.invoke<string[]>("modelFieldNames", { modelName });
+  }
+
   async createModel(params: CreateModelParams): Promise<null> {
     return this.invoke<null>("createModel", {
       modelName: params.modelName,

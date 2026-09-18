@@ -74,6 +74,7 @@ export interface ResolvedCard {
   sectionDepths: Map<number, string>;
   injectionOffset?: number;
   clozeTokens?: import("./clozeProcessor").ProcessedClozeToken[];
+  customFields?: Array<{ name: string; nodes: Content[] }>;
 }
 
 export interface FileDefaults {

@@ -3,6 +3,7 @@ import {
   buildKeywordSearchQueries,
   findNoteByFrontInDeck,
   frontsMatchForRecovery,
+  getNoteFrontValue,
 } from "./frontSearch";
 import { normalizeAnkiTagPath, normalizeAnkiTagSegment } from "./tagNormalize";
 
@@ -43,7 +44,7 @@ function pickSingleRelinkMatch(
   deck: string,
 ): NoteInfo | undefined {
   const frontMatches = notes.filter((note) =>
-    frontsMatchForRecovery(note.fields.Front?.value ?? "", frontHtml),
+    frontsMatchForRecovery(getNoteFrontValue(note), frontHtml),
   );
 
   if (frontMatches.length === 1) {

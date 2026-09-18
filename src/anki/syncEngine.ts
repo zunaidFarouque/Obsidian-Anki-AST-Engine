@@ -601,17 +601,26 @@ async function ensureModelsForPrepared(
   context: SyncRunContext,
   prepared: PreparedCardItem[],
   config: SyncEngineConfig,
-): Promise<void> {
+): Promise<Map<string, string>> {
   const modelNames = new Set(
     prepared.map((entry) =>
       resolvePayloadModelName(entry.item.payload, config),
     ),
   );
+  const errors = new Map<string, string>();
   await Promise.all(
-    [...modelNames].map((modelName) =>
-      context.modelEnsurer.ensureModel(modelName),
-    ),
+    [...modelNames].map(async (modelName) => {
+      try {
+        await context.modelEnsurer.ensureModel(modelName);
+      } catch (error) {
+        errors.set(
+          modelName,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }),
   );
+  return errors;
 }
 
 async function batchResolveExistingNoteIds(
@@ -852,26 +861,32 @@ async function syncFileCardsBatched(
   const results: CardSyncResult[] = new Array(items.length);
   let existingByIndex: Map<number, number | undefined>;
 
-  try {
-    await ensureModelsForPrepared(context, prepared, config);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    for (let index = 0; index < items.length; index += 1) {
-      results[index] = { action: "skip", error: message };
+  const modelErrors = await ensureModelsForPrepared(context, prepared, config);
+  const validPrepared: PreparedCardItem[] = [];
+  for (const entry of prepared) {
+    const modelName = resolvePayloadModelName(entry.item.payload, config);
+    const modelError = modelErrors.get(modelName);
+    if (modelError) {
+      results[entry.index] = { action: "skip", error: modelError };
+    } else {
+      validPrepared.push(entry);
     }
+  }
+
+  if (validPrepared.length === 0) {
     return { results, injections: [] };
   }
 
   try {
     existingByIndex = await batchResolveExistingNoteIds(
       client,
-      prepared,
+      validPrepared,
       config,
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    for (let index = 0; index < items.length; index += 1) {
-      results[index] = { action: "skip", error: message };
+    for (const entry of validPrepared) {
+      results[entry.index] = { action: "skip", error: message };
     }
     return { results, injections: [] };
   }
@@ -879,7 +894,7 @@ async function syncFileCardsBatched(
   const updates: Array<{ prepared: PreparedCardItem; noteId: number }> = [];
   const preparedAdds: PreparedCardItem[] = [];
 
-  for (const entry of prepared) {
+  for (const entry of validPrepared) {
     const existingNoteId = existingByIndex.get(entry.index);
     if (existingNoteId === undefined) {
       preparedAdds.push(entry);

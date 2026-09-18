@@ -7,6 +7,7 @@ import { unified } from "unified";
 import type { FootnoteEmbedRef } from "./remarkFootnoteEmbed";
 import {
   buildFootnoteEmbedContext,
+  buildMultiFieldFootnoteEmbedContext,
   prepareFootnoteRoot,
 } from "./remarkFootnoteEmbed";
 import { remarkObsidianCallout } from "./remarkObsidianCallout";
@@ -182,14 +183,18 @@ function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
   return result;
 }
 
+function cleanFieldNodes(nodes: Content[]): Content[] {
+  return hoistSingleChildMediaParagraphs(
+    stripMathHastAliases(
+      stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(nodes)),
+    ),
+  );
+}
+
 export function compileCardField(nodes: Content[]): string {
   return compileRoot({
     type: "root",
-    children: hoistSingleChildMediaParagraphs(
-      stripMathHastAliases(
-        stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(nodes)),
-      ),
-    ),
+    children: cleanFieldNodes(nodes),
   });
 }
 
@@ -202,16 +207,8 @@ export function compileCardFields(
   backNodes: Content[],
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
-  const strippedFront = hoistSingleChildMediaParagraphs(
-    stripMathHastAliases(
-      stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(frontNodes)),
-    ),
-  );
-  const strippedBack = hoistSingleChildMediaParagraphs(
-    stripMathHastAliases(
-      stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(backNodes)),
-    ),
-  );
+  const strippedFront = cleanFieldNodes(frontNodes);
+  const strippedBack = cleanFieldNodes(backNodes);
   const context = buildFootnoteEmbedContext(strippedFront, strippedBack, {
     inheritedDefs: options.inheritedFootnoteDefs,
   });
@@ -224,4 +221,37 @@ export function compileCardFields(
       prepareFootnoteRoot(strippedBack, context, { appendFooterFor: "back" }),
     ),
   };
+}
+
+export function compileCustomCardFields(
+  fields: Array<{ name: string; nodes: Content[] }>,
+  options: CompileCardFieldsOptions = {},
+): Record<string, string> {
+  const cleanedFields = fields.map((f) => ({
+    name: f.name.trim(),
+    nodes: cleanFieldNodes(f.nodes),
+  }));
+
+  const { context, fieldOrders } = buildMultiFieldFootnoteEmbedContext(
+    cleanedFields.map((f) => f.nodes),
+    { inheritedDefs: options.inheritedFootnoteDefs },
+  );
+
+  const result: Record<string, string> = {};
+
+  for (let i = 0; i < cleanedFields.length; i += 1) {
+    const field = cleanedFields[i]!;
+    const fieldOrder = fieldOrders[i] ?? [];
+    const html = compileRoot(
+      prepareFootnoteRoot(field.nodes, context, { appendFooterOrder: fieldOrder }),
+    );
+
+    if (result[field.name] !== undefined) {
+      result[field.name] = `${result[field.name]}<br>\n${html}`;
+    } else {
+      result[field.name] = html;
+    }
+  }
+
+  return result;
 }

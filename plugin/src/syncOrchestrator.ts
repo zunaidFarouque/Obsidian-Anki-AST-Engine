@@ -30,6 +30,7 @@ export type RunSyncFlowOptions = {
 	files?: string[];
 	/** Full-vault duplicate preflight before live sync. Default true for live sync. */
 	vaultWidePreflight?: boolean;
+	noteTypeFieldNamesByNoteType?: Record<string, string[]>;
 };
 
 function isVaultCollisionWarning(warning: DuplicateWarning): boolean {
@@ -155,6 +156,7 @@ export async function runSyncFlow(
 					files: options.files,
 					detectOrphans,
 					ankiClient: dryRunClient,
+					noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
 					onProgress: createProgressHandler(notice, true),
 				},
 			);
@@ -180,6 +182,7 @@ export async function runSyncFlow(
 				dryRun: true,
 				vault,
 				detectOrphans: false,
+				noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
 				onProgress: createProgressHandler(notice, true, true),
 			});
 			const vaultCollisions = preflight.duplicateWarnings.filter(
@@ -213,6 +216,7 @@ export async function runSyncFlow(
 				ankiClient: client,
 				excludeCardKeys,
 				detectOrphans,
+				noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
 				onProgress: createProgressHandler(notice, false),
 			},
 		);
@@ -278,7 +282,7 @@ export async function runSyncFlowForActiveFile(
 	app: App,
 	settings: AnkiAstSyncSettings,
 	createAnkiClient: () => AnkiConnectClient,
-	options: Pick<RunSyncFlowOptions, 'dryRun'>,
+	options: Pick<RunSyncFlowOptions, 'dryRun' | 'noteTypeFieldNamesByNoteType'>,
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile || activeFile.extension !== 'md') {
@@ -307,5 +311,6 @@ export async function runSyncFlowForActiveFile(
 		dryRun: options.dryRun,
 		files: [vaultPath],
 		vaultWidePreflight: options.dryRun ? false : true,
+		noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
 	});
 }
