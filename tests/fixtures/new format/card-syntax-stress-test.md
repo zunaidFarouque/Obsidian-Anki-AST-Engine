@@ -9,7 +9,7 @@ includeParentHeadersAsTags: true
 <!--
 CARD SYNTAX STRESS-TEST CHECKLIST
 Spec: Docs/DECIDING/Card-Syntax-Spec.md
-Engine: not wired yet — expect comments document intended outcomes only.
+Engine: wired and tested (Phases 1-3 complete).
 
 Section A  Basic baseline
   A1  Basic OK with user tag              -> sync

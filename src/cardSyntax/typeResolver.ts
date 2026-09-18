@@ -1,3 +1,8 @@
+import {
+  resolveCustomLayoutMapping,
+  type CustomLayoutMap,
+} from "./types";
+
 export type BuiltinCardType = "basic" | "cloze" | "reversible" | "typed";
 
 export interface HeadingTypeDeclaration {
@@ -14,12 +19,14 @@ export interface TypeResolverContext {
   /** Card body content before the first structural delimiter. */
   textRegion: string;
   hasFieldBlocks: boolean;
+  hasPlainSplit?: boolean;
   hasReversibleDelimiter: boolean;
   hasTypedDelimiter: boolean;
   frontmatter?: {
     anki_cardDefault?: BuiltinCardType;
     anki_customCardDefault?: string;
   };
+  customLayoutMap?: CustomLayoutMap;
   inferClozeFromManualSyntaxOnBasic?: boolean;
 }
 
@@ -116,7 +123,12 @@ export function resolveCardType(context: TypeResolverContext): ResolvedCardType 
   }
 
   const customDefault = context.frontmatter?.anki_customCardDefault;
-  if (context.hasFieldBlocks && customDefault) {
+  const hasLayoutRemap =
+    Boolean(customDefault) &&
+    resolveCustomLayoutMapping(context.customLayoutMap, customDefault!) !==
+      undefined;
+
+  if (customDefault && (context.hasFieldBlocks || hasLayoutRemap)) {
     return {
       kind: "custom",
       noteTypeId: customDefault,

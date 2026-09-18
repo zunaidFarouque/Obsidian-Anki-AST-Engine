@@ -20,7 +20,7 @@ import {
   effectiveCardOutcome,
   isAnkiWriteAllowed,
 } from "./cardSyntax/syncEligibility";
-import type { ResolvedCard, SyncOutcome } from "./cardSyntax/types";
+import type { CustomLayoutMap, ResolvedCard, SyncOutcome } from "./cardSyntax/types";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
@@ -123,7 +123,10 @@ export type SyncOptions = {
   detectOrphans?: boolean;
   /** Pre-fetched / cached note type field names map to avoid redundant AnkiConnect queries. */
   noteTypeFieldNamesByNoteType?: Record<string, string[]>;
+  customLayoutMap?: CustomLayoutMap;
 };
+
+export type SyncPipelineOptions = SyncOptions;
 
 export type SyncRunResult = {
   actions: SyncAction[];
@@ -483,6 +486,7 @@ export async function runSync(
       inferClozeFromManualSyntaxOnBasic:
         config.inferClozeFromManualSyntaxOnBasic,
       noteTypeFieldNamesByNoteType: noteTypeFieldNamesByNoteType ?? {},
+      customLayoutMap: options.customLayoutMap,
       ast,
     };
     const sourceCards = parseCardDocument(rawText, parseDocOptions).cards;

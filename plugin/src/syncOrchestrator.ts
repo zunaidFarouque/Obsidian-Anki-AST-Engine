@@ -157,6 +157,7 @@ export async function runSyncFlow(
 					detectOrphans,
 					ankiClient: dryRunClient,
 					noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
+					customLayoutMap: settings.customLayoutMap,
 					onProgress: createProgressHandler(notice, true),
 				},
 			);
@@ -183,6 +184,7 @@ export async function runSyncFlow(
 				vault,
 				detectOrphans: false,
 				noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
+				customLayoutMap: settings.customLayoutMap,
 				onProgress: createProgressHandler(notice, true, true),
 			});
 			const vaultCollisions = preflight.duplicateWarnings.filter(
@@ -217,6 +219,7 @@ export async function runSyncFlow(
 				excludeCardKeys,
 				detectOrphans,
 				noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
+				customLayoutMap: settings.customLayoutMap,
 				onProgress: createProgressHandler(notice, false),
 			},
 		);

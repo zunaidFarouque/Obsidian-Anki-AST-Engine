@@ -144,6 +144,7 @@ export class CardPreviewManager {
 			),
 			bodyStartOffset: inlineFrontmatter ? getBodyStartOffset(content) : 0,
 			noteTypeFieldNamesByNoteType: this.noteTypeFieldNamesByNoteType,
+			customLayoutMap: settings.customLayoutMap,
 			externalFrontmatter: inlineFrontmatter ? undefined : effectiveFrontmatter,
 		};
 	}

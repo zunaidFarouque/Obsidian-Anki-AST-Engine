@@ -1,4 +1,8 @@
 import { processClozeDeletions } from "./clozeProcessor";
+import {
+  resolveCustomLayoutMapping,
+  type CustomLayoutMap,
+} from "./types";
 
 export type BuiltInCardType = "basic" | "cloze" | "reversible" | "typed";
 
@@ -28,6 +32,7 @@ export interface LayoutValidatorOptions {
   inferClozeFromManualSyntaxOnBasic?: boolean;
   /** True when a custom note type default is set but the card resolved to a builtin type. */
   customNoteTypeDefaultAvailable?: boolean;
+  customLayoutMap?: CustomLayoutMap;
 }
 
 export type LayoutOutcome = "sync" | "skip" | "error";
@@ -404,6 +409,37 @@ function validateCustomLayout(
   }
 
   if (regions.hasPlainSplit && regions.fieldBlocks.length === 0) {
+    const mapping = resolveCustomLayoutMapping(
+      options.customLayoutMap,
+      resolvedType.noteTypeId,
+    );
+    if (mapping) {
+      if (resolvedType.fieldNames.length > 0) {
+        const knownFields = new Map(
+          resolvedType.fieldNames.map((name) => [name.toLowerCase(), name]),
+        );
+        if (!knownFields.has(mapping.front.toLowerCase())) {
+          pushMessage(
+            messages,
+            "error",
+            "CUS-02",
+            `Card "${title}": unknown field "${mapping.front}"; note type "${resolvedType.noteTypeId}" has: ${resolvedType.fieldNames.join(", ")}`,
+          );
+          return { outcome: "error", messages };
+        }
+        if (!knownFields.has(mapping.back.toLowerCase())) {
+          pushMessage(
+            messages,
+            "error",
+            "CUS-02",
+            `Card "${title}": unknown field "${mapping.back}"; note type "${resolvedType.noteTypeId}" has: ${resolvedType.fieldNames.join(", ")}`,
+          );
+          return { outcome: "error", messages };
+        }
+      }
+      return { outcome: "sync", messages };
+    }
+
     pushMessage(
       messages,
       "error",

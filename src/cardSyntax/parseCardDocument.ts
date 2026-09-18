@@ -42,7 +42,9 @@ import {
   customCardType,
   mergeSyncOutcomes,
   DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS,
+  resolveCustomLayoutMapping,
   type CardMessage,
+  type CustomLayoutMap,
   type FileDefaults,
   type ParseCardDocumentOptions,
   type ParseCardDocumentResult,
@@ -173,17 +175,24 @@ function resolveCard(
     ),
   );
 
+  const effectiveCustomLayoutMap: CustomLayoutMap = {
+    ...(options.customLayoutMap ?? {}),
+    ...(fileDefaults.customLayoutMap ?? {}),
+  };
+
   const resolved = resolveCardType({
     cardHeading: cardHeadingDecl,
     ancestors: ancestorDecls,
     textRegion: layoutRegions.textRegion,
     hasFieldBlocks: layoutRegions.fieldBlocks.length > 0,
+    hasPlainSplit: layoutRegions.hasPlainSplit,
     hasReversibleDelimiter: layoutRegions.hasReversibleDelimiter,
     hasTypedDelimiter: layoutRegions.hasTypedDelimiter,
     frontmatter: {
       anki_cardDefault: fileDefaults.builtInDefault,
       anki_customCardDefault: fileDefaults.customNoteTypeDefault,
     },
+    customLayoutMap: effectiveCustomLayoutMap,
     inferClozeFromManualSyntaxOnBasic:
       options.inferClozeFromManualSyntaxOnBasic,
   });
@@ -202,6 +211,7 @@ function resolveCard(
     inferClozeFromManualSyntaxOnBasic:
       options.inferClozeFromManualSyntaxOnBasic,
     customNoteTypeDefaultAvailable: fileDefaults.customNoteTypeDefault !== undefined,
+    customLayoutMap: effectiveCustomLayoutMap,
   });
 
   messages.push(...layoutMessagesToCardMessages(layoutResult.messages));
@@ -320,7 +330,7 @@ function resolveCard(
     stripTrailingSectionSeparators(extracted.backNodes),
   );
 
-  const customFields =
+  let customFields =
     extracted.fields.length > 0
       ? extracted.fields.map((f) => ({
           name: f.name.trim(),
@@ -329,6 +339,31 @@ function resolveCard(
           ),
         }))
       : undefined;
+
+  if (
+    layoutType.kind === "custom" &&
+    layoutRegions.hasPlainSplit &&
+    (!customFields || customFields.length === 0)
+  ) {
+    const mapping = resolveCustomLayoutMapping(
+      effectiveCustomLayoutMap,
+      layoutType.noteTypeId,
+    );
+    if (mapping) {
+      const mappedFront =
+        layoutType.fieldNames.find(
+          (f) => f.toLowerCase() === mapping.front.toLowerCase(),
+        ) ?? mapping.front;
+      const mappedBack =
+        layoutType.fieldNames.find(
+          (f) => f.toLowerCase() === mapping.back.toLowerCase(),
+        ) ?? mapping.back;
+      customFields = [
+        { name: mappedFront, nodes: frontNodes },
+        { name: mappedBack, nodes: backNodes },
+      ];
+    }
+  }
 
   const range = cardRange(cardHeading, bodyNodes, rawText.length);
   const primaryDelimiter = extracted.regions.delimiters[0];
@@ -754,5 +789,6 @@ function fileDefaultsFromFrontmatter(frontmatter: Frontmatter | null): FileDefau
   return {
     builtInDefault: resolved.builtIn ?? undefined,
     customNoteTypeDefault: resolved.custom ?? undefined,
+    customLayoutMap: resolved.customLayoutMap ?? undefined,
   };
 }

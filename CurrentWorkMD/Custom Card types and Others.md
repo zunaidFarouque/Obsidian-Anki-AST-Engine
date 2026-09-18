@@ -44,7 +44,7 @@ includeParentHeadersAsTags: true
    After rebuild: sync YES Cloze + inject `<!--anki-id-->` via front injectionOffset.
    Do NOT add empty `:::` to “fix” uuid / inject failures — that hides the bug.
 
- PHASE 3 DEFERRED — custom `#anki/noteType/…` → see tiny appendix at end only.
+ PHASE 3 IMPLEMENTED — custom `#anki/noteType/…` note types are now implemented and supported.
 -->
 
 # Built-In Card Types — Manual Stress Test
@@ -509,25 +509,25 @@ Mitochondria.
 
 ---
 
-## Appendix — Phase 3 deferred (custom only)
+## Appendix — Phase 3 (custom note types)
 
-> Custom `#anki/noteType/…` cards may preview as sync|skip|error but **never write to Anki** in v1. Not the focus of this note.
+> Custom `#anki/noteType/…` cards are supported in Phase 3. Notes sync to Anki using the resolved custom model (e.g. Vocab) and field mapping.
 
 ### Vocabulary appendix #anki/noteType/Vocab
 
-#### [STRESS-Custom-A1] Identify only no Anki write
+#### [STRESS-Custom-A1] Custom note type Vocab write
 
 ::: Word
 STRESS-Custom-A1 entropy
 
 ::: Definition
-Custom field layout — sync not implemented (Phase 3).
+Custom field layout mapped to Word and Definition fields.
 
 <!-- expect:
   preview: sync — custom Vocab
-  anki: NO — custom not implemented; never silent Basic
+  anki: YES model="Vocab" fields=Word,Definition
   rules: CUS-01, CUS-06
-  check: Sync results message like Custom note type "Vocab" sync is not yet implemented; no new Anki note
+  check: Anki note created under Vocab model with Word and Definition fields; browser search "STRESS-Custom-A1"
 -->
 
 #### [STRESS-Custom-A2] Custom skip no field blocks
@@ -578,7 +578,7 @@ STRESS-Custom-A2 prose under Vocab section with no ::: Field blocks.
 | Infer-01 | inferCloze ON → Cloze | sync* | YES Cloze* | ☐ |
 | Conf-01 | basic + `:::r` BAS-06 | error | NO | ☐ |
 | Migrate-01 | Basic→cloze mismatch drill† | — | block / summary | ☐ |
-| Custom-A1 | Custom identify only | sync | NO (Phase 3) | ☐ |
+| Custom-A1 | Custom identify only | sync | YES Vocab | ☐ |
 | Custom-A2 | Custom skip | skip | NO | ☐ |
 
 \* Re-check with `inferClozeFromManualSyntaxOnBasic` toggled; must match Basic-06.  
@@ -587,11 +587,11 @@ STRESS-Custom-A2 prose under Vocab section with no ::: Field blocks.
 
 ---
 
-## Quick reference — outcome → Anki (Phase 2c)
+## Quick reference — outcome → Anki (Phase 3)
 
 | Preview | Built-in stock models | Custom `#anki/noteType/…` |
 |---------|----------------------|----------------------------|
-| **sync** | Write resolved stock model | Identify only — **NO write** |
-| **warn** | Write + surface warnings | N/A (still no custom write) |
+| **sync** | Write resolved stock model | Write resolved custom model (CUS-01..CUS-06) |
+| **warn** | Write + surface warnings | Write + surface warnings |
 | **skip** | Hard-block | Hard-block |
 | **error** | Hard-block | Hard-block |

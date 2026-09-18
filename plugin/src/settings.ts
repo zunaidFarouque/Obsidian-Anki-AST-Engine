@@ -30,6 +30,7 @@ export interface AnkiAstSyncSettings {
 	/** Untinted gap before a card that follows another card. CSS: --anki-card-preview-inter-card-gap. */
 	cardPreviewInterCardGapEm: number;
 	inferClozeFromManualSyntaxOnBasic: boolean;
+	customLayoutMap: Record<string, [string, string]>;
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -57,6 +58,7 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	cardPreviewSectionTopExtend: 0.5,
 	cardPreviewInterCardGapEm: 0.28,
 	inferClozeFromManualSyntaxOnBasic: false,
+	customLayoutMap: {},
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {

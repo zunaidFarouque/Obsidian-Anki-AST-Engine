@@ -77,9 +77,16 @@ export interface ResolvedCard {
   customFields?: Array<{ name: string; nodes: Content[] }>;
 }
 
+export type CustomLayoutFieldMapping =
+  | [string, string]
+  | { front: string; back: string };
+
+export type CustomLayoutMap = Record<string, CustomLayoutFieldMapping>;
+
 export interface FileDefaults {
   builtInDefault?: BuiltInCardType;
   customNoteTypeDefault?: string;
+  customLayoutMap?: CustomLayoutMap;
 }
 
 export interface ParseCardDocumentOptions {
@@ -92,6 +99,7 @@ export interface ParseCardDocumentOptions {
   /** Obsidian Properties / metadata when the editor body omits the YAML block. */
   externalFrontmatter?: import("../io/frontmatterFilter").Frontmatter | null;
   ast?: Root;
+  customLayoutMap?: CustomLayoutMap;
 }
 
 export const DEFAULT_PARSE_CARD_DOCUMENT_OPTIONS: ParseCardDocumentOptions = {
@@ -176,3 +184,53 @@ export function isEngineHashtag(tag: string): boolean {
     normalized.startsWith("#anki/") || normalized.startsWith("#anki_card_")
   );
 }
+
+export function resolveCustomLayoutMapping(
+  map: CustomLayoutMap | undefined,
+  noteTypeId: string,
+): { front: string; back: string } | undefined {
+  if (!map || !noteTypeId) {
+    return undefined;
+  }
+
+  let entry: CustomLayoutFieldMapping | undefined = map[noteTypeId];
+  if (!entry) {
+    const targetLower = noteTypeId.toLowerCase();
+    for (const [key, val] of Object.entries(map)) {
+      if (key.toLowerCase() === targetLower) {
+        entry = val;
+        break;
+      }
+    }
+  }
+
+  if (!entry && map["*"]) {
+    entry = map["*"];
+  }
+
+  if (!entry) {
+    return undefined;
+  }
+
+  if (Array.isArray(entry)) {
+    if (entry.length >= 2) {
+      const front = String(entry[0]).trim();
+      const back = String(entry[1]).trim();
+      if (front.length > 0 && back.length > 0) {
+        return { front, back };
+      }
+    }
+    return undefined;
+  }
+
+  if (typeof entry === "object" && entry !== null) {
+    const front = typeof entry.front === "string" ? entry.front.trim() : "";
+    const back = typeof entry.back === "string" ? entry.back.trim() : "";
+    if (front.length > 0 && back.length > 0) {
+      return { front, back };
+    }
+  }
+
+  return undefined;
+}
+

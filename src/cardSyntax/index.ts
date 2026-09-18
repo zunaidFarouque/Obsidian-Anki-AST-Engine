@@ -31,6 +31,8 @@ export {
   parseCustomCardDefault,
   parseAnkiCardDefaultFromFrontmatter,
   parseAnkiCustomCardDefaultFromFrontmatter,
+  parseCustomLayoutMap,
+  parseAnkiCustomLayoutMapFromFrontmatter,
   effectiveBuiltInDefaultFm04,
   effectiveCustomNoteTypeFm04,
   customDefaultAppliesRes04,
