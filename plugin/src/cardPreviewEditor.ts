@@ -18,6 +18,7 @@ import {
 	buildClozeTokenDecorations,
 	buildDelimiterLineDecorations,
 	buildHeadingBadgeModel,
+	extractDocumentLines,
 	findCardHeadingLinePositions,
 	findLineRangeForOffset,
 	formatCardPreviewTooltip,
@@ -218,11 +219,24 @@ function findCoveredLineStarts(
 	startOffset: number,
 	endOffsetExclusive: number,
 ): number[] {
-	const starts: number[] = [];
-	for (const line of lines) {
-		if (line.from < startOffset) {
-			continue;
+	if (lines.length === 0) {
+		return [];
+	}
+	let low = 0;
+	let high = lines.length - 1;
+	let firstIdx = lines.length;
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		if (lines[mid]!.from >= startOffset) {
+			firstIdx = mid;
+			high = mid - 1;
+		} else {
+			low = mid + 1;
 		}
+	}
+	const starts: number[] = [];
+	for (let i = firstIdx; i < lines.length; i += 1) {
+		const line = lines[i]!;
 		if (line.from >= endOffsetExclusive) {
 			break;
 		}
@@ -254,13 +268,8 @@ export function buildCardPreviewDecorations(
 
 	const headingLevel = options.getCardDeclarationHeadingLevel(content, file);
 	const bodyStartOffset = getBodyStartOffset(content);
-	const lines = [];
+	const lines = extractDocumentLines(content);
 	const doc = view.state.doc;
-
-	for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber += 1) {
-		const line = doc.line(lineNumber);
-		lines.push({ from: line.from, to: line.to, text: line.text });
-	}
 
 	const headingPositions = findCardHeadingLinePositions(
 		lines,

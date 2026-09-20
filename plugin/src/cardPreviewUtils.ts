@@ -268,15 +268,52 @@ export function buildHeadingBadgeModel(card: ResolvedCard): HeadingBadgeModel {
 	};
 }
 
+export function extractDocumentLines(content: string): DocumentLine[] {
+	const lines: DocumentLine[] = [];
+	let start = 0;
+	const len = content.length;
+	while (start <= len) {
+		const nextNewline = content.indexOf('\n', start);
+		if (nextNewline === -1) {
+			const text = content.slice(start);
+			lines.push({ from: start, to: start + text.length, text });
+			break;
+		}
+		let lineEnd = nextNewline;
+		if (lineEnd > start && content.charCodeAt(lineEnd - 1) === 13) {
+			// CRLF: strip \r
+			const text = content.slice(start, lineEnd - 1);
+			lines.push({ from: start, to: start + text.length, text });
+		} else {
+			const text = content.slice(start, lineEnd);
+			lines.push({ from: start, to: lineEnd, text });
+		}
+		start = nextNewline + 1;
+	}
+	return lines;
+}
+
 export function findLineRangeForOffset(
 	lines: DocumentLine[],
 	offset: number,
 ): CardHeadingLinePosition | undefined {
-	const line = lines.find((entry) => offset >= entry.from && offset <= entry.to);
-	if (!line) {
+	if (lines.length === 0) {
 		return undefined;
 	}
-	return { from: line.from, to: line.to };
+	let low = 0;
+	let high = lines.length - 1;
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		const line = lines[mid]!;
+		if (offset < line.from) {
+			high = mid - 1;
+		} else if (offset > line.to) {
+			low = mid + 1;
+		} else {
+			return { from: line.from, to: line.to };
+		}
+	}
+	return undefined;
 }
 
 export function findCardHeadingLinePositions(

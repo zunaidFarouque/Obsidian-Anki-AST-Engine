@@ -6,17 +6,19 @@ import {
 	type ViewUpdate,
 	Direction,
 } from '@codemirror/view';
-import type { SyncOutcome } from 'obsidian-anki-ast-engine/cardSyntax';
+import type { ResolvedCard, SyncOutcome } from 'obsidian-anki-ast-engine/cardSyntax';
 import { getBodyStartOffset } from 'obsidian-anki-ast-engine/cardSyntax';
 import type { CardPreviewEditorOptions } from './cardPreviewEditor';
 import { refreshPreviewEffect } from './cardPreviewEditor';
 import {
 	buildHeadingBadgeModel,
+	extractDocumentLines,
 	findCardHeadingLinePositions,
 	mapCardsToHeadingLines,
 	resolveCardBlockEndOffset,
 	resolveEditorFile,
 	resolveLivePreviewMode,
+	type CardHeadingLinePosition,
 	type DocumentLine,
 } from './cardPreviewUtils';
 import { cardFollowsSectionHeading } from './cardPreviewLayout';
@@ -117,6 +119,16 @@ function safeLineBlockAt(
 	return { top: 0, bottom: defaultHeight, height: defaultHeight };
 }
 
+interface CachedEnvelopeParse {
+	file: unknown;
+	settingsRevision: number;
+	headingLevel: number;
+	lines: DocumentLine[];
+	pairs: Array<{ card: ResolvedCard; heading: CardHeadingLinePosition }>;
+}
+
+const envelopeDocParseCache = new WeakMap<object, CachedEnvelopeParse>();
+
 export function calculateCardEnvelopeMarkers(
 	view: EditorView,
 	options: CardPreviewEditorOptions,
@@ -130,33 +142,58 @@ export function calculateCardEnvelopeMarkers(
 		return [];
 	}
 
+	const docObj =
+		typeof view.state?.doc === 'object' && view.state.doc !== null
+			? (view.state.doc as object)
+			: null;
 	const file = resolveEditorFile(view, options.editorInfoField);
-	const content = view.state.doc.toString();
-	const result = options.parseContent(content, file);
-	if (!result.syncEligible || result.cards.length === 0) {
+	const settingsRevision = options.getSettingsRevision();
+
+	let cached = docObj ? envelopeDocParseCache.get(docObj) : undefined;
+	if (
+		!cached ||
+		cached.file !== file ||
+		cached.settingsRevision !== settingsRevision
+	) {
+		const content = view.state.doc.toString();
+		const result = options.parseContent(content, file);
+		if (!result.syncEligible || result.cards.length === 0) {
+			cached = {
+				file,
+				settingsRevision,
+				headingLevel: 0,
+				lines: [],
+				pairs: [],
+			};
+		} else {
+			const headingLevel = options.getCardDeclarationHeadingLevel(content, file);
+			const bodyStartOffset = getBodyStartOffset(content);
+			const lines = extractDocumentLines(content);
+			const headingPositions = findCardHeadingLinePositions(
+				lines,
+				headingLevel,
+				bodyStartOffset,
+			);
+			const pairs = mapCardsToHeadingLines(result.cards, lines, headingLevel, headingPositions);
+			cached = {
+				file,
+				settingsRevision,
+				headingLevel,
+				lines,
+				pairs,
+			};
+		}
+		if (docObj) {
+			envelopeDocParseCache.set(docObj, cached);
+		}
+	}
+
+	if (cached.pairs.length === 0) {
 		return [];
 	}
 
-	const headingLevel = options.getCardDeclarationHeadingLevel(content, file);
-	const bodyStartOffset = getBodyStartOffset(content);
+	const { headingLevel, lines, pairs } = cached;
 	const doc = view.state.doc;
-	const lines: DocumentLine[] = [];
-
-	for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber += 1) {
-		const line = doc.line(lineNumber);
-		lines.push({ from: line.from, to: line.to, text: line.text });
-	}
-
-	const headingPositions = findCardHeadingLinePositions(
-		lines,
-		headingLevel,
-		bodyStartOffset,
-	);
-	const pairs = mapCardsToHeadingLines(result.cards, lines, headingLevel, headingPositions);
-	if (pairs.length === 0) {
-		return [];
-	}
-
 	const viewport = view.viewport ?? { from: 0, to: doc.length };
 	const previewSettings = options.getSettings();
 	const sectionTopExtend = previewSettings.cardPreviewSectionTopExtend ?? 0;
@@ -288,7 +325,12 @@ export function createCardPreviewLayer(options: CardPreviewEditorOptions): Exten
 				return true;
 			}
 
-			if (update.viewportChanged) {
+			// If preview is disabled or not in live preview, skip viewport/geometry updates
+			if (!options.getSettings().enableCardPreview || !currentLivePreview) {
+				return false;
+			}
+
+			if (update.viewportChanged || update.geometryChanged) {
 				return true;
 			}
 

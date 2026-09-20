@@ -5,6 +5,8 @@ import {
 	buildDelimiterLineDecorations,
 	buildHeadingBadgeModel,
 	computeContentCacheKey,
+	extractDocumentLines,
+	findLineRangeForOffset,
 	formatCardPreviewTooltip,
 	formatProblemForHeadingContext,
 	frontmatterFromObsidianMetadata,
@@ -485,5 +487,68 @@ describe('cardPreviewUtils', () => {
 				editorFileChanged: false,
 			}),
 		).toBe(false);
+	});
+
+	describe('extractDocumentLines', () => {
+		test('handles empty document', () => {
+			const lines = extractDocumentLines('');
+			expect(lines).toEqual([{ from: 0, to: 0, text: '' }]);
+		});
+
+		test('handles single line without newline', () => {
+			const lines = extractDocumentLines('hello world');
+			expect(lines).toEqual([{ from: 0, to: 11, text: 'hello world' }]);
+		});
+
+		test('handles LF newlines accurately', () => {
+			const lines = extractDocumentLines('first\nsecond line\nthird');
+			expect(lines).toEqual([
+				{ from: 0, to: 5, text: 'first' },
+				{ from: 6, to: 17, text: 'second line' },
+				{ from: 18, to: 23, text: 'third' },
+			]);
+		});
+
+		test('handles CRLF newlines without including CR in text', () => {
+			const lines = extractDocumentLines('first\r\nsecond\r\nthird');
+			expect(lines).toEqual([
+				{ from: 0, to: 5, text: 'first' },
+				{ from: 7, to: 13, text: 'second' },
+				{ from: 15, to: 20, text: 'third' },
+			]);
+		});
+
+		test('handles trailing newline by producing empty final line', () => {
+			const lines = extractDocumentLines('abc\n');
+			expect(lines).toEqual([
+				{ from: 0, to: 3, text: 'abc' },
+				{ from: 4, to: 4, text: '' },
+			]);
+		});
+	});
+
+	describe('findLineRangeForOffset binary search', () => {
+		const lines = [
+			{ from: 0, to: 5, text: 'line0' },
+			{ from: 6, to: 12, text: 'line01' },
+			{ from: 13, to: 20, text: 'line002' },
+		];
+
+		test('finds exact offsets inside lines', () => {
+			expect(findLineRangeForOffset(lines, 0)).toEqual({ from: 0, to: 5 });
+			expect(findLineRangeForOffset(lines, 3)).toEqual({ from: 0, to: 5 });
+			expect(findLineRangeForOffset(lines, 5)).toEqual({ from: 0, to: 5 });
+			expect(findLineRangeForOffset(lines, 6)).toEqual({ from: 6, to: 12 });
+			expect(findLineRangeForOffset(lines, 20)).toEqual({ from: 13, to: 20 });
+		});
+
+		test('returns undefined for offsets out of bounds or on newline', () => {
+			expect(findLineRangeForOffset(lines, -1)).toBeUndefined();
+			expect(findLineRangeForOffset(lines, 25)).toBeUndefined();
+		});
+
+		test('handles empty lines array', () => {
+			expect(findLineRangeForOffset([], 5)).toBeUndefined();
+		});
 	});
 });

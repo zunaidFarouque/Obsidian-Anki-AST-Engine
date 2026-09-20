@@ -457,6 +457,70 @@ describe('calculateCardEnvelopeMarkers', () => {
 		// heading line height is 20 + sectionTopExtend (0.5 * 20 = 10) = 30
 		expect(marker.headingHeight).toBe(30);
 	});
+
+	test('caches parsed card models across viewport changes when doc is unchanged', () => {
+		const livePreviewField = StateField.define<boolean>({
+			create: () => true,
+			update: (value) => value,
+		});
+		const doc = ['#### Card 1', 'Front 1', ':::', 'Back 1', '', '#### Card 2', 'Front 2', ':::', 'Back 2'].join('\n');
+		const state = EditorState.create({ doc, extensions: [livePreviewField] });
+		let parseCount = 0;
+		const card2Start = doc.indexOf('#### Card 2');
+		const view = {
+			state,
+			scrollDOM: {
+				getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600 }),
+				scrollLeft: 0,
+				scrollTop: 0,
+				clientWidth: 800,
+			},
+			contentDOM: {
+				getBoundingClientRect: () => ({ left: 50, top: 20, width: 700, right: 750, bottom: 500 }),
+			},
+			defaultLineHeight: 24,
+			viewport: { from: 0, to: card2Start - 1 },
+		} as unknown as EditorView;
+
+		const options = {
+			getSettings: () =>
+				({
+					enableCardPreview: true,
+					cardPreviewSectionTopExtend: 0,
+					cardPreviewInterCardGapEm: 0,
+				}) as any,
+			parseContent: () => {
+				parseCount += 1;
+				return {
+					syncEligible: true,
+					cards: [
+						makeCard({ title: 'Card 1', range: { start: 0, end: card2Start - 1 } }),
+						makeCard({ title: 'Card 2', range: { start: card2Start, end: doc.length } }),
+					],
+				} as any;
+			},
+			getCardDeclarationHeadingLevel: () => 4,
+			getSettingsRevision: () => 0,
+			editorLivePreviewField: livePreviewField as any,
+		};
+
+		// First call (viewport only covers Card 1)
+		const markers1 = calculateCardEnvelopeMarkers(view, options);
+		expect(markers1).toHaveLength(1);
+		expect(parseCount).toBe(1);
+
+		// Second call (scrolled viewport covers Card 2) on identical doc
+		(view as any).viewport = { from: card2Start, to: doc.length };
+		const markers2 = calculateCardEnvelopeMarkers(view, options);
+		expect(markers2).toHaveLength(1);
+		expect(parseCount).toBe(1); // parseContent should NOT have been re-invoked on scroll!
+
+		// When doc changes to a new state
+		const nextState = EditorState.create({ doc: doc + '\n', extensions: [livePreviewField] });
+		(view as any).state = nextState;
+		const markers3 = calculateCardEnvelopeMarkers(view, options);
+		expect(parseCount).toBe(2); // re-parsed on doc change
+	});
 });
 
 describe('createCardPreviewLayer', () => {
