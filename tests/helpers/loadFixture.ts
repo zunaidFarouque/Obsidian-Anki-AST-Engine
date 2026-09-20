@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 const STRESS_TEST_FIXTURE = join(
   import.meta.dir,
-  "../../tests/fixtures/new format/card-syntax-stress-test.md",
+  "../fixtures/new format/card-syntax-stress-test.md",
 );
 
 const ORPHAN_CUSTOM_FIXTURE = join(
   import.meta.dir,
-  "../../tests/fixtures/new format/card-syntax-orphan-custom.md",
+  "../fixtures/new format/card-syntax-orphan-custom.md",
 );
 
 export async function loadCardSyntaxStressTest(): Promise<string> {

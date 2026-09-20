@@ -27,6 +27,21 @@ function createMockClient(overrides: Partial<AnkiConnectClient> = {}): AnkiConne
             if (action.action === "findNotes") {
               return findNotesImpl(action.params?.query as string);
             }
+            if (action.action === "updateNoteFields") {
+              const note = action.params?.note as { id: number; fields: Record<string, string> };
+              if (overrides.updateNoteFields) {
+                return overrides.updateNoteFields(note.id, note.fields);
+              }
+              return null;
+            }
+            if (action.action === "updateNoteTags") {
+              const noteId = action.params?.note as number;
+              const tags = action.params?.tags as string[];
+              if (overrides.updateNoteTags) {
+                return overrides.updateNoteTags(noteId, tags);
+              }
+              return null;
+            }
             throw new Error(`unsupported multi action ${action.action}`);
           }),
         )),
@@ -728,8 +743,22 @@ describe("syncEngine", () => {
   test("syncFileCards updates existing cards concurrently", async () => {
     let inFlight = 0;
     let maxInFlight = 0;
-    const client = createMockClient({
-      invokeMulti: async () => [[99], [100], [101]],
+    let client: AnkiConnectClient;
+    client = createMockClient({
+      invokeMulti: async (actions) => {
+        if (actions[0]?.action === "findNotes") {
+          return [[99], [100], [101]];
+        }
+        for (const action of actions) {
+          if (action.action === "updateNoteFields") {
+            await client.updateNoteFields(
+              (action.params?.note as any).id,
+              (action.params?.note as any).fields,
+            );
+          }
+        }
+        return actions.map(() => null) as any;
+      },
       notesInfo: async (ids) =>
         ids.map((noteId) => ({
           noteId,
@@ -890,5 +919,46 @@ describe("syncEngine — Phase 2c model migration", () => {
     });
     expect(result.error).toContain("Cloze");
     expect(result.modelMismatchWarning).toBeDefined();
+  });
+
+  test("batches field and tag updates into invokeMulti when both change", async () => {
+    const multiActions: any[] = [];
+    const client = createMockClient({
+      findNotes: async () => [503],
+      notesInfo: async () => [
+        {
+          noteId: 503,
+          modelName: "Basic",
+          tags: ["old-tag"],
+          fields: {
+            Front: { value: "<p>Old front</p>", order: 0 },
+            Back: { value: "<p>Old back</p>", order: 1 },
+          },
+        },
+      ],
+      invokeMulti: async (actions) => {
+        multiActions.push(...actions);
+        return actions.map(() => null) as any;
+      },
+    });
+
+    const result = await syncCard(
+      client,
+      {
+        deck: "Test::Deck",
+        tag: "CS101::Entropy",
+        frontHtml: "<p>New front</p>",
+        backHtml: "<p>New back</p>",
+        modelName: "Basic",
+        fields: { Front: "<p>New front</p>", Back: "<p>New back</p>" },
+        ankiId: "uuid-both-change",
+      },
+      baseConfig,
+    );
+
+    expect(result.action).toBe("update");
+    expect(multiActions).toHaveLength(2);
+    expect(multiActions[0].action).toBe("updateNoteFields");
+    expect(multiActions[1].action).toBe("updateNoteTags");
   });
 });

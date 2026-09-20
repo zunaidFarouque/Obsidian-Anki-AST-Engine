@@ -309,6 +309,18 @@ async function updateExistingNote(
     return "skip";
   }
 
+  if (needsFieldUpdate && needsTagUpdate && typeof client.invokeMulti === "function") {
+    try {
+      await client.invokeMulti([
+        { action: "updateNoteFields", params: { note: { id: noteId, fields } } },
+        { action: "updateNoteTags", params: { note: noteId, tags } },
+      ]);
+      return "update";
+    } catch {
+      // Fallback to separate calls if invokeMulti fails
+    }
+  }
+
   if (needsFieldUpdate) {
     await client.updateNoteFields(noteId, fields);
   }

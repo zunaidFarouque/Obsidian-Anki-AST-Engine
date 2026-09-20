@@ -1,7 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { resolve as nodeResolve } from "node:path";
 import { runExclusive } from "../utils/mutexMap";
-import type { ExtractedCard } from "../parser/stateMachine";
 import type { VaultAdapter } from "./vaultAdapter";
 
 export type InjectionPlan = {

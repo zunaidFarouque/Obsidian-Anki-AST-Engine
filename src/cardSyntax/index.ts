@@ -81,7 +81,3 @@ export {
   collectPreviewWarnings,
 } from "./syncEligibility";
 export { getBodyStartOffset } from "../io/frontmatterFilter";
-export {
-  loadCardSyntaxStressTest,
-  stressTestFixturePath,
-} from "./loadFixture";

@@ -8,7 +8,7 @@ import {
 import { builtinCardType, type ResolvedCard } from '../../src/cardSyntax/types';
 import { parseCardDocument } from '../../src/cardSyntax/parseCardDocument';
 import { getBodyStartOffset } from '../../src/io/frontmatterFilter';
-import { loadCardSyntaxStressTest } from '../../src/cardSyntax/loadFixture';
+import { loadCardSyntaxStressTest } from '../helpers/loadFixture';
 
 function makeCard(overrides: Partial<ResolvedCard> = {}): ResolvedCard {
 	return {

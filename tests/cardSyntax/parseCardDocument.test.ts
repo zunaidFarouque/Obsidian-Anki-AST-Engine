@@ -5,7 +5,7 @@ import {
   formatResolvedCardType,
 } from "../../src/cardSyntax/types";
 import { parseCardDocument } from "../../src/cardSyntax/parseCardDocument";
-import { loadCardSyntaxStressTest } from "../../src/cardSyntax/loadFixture";
+import { loadCardSyntaxStressTest } from "../helpers/loadFixture";
 
 const SYNC_HEADER = `---
 AnkiSync: on
