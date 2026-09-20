@@ -18,6 +18,11 @@ Living reference for post–Step 1 plugin work. Step 1 (vault adapter + live syn
 - Unified sync results modal with clickable failures, duplicates, and media warnings
 - Settings for `noteModelName` and `syncTagPrefix`
 - Fixture id-free integrity test guarding parser regression fixtures
+- Authoring helper commands: `create-new-anki-note`, `toggle-anki-sync-current-note`, `set-target-deck-current-note`
+- Card templates: `insert-card-template-picker`, `insert-card-basic`, `insert-card-reversible`, `insert-card-typed`, `insert-card-cloze`, plus dynamic custom note types
+- In-editor cloze authoring: `wrap-selection-cloze` with automatic index incrementation (`c1` → `c2` → `c3`)
+- Card navigation & inspection: `jump-to-next-card`, `jump-to-previous-card`, `jump-to-next-problem-card` (AST syntax issue jumper), and `open-card-in-anki` (browse in Anki Desktop)
+- Full command reference and documentation: [`Docs/Plugin-Helper-Commands.md`](Plugin-Helper-Commands.md)
 
 **Still thin**
 

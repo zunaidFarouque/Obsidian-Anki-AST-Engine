@@ -11,6 +11,22 @@ import {
 import { reloadPlugin, reloadPluginCss } from './devReload';
 import type { CardPreviewManager } from './cardPreview';
 import { removeAnkiSyncCommentsFromActiveNote } from './commentCleaner';
+import {
+	createNewAnkiNote,
+	setTargetDeckForActiveNote,
+	toggleAnkiSyncForActiveNote,
+} from './helpers/noteHelpers';
+import {
+	insertCardTemplate,
+	openCardTemplatePicker,
+	wrapSelectionWithCloze,
+} from './helpers/cardTemplates';
+import {
+	jumpToNextCard,
+	jumpToNextProblemCard,
+	jumpToPreviousCard,
+	openActiveCardInAnki,
+} from './navigation/cardNavigation';
 
 type SyncOrchestratorModule = typeof import('./syncOrchestrator');
 
@@ -73,6 +89,137 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Remove all Anki sync comments from current Obsidian note',
 			callback: () => {
 				void removeAnkiSyncCommentsFromActiveNote(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: 'create-new-anki-note',
+			name: 'Create new Anki note',
+			callback: () => {
+				void createNewAnkiNote(this.app, this.settings);
+			},
+		});
+
+		this.addCommand({
+			id: 'toggle-anki-sync-current-note',
+			name: 'Toggle Anki sync for current note',
+			callback: () => {
+				void toggleAnkiSyncForActiveNote(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: 'set-target-deck-current-note',
+			name: 'Set target Anki deck for current note',
+			callback: () => {
+				void setTargetDeckForActiveNote(this.app, () => this.createAnkiClient());
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-card-template-picker',
+			name: 'Insert card template...',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				openCardTemplatePicker(
+					this.app,
+					editor,
+					this.settings,
+					this.cardPreview?.getNoteTypeFieldMap(),
+				);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-card-basic',
+			name: 'Insert basic card at cursor',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				insertCardTemplate(this.app, editor, this.settings, 'basic');
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-card-reversible',
+			name: 'Insert reversible card at cursor',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				insertCardTemplate(this.app, editor, this.settings, 'reversible');
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-card-typed',
+			name: 'Insert typed card at cursor',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				insertCardTemplate(this.app, editor, this.settings, 'typed');
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'insert-card-cloze',
+			name: 'Insert cloze card at cursor',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				insertCardTemplate(this.app, editor, this.settings, 'cloze');
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'wrap-selection-cloze',
+			name: 'Wrap selection as cloze deletion',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				wrapSelectionWithCloze(this.app, editor, this.settings);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'jump-to-next-card',
+			name: 'Jump to next card in note',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				jumpToNextCard(this.app, editor, this.settings);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'jump-to-previous-card',
+			name: 'Jump to previous card in note',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				jumpToPreviousCard(this.app, editor, this.settings);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'jump-to-next-problem-card',
+			name: 'Jump to next card with sync issue (warning/error)',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				jumpToNextProblemCard(this.app, editor, this.settings);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: 'open-card-in-anki',
+			name: 'Open current card in Anki Desktop',
+			editorCheckCallback: (checking, editor) => {
+				if (checking) return !!editor;
+				void openActiveCardInAnki(this.app, editor, this.settings, () =>
+					this.createAnkiClient(),
+				);
+				return true;
 			},
 		});
 

@@ -46,10 +46,21 @@ The plugin calls AnkiConnect from the browser. Add your Obsidian origin to `webC
 
 - **Check AnkiConnect connection** — verifies Anki is reachable.
 - **Sync vault to Anki** — live sync via the AST engine (base64 media, ID injection).
-- **Reload CSS** — re-read `styles.css` from disk without restarting Obsidian (use after CSS-only changes).
+- **Dry-run sync vault to Anki** / **Dry-run sync current note to Anki** — simulate sync and preview Anki actions without modifying files.
+- **Sync current note to Anki** — scoped single-file live sync.
+- **Create new Anki note** — create a new note pre-populated with `AnkiSync: on` and starter card.
+- **Toggle Anki sync for current note** — enable/disable Anki sync in frontmatter.
+- **Set target Anki deck for current note** — choose target deck via fuzzy suggester.
+- **Insert card template...** — modal picker for Basic, Reversible, Typed, Cloze, and custom note types.
+- **Insert basic / reversible / typed / cloze card at cursor** — instant hotkey-friendly card skeletons.
+- **Wrap selection as cloze deletion** — wrap text in `{{cN::...}}` with intelligent auto-incrementing.
+- **Jump to next / previous card in note** — rapid navigation between card headings.
+- **Jump to next card with sync issue** — jump directly to cards with syntax warnings/errors.
+- **Open current card in Anki Desktop** — find and browse active card in Anki Desktop.
+- **Reload CSS** — re-read `styles.css` from disk without restarting Obsidian.
 - **Reload plugin** — disable and re-enable this plugin to pick up a new `main.js` build.
 
-Planned features (dry-run, sync current file, results modal, etc.): [Docs/Plugin-Roadmap.md](../Docs/Plugin-Roadmap.md).
+Detailed command reference and recommended hotkeys: [Docs/Plugin-Helper-Commands.md](../Docs/Plugin-Helper-Commands.md).
 
 ## Watch mode
 

@@ -31,6 +31,16 @@ export interface AnkiAstSyncSettings {
 	cardPreviewInterCardGapEm: number;
 	inferClozeFromManualSyntaxOnBasic: boolean;
 	customLayoutMap: Record<string, [string, string]>;
+	/** Folder path where "Create new Anki note" places new files. Empty = Obsidian default. */
+	newNoteFolder: string;
+	/** Whether to automatically insert a starter card when creating a new Anki note. */
+	newNoteInsertStarterCard: boolean;
+	/** Default target Anki deck for newly created notes. Empty = defaultAnkiDeck. */
+	newNoteDefaultDeck: string;
+	/** Auto-increment cloze index (c1, c2, c3...) within the current card. */
+	clozeAutoIncrement: boolean;
+	/** Generate shorthand cloze format ({{...}}) instead of standard ({{c1::...}}). */
+	clozeDefaultToShorthand: boolean;
 }
 
 export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
@@ -59,6 +69,11 @@ export const DEFAULT_SETTINGS: AnkiAstSyncSettings = {
 	cardPreviewInterCardGapEm: 0.28,
 	inferClozeFromManualSyntaxOnBasic: false,
 	customLayoutMap: {},
+	newNoteFolder: '',
+	newNoteInsertStarterCard: true,
+	newNoteDefaultDeck: '',
+	clozeAutoIncrement: true,
+	clozeDefaultToShorthand: false,
 };
 
 export class AnkiAstSyncSettingTab extends PluginSettingTab {
@@ -433,6 +448,70 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.orphanIgnoreTag)
 					.onChange(async (value) => {
 						this.plugin.settings.orphanIgnoreTag = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl).setName('Authoring and helper commands').setHeading();
+
+		new Setting(containerEl)
+			.setName('New note folder')
+			.setDesc('Folder where new Anki notes are created. Leave empty to use Obsidian default.')
+			.addText((text) =>
+				text
+					.setPlaceholder('Cards or notes/Anki')
+					.setValue(this.plugin.settings.newNoteFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.newNoteFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Insert starter card in new notes')
+			.setDesc('Automatically insert a basic card template when creating a new Anki note.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.newNoteInsertStarterCard)
+					.onChange(async (value) => {
+						this.plugin.settings.newNoteInsertStarterCard = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('New note default deck')
+			.setDesc('Specific deck for newly created notes. Leave empty to inherit the default Anki deck above.')
+			.addText((text) =>
+				text
+					.setPlaceholder('Default deck')
+					.setValue(this.plugin.settings.newNoteDefaultDeck)
+					.onChange(async (value) => {
+						this.plugin.settings.newNoteDefaultDeck = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Auto-increment cloze index')
+			.setDesc('When wrapping text as cloze, automatically increment the cloze number (c1, c2, c3) if previous clozes exist in the card.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.clozeAutoIncrement)
+					.onChange(async (value) => {
+						this.plugin.settings.clozeAutoIncrement = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Use shorthand cloze format')
+			.setDesc('Generate shorthand {{...}} clozes instead of standard {{c1::...}} clozes.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.clozeDefaultToShorthand)
+					.onChange(async (value) => {
+						this.plugin.settings.clozeDefaultToShorthand = value;
 						await this.plugin.saveSettings();
 					}),
 			);
