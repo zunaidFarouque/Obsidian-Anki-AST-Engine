@@ -9,7 +9,7 @@ import {
   parseLinktext,
   resolveSubpath,
 } from "../obsidian/linkResolver";
-import type { VaultFileIndex } from "../obsidian/vaultIndex";
+import type { FileCache, VaultFileIndex } from "../obsidian/vaultIndex";
 import {
   getMediaKind,
   resolveAttachmentPath,
@@ -197,7 +197,10 @@ async function resolveParsedEmbed(
 
   let grafted: Content[];
   if (parsed.subpath) {
-    const cache = context.vaultIndex.fileCaches.get(destPath);
+    let cache = context.vaultIndex.fileCaches.get(destPath);
+    if (!cache) {
+      cache = await getOrLoadFileCache(destPath, context);
+    }
     grafted = cache ? resolveSubpath(cache, parsed.subpath) ?? [] : [];
   } else {
     grafted = await loadFileNodes(destPath, context);
@@ -265,24 +268,44 @@ function resolveVaultMediaEmbed(
   return buildReplacementNodes(before, [mediaNode], after);
 }
 
-async function loadFileNodes(
+async function getOrLoadFileCache(
   destPath: string,
   context: { vaultPath: string; vaultIndex: VaultFileIndex; vault?: VaultAdapter },
-): Promise<Content[]> {
-  const cache = context.vaultIndex.fileCaches.get(destPath);
-  if (cache) {
-    return structuredClone(cache.ast.children) as Content[];
+): Promise<FileCache | undefined> {
+  const existing = context.vaultIndex.fileCaches.get(destPath);
+  if (existing) {
+    return existing;
   }
 
   try {
     const rawText = context.vault
       ? await context.vault.readText(destPath)
       : await readFile(resolvePath(context.vaultPath, destPath), "utf8");
-    const ast = parseMarkdown(stripFrontmatter(rawText), context.vaultPath);
-    return [...ast.children];
+    const body = stripFrontmatter(rawText);
+    const ast = parseMarkdown(body, context.vaultPath);
+    const cache: FileCache = {
+      path: destPath,
+      ast,
+      headings: [],
+      blocks: [],
+    };
+    context.vaultIndex.fileCaches.set(destPath, cache);
+    return cache;
   } catch {
-    return [];
+    return undefined;
   }
+}
+
+async function loadFileNodes(
+  destPath: string,
+  context: { vaultPath: string; vaultIndex: VaultFileIndex; vault?: VaultAdapter },
+): Promise<Content[]> {
+  const cache = await getOrLoadFileCache(destPath, context);
+  if (cache) {
+    return structuredClone(cache.ast.children) as Content[];
+  }
+
+  return [];
 }
 
 function buildReplacementNodes(

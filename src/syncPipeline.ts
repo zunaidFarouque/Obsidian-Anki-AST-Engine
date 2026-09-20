@@ -377,7 +377,7 @@ export async function runSync(
   clearMediaDryRunQueue();
   const vault = resolveVaultAdapter(config, options);
   const vaultPath = vault.vaultRoot;
-  const vaultIndex = await buildVaultFileIndex(vault);
+  const vaultIndex = await buildVaultFileIndex(vault, { lazy: true });
   const filePaths = filterFilePaths(
     await vault.listMarkdownFiles(config.scanFolders),
     options.files,

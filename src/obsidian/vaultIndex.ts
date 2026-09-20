@@ -119,6 +119,7 @@ export function isImageMediaPath(path: string): boolean {
 
 export async function buildVaultFileIndex(
   vaultOrPath: VaultAdapter | string,
+  options?: { lazy?: boolean },
 ): Promise<VaultFileIndex> {
   const vault =
     typeof vaultOrPath === "string"
@@ -145,6 +146,10 @@ export async function buildVaultFileIndex(
         list.push(normalized);
         byBasename.set(key, list);
       }
+    }
+
+    if (options?.lazy) {
+      continue;
     }
 
     if (!normalized.endsWith(".md")) {

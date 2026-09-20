@@ -120,4 +120,22 @@ describe("resolveAttachmentPath", () => {
     expect(resolved).toBeNull();
     await rm(root, { recursive: true, force: true });
   });
+
+  test("supports lazy indexing without eagerly parsing markdown file ASTs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "vault-lazy-"));
+    await mkdir(join(root, "notes"), { recursive: true });
+    await Bun.write(join(root, "notes", "card1.md"), "# Card 1\nFront ::: Back");
+    await Bun.write(join(root, "notes", "card2.md"), "# Card 2\nFront 2 ::: Back 2");
+
+    const eagerIndex = await buildVaultFileIndex(root, { lazy: false });
+    expect(eagerIndex.files.size).toBe(2);
+    expect(eagerIndex.fileCaches.size).toBe(2);
+
+    const lazyIndex = await buildVaultFileIndex(root, { lazy: true });
+    expect(lazyIndex.files.size).toBe(2);
+    expect(lazyIndex.byBasename.get("card1")?.length).toBe(1);
+    expect(lazyIndex.fileCaches.size).toBe(0); // Zero ASTs held in memory!
+
+    await rm(root, { recursive: true, force: true });
+  });
 });
