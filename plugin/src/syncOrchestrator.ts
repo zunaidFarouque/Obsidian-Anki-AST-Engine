@@ -313,7 +313,7 @@ export async function runSyncFlowForActiveFile(
 	await runSyncFlow(app, settings, createAnkiClient, {
 		dryRun: options.dryRun,
 		files: [vaultPath],
-		vaultWidePreflight: options.dryRun ? false : true,
+		vaultWidePreflight: false,
 		noteTypeFieldNamesByNoteType: options.noteTypeFieldNamesByNoteType,
 	});
 }

@@ -212,6 +212,13 @@ function nodesRange(nodes: Content[]): ReturnType<typeof createSourceRange> | un
     return undefined;
   }
 
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+
+  if (first?.position?.start?.offset !== undefined && last?.position?.end?.offset !== undefined) {
+    return createSourceRange(first.position.start.offset, last.position.end.offset);
+  }
+
   let start: number | undefined;
   let end: number | undefined;
 

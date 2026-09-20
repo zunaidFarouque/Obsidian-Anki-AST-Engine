@@ -71,17 +71,26 @@ export function shouldSyncFile(rawText: string): boolean {
   return shouldSync(frontmatter);
 }
 
-export function stripFrontmatter(rawText: string): string {
+export function getBodyStartOffset(rawText: string): number {
   const match = rawText.match(FRONTMATTER_REGEX);
   if (!match) {
+    return 0;
+  }
+
+  let offset = match[0].length;
+  while (offset < rawText.length && /\s/.test(rawText[offset]!)) {
+    offset += 1;
+  }
+  return offset;
+}
+
+export function stripFrontmatter(rawText: string): string {
+  const offset = getBodyStartOffset(rawText);
+  if (offset === 0) {
     return rawText;
   }
 
-  return rawText.slice(match[0].length).replace(/^\s+/, "");
-}
-
-export function getBodyStartOffset(rawText: string): number {
-  return rawText.length - stripFrontmatter(rawText).length;
+  return rawText.slice(offset);
 }
 
 export function getCardDeclarationHeadingLevel(

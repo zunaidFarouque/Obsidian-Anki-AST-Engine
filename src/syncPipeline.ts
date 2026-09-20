@@ -826,6 +826,10 @@ async function collectVaultMediaPaths(
   const entries = [];
 
   for (const { sourcePath, rawText } of eligibleFiles) {
+    if (!rawText.includes("![")) {
+      continue;
+    }
+
     const ast = parseMarkdown(rawText, vault.vaultRoot);
     const unresolvedEmbeds: string[] = [];
 

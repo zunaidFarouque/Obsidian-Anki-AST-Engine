@@ -9,6 +9,8 @@ import {
   getIncludeParentHeadersAsTags,
   getTargetAnkiDeck,
   getFileAnkiTags,
+  stripFrontmatter,
+  getBodyStartOffset,
 } from "../../src/io/frontmatterFilter";
 
 describe("frontmatterFilter", () => {
@@ -217,5 +219,35 @@ AnkiSync: on
 
 # Note`;
     expect(getFileAnkiTags(raw)).toEqual([]);
+  });
+
+  describe("getBodyStartOffset and stripFrontmatter", () => {
+    test("returns 0 and full text when no frontmatter is present", () => {
+      const raw = "# Heading\nSome content";
+      expect(getBodyStartOffset(raw)).toBe(0);
+      expect(stripFrontmatter(raw)).toBe(raw);
+    });
+
+    test("accurately calculates offset and stripped body for standard frontmatter", () => {
+      const raw = "---\nAnkiSync: on\n---\n\n# Heading\nContent";
+      const offset = getBodyStartOffset(raw);
+      expect(offset).toBe(22);
+      expect(raw.slice(offset)).toBe("# Heading\nContent");
+      expect(stripFrontmatter(raw)).toBe("# Heading\nContent");
+    });
+
+    test("accurately handles CRLF line endings", () => {
+      const raw = "---\r\nAnkiSync: on\r\n---\r\n\r\n# Heading\r\nContent";
+      const offset = getBodyStartOffset(raw);
+      expect(raw.slice(offset)).toBe("# Heading\r\nContent");
+      expect(stripFrontmatter(raw)).toBe("# Heading\r\nContent");
+    });
+
+    test("handles trailing whitespace after closing fence without extra allocations", () => {
+      const raw = "---\nAnkiSync: on\n---   \n\n\n# Body";
+      const offset = getBodyStartOffset(raw);
+      expect(raw.slice(offset)).toBe("# Body");
+      expect(stripFrontmatter(raw)).toBe("# Body");
+    });
   });
 });
