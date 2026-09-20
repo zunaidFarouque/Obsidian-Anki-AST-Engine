@@ -1,32 +1,13 @@
 import { Notice, Plugin, addIcon } from 'obsidian';
 import { ANKI_SYNC_STAR_ICON_ID, registerPluginIcons } from './icons';
-import { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
-import { formatNoteTypeCacheNotice } from './cardPreviewUtils';
+import type { AnkiConnectClient } from 'obsidian-anki-ast-engine/anki';
 import { createObsidianFetch } from './obsidianFetch';
 import {
 	AnkiAstSyncSettingTab,
 	DEFAULT_SETTINGS,
 	type AnkiAstSyncSettings,
 } from './settings';
-import { reloadPlugin, reloadPluginCss } from './devReload';
 import type { CardPreviewManager } from './cardPreview';
-import { removeAnkiSyncCommentsFromActiveNote } from './commentCleaner';
-import {
-	createNewAnkiNote,
-	setTargetDeckForActiveNote,
-	toggleAnkiSyncForActiveNote,
-} from './helpers/noteHelpers';
-import {
-	insertCardTemplate,
-	openCardTemplatePicker,
-	wrapSelectionWithCloze,
-} from './helpers/cardTemplates';
-import {
-	jumpToNextCard,
-	jumpToNextProblemCard,
-	jumpToPreviousCard,
-	openActiveCardInAnki,
-} from './navigation/cardNavigation';
 
 type SyncOrchestratorModule = typeof import('./syncOrchestrator');
 
@@ -88,7 +69,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			id: 'remove-anki-sync-comments-current-note',
 			name: 'Remove all Anki sync comments from current Obsidian note',
 			callback: () => {
-				void removeAnkiSyncCommentsFromActiveNote(this.app);
+				void import('./commentCleaner').then((m) =>
+					m.removeAnkiSyncCommentsFromActiveNote(this.app),
+				);
 			},
 		});
 
@@ -96,7 +79,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			id: 'create-new-anki-note',
 			name: 'Create new Anki note',
 			callback: () => {
-				void createNewAnkiNote(this.app, this.settings);
+				void import('./helpers/noteHelpers').then((m) =>
+					m.createNewAnkiNote(this.app, this.settings),
+				);
 			},
 		});
 
@@ -104,7 +89,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			id: 'toggle-anki-sync-current-note',
 			name: 'Toggle Anki sync for current note',
 			callback: () => {
-				void toggleAnkiSyncForActiveNote(this.app);
+				void import('./helpers/noteHelpers').then((m) =>
+					m.toggleAnkiSyncForActiveNote(this.app),
+				);
 			},
 		});
 
@@ -112,7 +99,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			id: 'set-target-deck-current-note',
 			name: 'Set target Anki deck for current note',
 			callback: () => {
-				void setTargetDeckForActiveNote(this.app, () => this.createAnkiClient());
+				void import('./helpers/noteHelpers').then((m) =>
+					m.setTargetDeckForActiveNote(this.app, () => this.createAnkiClient()),
+				);
 			},
 		});
 
@@ -121,11 +110,13 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Insert card template...',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				openCardTemplatePicker(
-					this.app,
-					editor,
-					this.settings,
-					this.cardPreview?.getNoteTypeFieldMap(),
+				void import('./helpers/cardTemplates').then((m) =>
+					m.openCardTemplatePicker(
+						this.app,
+						editor,
+						this.settings,
+						this.cardPreview?.getNoteTypeFieldMap(),
+					),
 				);
 				return true;
 			},
@@ -136,7 +127,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Insert basic card at cursor',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				insertCardTemplate(this.app, editor, this.settings, 'basic');
+				void import('./helpers/cardTemplates').then((m) =>
+					m.insertCardTemplate(this.app, editor, this.settings, 'basic'),
+				);
 				return true;
 			},
 		});
@@ -146,7 +139,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Insert reversible card at cursor',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				insertCardTemplate(this.app, editor, this.settings, 'reversible');
+				void import('./helpers/cardTemplates').then((m) =>
+					m.insertCardTemplate(this.app, editor, this.settings, 'reversible'),
+				);
 				return true;
 			},
 		});
@@ -156,7 +151,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Insert typed card at cursor',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				insertCardTemplate(this.app, editor, this.settings, 'typed');
+				void import('./helpers/cardTemplates').then((m) =>
+					m.insertCardTemplate(this.app, editor, this.settings, 'typed'),
+				);
 				return true;
 			},
 		});
@@ -166,7 +163,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Insert cloze card at cursor',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				insertCardTemplate(this.app, editor, this.settings, 'cloze');
+				void import('./helpers/cardTemplates').then((m) =>
+					m.insertCardTemplate(this.app, editor, this.settings, 'cloze'),
+				);
 				return true;
 			},
 		});
@@ -176,7 +175,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Wrap selection as cloze deletion',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				wrapSelectionWithCloze(this.app, editor, this.settings);
+				void import('./helpers/cardTemplates').then((m) =>
+					m.wrapSelectionWithCloze(this.app, editor, this.settings),
+				);
 				return true;
 			},
 		});
@@ -186,7 +187,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Jump to next card in note',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				jumpToNextCard(this.app, editor, this.settings);
+				void import('./navigation/cardNavigation').then((m) =>
+					m.jumpToNextCard(this.app, editor, this.settings),
+				);
 				return true;
 			},
 		});
@@ -196,7 +199,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Jump to previous card in note',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				jumpToPreviousCard(this.app, editor, this.settings);
+				void import('./navigation/cardNavigation').then((m) =>
+					m.jumpToPreviousCard(this.app, editor, this.settings),
+				);
 				return true;
 			},
 		});
@@ -206,7 +211,9 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Jump to next card with sync issue (warning/error)',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				jumpToNextProblemCard(this.app, editor, this.settings);
+				void import('./navigation/cardNavigation').then((m) =>
+					m.jumpToNextProblemCard(this.app, editor, this.settings),
+				);
 				return true;
 			},
 		});
@@ -216,8 +223,10 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			name: 'Open current card in Anki Desktop',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
-				void openActiveCardInAnki(this.app, editor, this.settings, () =>
-					this.createAnkiClient(),
+				void import('./navigation/cardNavigation').then((m) =>
+					m.openActiveCardInAnki(this.app, editor, this.settings, () =>
+						this.createAnkiClient(),
+					),
 				);
 				return true;
 			},
@@ -287,7 +296,8 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		this.cardPreview = undefined;
 	}
 
-	private createAnkiClient(): AnkiConnectClient {
+	private async createAnkiClient(): Promise<AnkiConnectClient> {
+		const { AnkiConnectClient } = await import('obsidian-anki-ast-engine/anki');
 		return new AnkiConnectClient({
 			url: this.settings.ankiConnectUrl,
 			apiKey: this.settings.ankiConnectApiKey || undefined,
@@ -296,7 +306,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	}
 
 	private async checkAnkiConnect(): Promise<void> {
-		const client = this.createAnkiClient();
+		const client = await this.createAnkiClient();
 
 		try {
 			const version = await client.version();
@@ -309,62 +319,69 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	}
 
 	private syncVaultToAnki(): Promise<void> {
-		return this.getSyncOrchestrator().then((module) =>
-			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
-				dryRun: false,
-				noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
-			}),
+		return Promise.all([this.getSyncOrchestrator(), this.createAnkiClient()]).then(
+			([module, client]) =>
+				module.runSyncFlow(this.app, this.settings, () => client, {
+					dryRun: false,
+					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+				}),
 		);
 	}
 
 	private dryRunSyncVaultToAnki(): Promise<void> {
-		return this.getSyncOrchestrator().then((module) =>
-			module.runSyncFlow(this.app, this.settings, () => this.createAnkiClient(), {
-				dryRun: true,
-				noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
-			}),
+		return Promise.all([this.getSyncOrchestrator(), this.createAnkiClient()]).then(
+			([module, client]) =>
+				module.runSyncFlow(this.app, this.settings, () => client, {
+					dryRun: true,
+					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+				}),
 		);
 	}
 
 	private dryRunSyncCurrentFile(): Promise<void> {
-		return this.getSyncOrchestrator().then((module) =>
-			module.runSyncFlowForActiveFile(
-				this.app,
-				this.settings,
-				() => this.createAnkiClient(),
-				{
-					dryRun: true,
-					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
-				},
-			),
+		return Promise.all([this.getSyncOrchestrator(), this.createAnkiClient()]).then(
+			([module, client]) =>
+				module.runSyncFlowForActiveFile(
+					this.app,
+					this.settings,
+					() => client,
+					{
+						dryRun: true,
+						noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+					},
+				),
 		);
 	}
 
 	private syncCurrentFileToAnki(): Promise<void> {
-		return this.getSyncOrchestrator().then((module) =>
-			module.runSyncFlowForActiveFile(
-				this.app,
-				this.settings,
-				() => this.createAnkiClient(),
-				{
-					dryRun: false,
-					noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
-				},
-			),
+		return Promise.all([this.getSyncOrchestrator(), this.createAnkiClient()]).then(
+			([module, client]) =>
+				module.runSyncFlowForActiveFile(
+					this.app,
+					this.settings,
+					() => client,
+					{
+						dryRun: false,
+						noteTypeFieldNamesByNoteType: this.cardPreview?.getNoteTypeFieldMap(),
+					},
+				),
 		);
 	}
 
 	private async reloadCss(): Promise<void> {
+		const { reloadPluginCss } = await import('./devReload');
 		const result = await reloadPluginCss(this);
 		new Notice(result.message, result.ok ? undefined : 12_000);
 	}
 
 	private async reloadSelf(): Promise<void> {
+		const { reloadPlugin } = await import('./devReload');
 		const result = await reloadPlugin(this);
 		new Notice(result.message, result.ok ? undefined : 12_000);
 	}
 
 	async refreshNoteTypeMap(): Promise<void> {
+		const { formatNoteTypeCacheNotice } = await import('./cardPreviewUtils');
 		const result =
 			(await this.cardPreview?.refreshNoteTypeMap()) ?? {
 				ok: false,
@@ -379,7 +396,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	}
 
 	private async fetchNoteTypeFieldMap(): Promise<Record<string, string[]>> {
-		const client = this.createAnkiClient();
+		const client = await this.createAnkiClient();
 		const modelNames = await client.modelNames();
 		const map: Record<string, string[]> = {};
 		for (const modelName of modelNames) {

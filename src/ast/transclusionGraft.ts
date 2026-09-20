@@ -18,7 +18,7 @@ import { createResolvedMediaNode } from "./vaultMediaNodes";
 import { stripFrontmatter } from "../io/frontmatterFilter";
 import type { VaultAdapter } from "../io/vaultAdapter";
 import { readFile } from "node:fs/promises";
-import { resolve as nodeResolve } from "node:path";
+import { resolvePath } from "../utils/pathUtils";
 
 export type GraftContext = {
   vaultPath: string;
@@ -277,7 +277,7 @@ async function loadFileNodes(
   try {
     const rawText = context.vault
       ? await context.vault.readText(destPath)
-      : await readFile(nodeResolve(context.vaultPath, destPath), "utf8");
+      : await readFile(resolvePath(context.vaultPath, destPath), "utf8");
     const ast = parseMarkdown(stripFrontmatter(rawText), context.vaultPath);
     return [...ast.children];
   } catch {

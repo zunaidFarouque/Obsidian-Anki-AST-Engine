@@ -1,5 +1,5 @@
-import { resolve as resolvePath } from "node:path";
 import type { Content, Image, Link, Paragraph, Root } from "mdast";
+import { resolvePath } from "../utils/pathUtils";
 import { isObsidianEmbed, type ObsidianEmbed } from "./obsidianLinks";
 import { formatWikilink, parseLinktext, type ParsedLinktext } from "../obsidian/linkResolver";
 import {

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import pLimit from "p-limit";
 import type { Config } from "../config/configParser";
 
@@ -10,10 +9,25 @@ const INVOKE_RETRY_BASE_MS = 50;
 const TRANSIENT_ERROR_PATTERN =
   /unable to connect|failed to fetch|network|econnreset|econnrefused|socket hang up/i;
 
-const AnkiResponseSchema = z.object({
-  result: z.unknown(),
-  error: z.union([z.string(), z.null()]),
-});
+type AnkiResponsePayload = {
+  result?: unknown;
+  error?: string | null;
+};
+
+function parseAnkiResponse(data: unknown): AnkiResponsePayload {
+  if (typeof data !== "object" || data === null || !("error" in data)) {
+    throw new AnkiConnectError("Malformed response from AnkiConnect");
+  }
+  const payload = data as AnkiResponsePayload;
+  if (
+    payload.error !== null &&
+    payload.error !== undefined &&
+    typeof payload.error !== "string"
+  ) {
+    throw new AnkiConnectError("Malformed response from AnkiConnect");
+  }
+  return payload;
+}
 
 export class AnkiConnectError extends Error {
   constructor(message: string) {
@@ -180,7 +194,7 @@ export class AnkiConnectClient {
       );
     }
 
-    const parsed = AnkiResponseSchema.parse(await response.json());
+    const parsed = parseAnkiResponse(await response.json());
     if (parsed.error) {
       throw new AnkiConnectError(parsed.error);
     }

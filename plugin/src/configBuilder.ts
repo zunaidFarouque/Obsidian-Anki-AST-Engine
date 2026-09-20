@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import { ConfigSchema, type Config } from 'obsidian-anki-ast-engine/config';
+import type { Config } from 'obsidian-anki-ast-engine/config';
 import type { AnkiAstSyncSettings } from './settings';
 import { parseScanFolders } from './scanFolders';
 
@@ -13,26 +13,26 @@ export function buildPluginConfig(
 			? adapter.getBasePath()
 			: '';
 
-	return ConfigSchema.parse({
+	return {
 		vaultPath,
-		delimiter: settings.delimiter,
+		delimiter: settings.delimiter || ':::',
 		scanFolders: parseScanFolders(settings.scanFolders),
-		defaultAnkiDeck: settings.defaultAnkiDeck,
-		defaultEngineTag: settings.defaultEngineTag,
-		ankiConnectUrl: settings.ankiConnectUrl,
+		defaultAnkiDeck: settings.defaultAnkiDeck || 'Synced from Obsidian',
+		defaultEngineTag: settings.defaultEngineTag || 'Obsidian-Anki-AST',
+		ankiConnectUrl: settings.ankiConnectUrl || 'http://127.0.0.1:8765',
 		ankiConnectApiKey: settings.ankiConnectApiKey || undefined,
-		noteModelName: settings.noteModelName,
+		noteModelName: settings.noteModelName || 'Basic',
 		noteModelType: 'basic',
-		autoCreateDecks: settings.autoCreateDecks,
-		autoCreateStockNoteModels: settings.autoCreateStockNoteModels,
+		autoCreateDecks: settings.autoCreateDecks ?? true,
+		autoCreateStockNoteModels: settings.autoCreateStockNoteModels ?? true,
 		inferClozeFromManualSyntaxOnBasic:
-			settings.inferClozeFromManualSyntaxOnBasic,
-		syncTagPrefix: settings.syncTagPrefix,
-		orphanIgnoreTag: settings.orphanIgnoreTag,
-		linkFormat: settings.linkFormat,
+			settings.inferClozeFromManualSyntaxOnBasic ?? false,
+		syncTagPrefix: settings.syncTagPrefix || 'obsidian-id',
+		orphanIgnoreTag: settings.orphanIgnoreTag || 'obsidian-sync-ignore',
+		linkFormat: settings.linkFormat || 'shortest',
 		attachmentFolder: settings.attachmentFolder || undefined,
 		defaultCardDeclarationHeadingLevel:
-			settings.defaultCardDeclarationHeadingLevel,
-		includeParentHeadersAsTags: settings.includeParentHeadersAsTags,
-	});
+			settings.defaultCardDeclarationHeadingLevel ?? 4,
+		includeParentHeadersAsTags: settings.includeParentHeadersAsTags ?? true,
+	};
 }

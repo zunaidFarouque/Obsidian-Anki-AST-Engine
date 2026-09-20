@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { parseScanFolders } from '../../plugin/src/scanFolders';
-import { ConfigSchema } from '../../src/config/configParser';
+import { buildPluginConfig } from '../../plugin/src/configBuilder';
 import type { AnkiAstSyncSettings } from '../../plugin/src/settings';
+import type { App } from 'obsidian';
 
 const baseSettings: AnkiAstSyncSettings = {
 	scanFolders: '',
@@ -28,6 +29,12 @@ const baseSettings: AnkiAstSyncSettings = {
 	cardPreviewSectionTopExtend: 0.5,
 	cardPreviewInterCardGapEm: 0.28,
 	inferClozeFromManualSyntaxOnBasic: false,
+	customLayoutMap: {},
+	newNoteFolder: '',
+	newNoteInsertStarterCard: true,
+	newNoteDefaultDeck: '',
+	clozeAutoIncrement: true,
+	clozeDefaultToShorthand: false,
 };
 
 describe('configBuilder', () => {
@@ -52,27 +59,15 @@ describe('configBuilder', () => {
 			syncTagPrefix: 'vault-card-id',
 		};
 
-		const config = ConfigSchema.parse({
-			vaultPath: 'C:/Vault',
-			delimiter: settings.delimiter,
-			scanFolders: parseScanFolders(settings.scanFolders),
-			defaultAnkiDeck: settings.defaultAnkiDeck,
-			defaultEngineTag: settings.defaultEngineTag,
-			ankiConnectUrl: settings.ankiConnectUrl,
-			ankiConnectApiKey: settings.ankiConnectApiKey || undefined,
-			noteModelName: settings.noteModelName,
-			noteModelType: 'basic',
-			autoCreateDecks: settings.autoCreateDecks,
-			autoCreateStockNoteModels: settings.autoCreateStockNoteModels,
-			inferClozeFromManualSyntaxOnBasic:
-				settings.inferClozeFromManualSyntaxOnBasic,
-			syncTagPrefix: settings.syncTagPrefix,
-			linkFormat: settings.linkFormat,
-			attachmentFolder: settings.attachmentFolder || undefined,
-			defaultCardDeclarationHeadingLevel:
-				settings.defaultCardDeclarationHeadingLevel,
-			includeParentHeadersAsTags: settings.includeParentHeadersAsTags,
-		});
+		const mockApp = {
+			vault: {
+				adapter: {
+					getBasePath: () => 'C:/Vault',
+				},
+			},
+		} as unknown as App;
+
+		const config = buildPluginConfig(mockApp, settings);
 
 		expect(config.vaultPath).toBe('C:/Vault');
 		expect(config.scanFolders).toEqual(['Notes']);

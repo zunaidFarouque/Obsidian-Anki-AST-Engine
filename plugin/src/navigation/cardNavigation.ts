@@ -124,7 +124,7 @@ export async function openActiveCardInAnki(
 	app: App,
 	editor: Editor,
 	settings: AnkiAstSyncSettings,
-	clientProvider: () => AnkiConnectClient,
+	clientProvider: () => AnkiConnectClient | Promise<AnkiConnectClient>,
 ): Promise<void> {
 	const headingLevel = getHeadingLevel(app, settings);
 	const lines = editor.getValue().split('\n');
@@ -142,7 +142,7 @@ export async function openActiveCardInAnki(
 		return;
 	}
 
-	const client = clientProvider();
+	const client = await clientProvider();
 
 	try {
 		if (ankiId.isNumeric && ankiId.noteId !== undefined) {

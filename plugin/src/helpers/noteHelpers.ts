@@ -102,7 +102,7 @@ export async function toggleAnkiSyncForActiveNote(app: App): Promise<void> {
 
 export async function setTargetDeckForActiveNote(
 	app: App,
-	clientProvider: () => AnkiConnectClient,
+	clientProvider: () => AnkiConnectClient | Promise<AnkiConnectClient>,
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile || activeFile.extension !== 'md') {
@@ -112,7 +112,7 @@ export async function setTargetDeckForActiveNote(
 
 	let decks: string[] = [];
 	try {
-		const client = clientProvider();
+		const client = await clientProvider();
 		decks = await client.deckNames();
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);

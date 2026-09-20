@@ -29,23 +29,23 @@ const context = await esbuild.context({
 	alias: {
 		'obsidian-anki-ast-engine/anki': path.join(
 			repoRoot,
-			'dist/anki/client.js',
+			'src/anki/client.ts',
 		),
 		'obsidian-anki-ast-engine/config': path.join(
 			repoRoot,
-			'dist/config/configParser.js',
+			'src/config/configParser.ts',
 		),
 		'obsidian-anki-ast-engine/sync': path.join(
 			repoRoot,
-			'dist/syncPipeline.js',
+			'src/syncPipeline.ts',
 		),
 		'obsidian-anki-ast-engine/vault': path.join(
 			repoRoot,
-			'dist/io/vaultAdapter.js',
+			'src/io/vaultAdapter.ts',
 		),
 		'obsidian-anki-ast-engine/cardSyntax': path.join(
 			repoRoot,
-			'dist/cardSyntax/pluginApi.js',
+			'src/cardSyntax/pluginApi.ts',
 		),
 		'node:fs/promises': path.join(
 			fileURLToPath(new URL('.', import.meta.url)),
@@ -54,6 +54,10 @@ const context = await esbuild.context({
 		'fast-glob': path.join(
 			fileURLToPath(new URL('.', import.meta.url)),
 			'shims/fast-glob.js',
+		),
+		'katex': path.join(
+			fileURLToPath(new URL('.', import.meta.url)),
+			'shims/katex-stub.js',
 		),
 	},
 	external: [
@@ -70,7 +74,7 @@ const context = await esbuild.context({
 		'@lezer/common',
 		'@lezer/highlight',
 		'@lezer/lr',
-		...builtinModules,
+		...builtinModules.flatMap((m) => [m, `node:${m}`]),
 	],
 	format: 'cjs',
 	target: 'es2021',
