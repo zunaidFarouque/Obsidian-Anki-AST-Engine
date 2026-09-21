@@ -73,5 +73,5 @@ export function createObsidianFetch(): typeof fetch {
 		});
 	};
 
-	return obsidianFetch;
+	return obsidianFetch as unknown as typeof fetch;
 }

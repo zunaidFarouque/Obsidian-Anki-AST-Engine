@@ -590,7 +590,10 @@ export function resolveLivePreviewMode(
 	livePreviewField?: StateField<boolean>,
 ): boolean {
 	if (livePreviewField) {
-		const fieldValue = view.state.field(livePreviewField, false);
+		const fieldValue = (view.state.field as (field: unknown, check?: boolean) => unknown)(
+			livePreviewField,
+			false,
+		);
 		if (typeof fieldValue === 'boolean') {
 			return fieldValue;
 		}
@@ -607,6 +610,10 @@ export function resolveEditorFile(
 	if (!infoField) {
 		return undefined;
 	}
-	return view.state.field(infoField, false)?.file ?? undefined;
+	const stateValue = (view.state.field as (field: unknown, check?: boolean) => unknown)(
+		infoField,
+		false,
+	) as { file: TFile | null } | undefined;
+	return stateValue?.file ?? undefined;
 }
 
