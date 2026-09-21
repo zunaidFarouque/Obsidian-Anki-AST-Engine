@@ -1,40 +1,110 @@
-# **Obsidian-Anki AST Engine 🧠⚡️**
+# Anki AST Sync 🧠⚡️
 
-A deterministic, headless Node.js synchronization pipeline bridging Obsidian and Anki.
+A deterministic, AST-powered synchronization pipeline and Obsidian plugin bridging **Obsidian** and **Anki**.
 
-Traditional sync tools rely on fragile Regular Expressions (Regex) that break when confronted with modern Markdown complexities like nested code blocks, escaped characters, and deeply linked block transclusions.
+Traditional sync tools rely on fragile Regular Expressions (Regex) that break when confronted with modern Markdown complexities like nested code blocks, escaped characters, LaTeX math, HTML tables, or block transclusions (`![[SourceNote#^block-id]]`).
 
-This engine solves that by transforming your Obsidian vault into a traversable **Abstract Syntax Tree (AST)**. By understanding the semantic structure of your notes, it achieves flawless, non-destructive, two-way synchronization with Anki.
+**Anki AST Sync** solves this by transforming your Obsidian vault notes into a traversable **Abstract Syntax Tree (AST)** via the `unified` / `remark` ecosystem. By understanding the semantic structure of your notes, it achieves flawless, non-destructive synchronization with Anki while keeping your Markdown files pristine.
 
-## **✨ Core Features**
+---
 
-* **Deterministic AST Parsing:** Powered by the unified and remark ecosystem. Parses flashcard layouts structurally, completely ignoring delimiters hidden inside code, inlineCode, or math blocks.  
-* **Deep Transclusion Resolution:** Native support for Obsidian block embeds (\!\[\[SourceNote\#^block-id\]\]). The engine recursively fetches, parses, and grafts transcluded content directly into your flashcards before syncing.  
-* **Local Media Syncing:** Automatically detects embedded media (\!\[\[image.png\]\]), converts files to Base64 payloads, and queues them for injection via AnkiConnect.  
-* **Surgical Two-Way Binding:** Generates and tracks unique UUIDs via HTML comments (\<\!--anki-id: uuid--\>). IDs are injected by splicing the raw file at AST-derived byte offsets—never by round-tripping Markdown through a serializer. Pre-graft offsets are preserved when transclusions expand card content for HTML compile. See [Docs/Engine-Architecture.md](Docs/Engine-Architecture.md#read-only-ast-and-vault-safety).
-* **Duplicate detection:** Flags vault cards that compile to the same Front HTML (and `back_mismatch` when answers differ). Warnings are emitted on stderr as JSON for future in-editor notifications. See [Docs/Anki-Integration.md](Docs/Anki-Integration.md#duplicate-detection).
-* **Stable Anki updates:** Normalizes line endings inside compiled code blocks before comparing to Anki, so Windows CRLF does not cause false `update` actions.
-* **Stateless Concurrency Control:** Throttles AnkiConnect HTTP (media uploads, batched card sync) with `p-limit` and automatic retry so large vault syncs do not overwhelm the local Anki server. See [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md).
-* **Shared card syntax + stock multi-type sync:** Live Preview and sync share `parseCardDocument`. Preview skip/error outcomes hard-block Anki writes. Built-ins sync to stock Basic / Cloze / reversible / typed models; custom note types warn and skip until later. See [Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md](Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md) and [Docs/Anki-Integration.md](Docs/Anki-Integration.md).
+## ✨ Core Features
 
-## **🚀 Architecture Overview**
+* **Deterministic AST Parsing:** Structural delimiters inside code blocks, math formulas, or inline code are safely ignored.
+* **Non-Destructive Surgical ID Injection:** Generates and tracks unique UUIDs via HTML comments (`<!--anki-id: uuid-->`). IDs are injected by splicing the raw file buffer at AST-derived byte offsets—never by round-tripping Markdown through a serializer, preserving 100% of your vault's original formatting and whitespace.
+* **Live Preview & Sync Parity:** Real-time CodeMirror 6 editor decorations display card envelopes, card types, and sync status badges. Preview errors hard-block Anki writes so you never get broken cards in Anki.
+* **Deep Transclusion Resolution:** Native support for Obsidian block embeds (`![[SourceNote#^block-id]]`). The engine recursively fetches, parses, and grafts transcluded content directly into your flashcards prior to sync.
+* **Local Media Syncing:** Automatically detects embedded images, audio, video, and PDFs, converting them to Base64 payloads and uploading them to Anki via AnkiConnect.
+* **Stock & Custom Card Types:** Supports stock Anki models out of the box:
+  * **Basic** (`:::`)
+  * **Reversible** (`:::r`)
+  * **Typed** (`:::t`)
+  * **Cloze** (`{{c1::...}}` or `#anki/cardType/cloze`)
+* **Duplicate Detection:** Scans your entire vault to detect duplicate fronts and answer mismatches before writing to Anki.
+* **Stateless Concurrency Control:** Throttles AnkiConnect HTTP requests with `p-limit` and automatic retries so large vault syncs never overwhelm the local Anki instance.
 
-The system operates strictly headlessly, reading from an absolute vault path and talking to a local AnkiConnect instance.
+---
 
-1. **Scanner:** Recursively globs .md files in target folders.  
-2. **Processor:** Converts raw text to mdast (Markdown AST).  
-3. **Transclusion & Media:** Resolves local file paths and fetches linked block nodes.  
-4. **Layout Extractor:** Uses state-machine logic to chunk nodes into Front and Back card buffers based on heading depth and user-defined delimiters (default `:::`; `?` and other strings are supported).
-5. **Injector:** Calculates exact byte-offsets on the **pre-graft** AST to safely inject tracking IDs back into the source Obsidian file via async-mutex locking; merges grafted compile buffers without shifting offsets.  
-6. **Anki Sync:** Compiles AST buffers to raw HTML, detects duplicate fronts vault-wide, normalizes code-block line endings for field compare, and syncs to Anki via batched `addNotes` / parallel updates (see [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)).
+## 📦 Prerequisites
 
-## **📦 Prerequisites**
+1. **Anki Desktop** running locally (required for live sync).
+2. **AnkiConnect** add-on installed in Anki (Add-on code: `2055492159`).
+3. **AnkiConnect CORS Setup**:
+   In Anki Desktop, navigate to **Tools → Add-ons → AnkiConnect → Config** and ensure your `webCorsOriginList` includes Obsidian:
+   ```json
+   {
+       "apiKey": null,
+       "apiPort": 8765,
+       "webCorsOriginList": [
+           "http://localhost",
+           "app://obsidian.md"
+       ]
+   }
+   ```
+   *(Restart Anki after editing this configuration).*
 
-* **Bun:** v1.0.0 or higher (or Node.js v18+ with Bun installed).  
-* **Anki Desktop:** Running locally (required for live sync; not needed for dry-run).  
-* **AnkiConnect:** Installed in Anki (Add-on code: 2055492159).
+---
 
-## **🛠 Installation**
+## 🚀 Obsidian Plugin Quick Start
+
+### 1. Installation
+
+- **Community Plugins:** Search for **Anki AST Sync** in Obsidian under **Settings → Community plugins → Browse** and click **Install** then **Enable**.
+- **Manual / BRAT:** You can also install beta releases using the [BRAT plugin](https://github.com/TfTHacker/obsidian42-brat) with repository `zunaidFarouque/Obsidian-Anki-AST-Engine`.
+
+### 2. Enable Sync on a Note
+
+Add `AnkiSync: on` to your note's YAML frontmatter:
+
+```markdown
+---
+AnkiSync: on
+target_anki_deck: Computer Science
+---
+
+#### What is the time complexity of binary search?
+:::
+O(log n)
+```
+
+### 3. Supported Card Syntax
+
+#### Basic Card
+```markdown
+#### What is the primary function of mitochondria?
+:::
+ATP production via cellular respiration.
+```
+
+#### Reversible Card
+```markdown
+#### Bonjour :::r Hello
+```
+
+#### Typed Card
+```markdown
+#### What command lists directory contents in Linux?
+:::t
+ls
+```
+
+#### Cloze Deletion Card
+```markdown
+#### Photosynthesis
+:::
+In plants, {{c1::chlorophyll}} absorbs light energy to convert {{c2::carbon dioxide}} and water into glucose.
+```
+
+### 4. Running a Sync
+
+- Click the ribbon icon (⚡ / ⭐) on the left sidebar.
+- Open the Command Palette (`Ctrl/Cmd + P`) and run **Anki AST Sync: Sync active note** or **Anki AST Sync: Sync entire vault**.
+
+---
+
+## 💻 Headless CLI & Engine Usage
+
+For headless automation, CI/CD pipelines, or standalone terminal usage:
 
 ```bash
 git clone https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine.git
@@ -43,68 +113,37 @@ bun install
 bun run build
 ```
 
-Copy `config.json.example` to `config.json` and set your vault path.
-
-## **⚙️ Configuration**
-
-Create a `config.json` in the root directory. This config is strictly validated at runtime via Zod.
-
-**Note:** Files must include frontmatter with `AnkiSync: on` (or `true` / `yes`) to be synced. Set `AnkiSync: off` (or `false` / `no`) to disable sync for a card file without removing the key. Files without an `AnkiSync` key are ignored. This is an engine-specific gate—not required by Obsidian itself. Optional frontmatter keys include `cardDeclarationHeadingLevel` (1–6, default from config), `delimiter` (overrides the config delimiter for that file), and `includeParentHeadersAsTags` (overrides the config tag behavior). See [Docs/Engine-Architecture.md](Docs/Engine-Architecture.md) for the full engine contract (including read-only AST and surgical ID injection) and [Docs/Obsidian-Parity.md](Docs/Obsidian-Parity.md) for link/embed resolution rules.
-
-```json
-{
-  "vaultPath": "/Users/username/Documents/ObsidianVault",
-  "delimiter": ":::",
-  "scanFolders": ["01 - Computer Science", "Notes"],
-  "defaultAnkiDeck": "Synced from Obsidian",
-  "defaultEngineTag": "Obsidian-Anki-AST",
-  "ankiConnectUrl": "http://127.0.0.1:8765",
-  "linkFormat": "shortest",
-  "attachmentFolder": "attachments",
-  "defaultCardDeclarationHeadingLevel": 4,
-  "includeParentHeadersAsTags": true
-}
-```
-
-## **💻 Usage**
-
-To execute a dry-run (parses AST and logs intended Anki actions without modifying files or database):
+Copy `config.json.example` to `config.json` and set your vault path:
 
 ```bash
+# Dry run (parses AST and outputs planned actions without touching Anki or files)
 bun run sync -- --dry-run
-```
 
-Each line of output is a JSON `SyncAction` with compiled `frontHtml` and `backHtml` fields (see [Docs/Card-Rendering.md](Docs/Card-Rendering.md)). Duplicate warnings (if any) are printed to **stderr** as `{"event":"duplicate_warning",…}`.
-
-To execute a full synchronization (requires Anki Desktop + AnkiConnect):
-
-```bash
+# Live synchronization
 bun run sync
-```
 
-Check AnkiConnect connectivity:
-
-```bash
+# Connectivity check
 bun run sync -- --check
 ```
 
-See [Docs/Anki-Integration.md](Docs/Anki-Integration.md) for Anki setup, ID binding, and troubleshooting. Live sync performance (batched adds, HTTP throttling): [Docs/Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md).
+---
 
-## **🔌 Obsidian plugin**
+## 🧪 Test-Driven Development (TDD)
 
-An in-vault plugin lives in [`plugin/`](plugin/). Build with `bun run deploy:plugin`. See [plugin/README.md](plugin/README.md) for install steps and [Docs/Plugin-Roadmap.md](Docs/Plugin-Roadmap.md) for planned plugin features.
-
-## **🧪 Test-Driven Development (TDD)**
-
-This project strictly adheres to TDD to handle the immense edge cases of personal knowledge management workflows. Before contributing new features, refer to the fixtures directory (`tests/fixtures/`).
-
-To run the test suite:
+This project strictly adheres to TDD to handle edge cases across personal knowledge management workflows.
 
 ```bash
 bun test
 ```
 
-## **🤝 Contributing**
+Currently passing **800+ test cases** across AST parsing, cloze extraction, transclusion resolution, media encoding, and CodeMirror Live Preview editor decorations.
 
-Contributions are welcome\! Please ensure you have read the architectural docs in the `Docs/` folder ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Anki-Integration.md](Docs/Anki-Integration.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md), [Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)) and the locked card-syntax contract ([DECIDED-Preview-Sync-Contract-2026-07.md](Docs/DECIDING/DECIDED-Preview-Sync-Contract-2026-07.md), [Card-Syntax-Spec.md](Docs/DECIDING/Card-Syntax-Spec.md)) before opening a PR. All parsing modifications must include an accompanying edge-case fixture test.
+---
 
+## 🤝 Contributing
+
+Contributions are welcome! Please ensure you have read the architectural docs in the `Docs/` directory ([Engine-Architecture.md](Docs/Engine-Architecture.md), [Anki-Integration.md](Docs/Anki-Integration.md), [Obsidian-Parity.md](Docs/Obsidian-Parity.md), and [Sync-Performance-Roadmap.md](Docs/Sync-Performance-Roadmap.md)). All parsing modifications must include an accompanying fixture test in `tests/`.
+
+## 📄 License
+
+MIT
