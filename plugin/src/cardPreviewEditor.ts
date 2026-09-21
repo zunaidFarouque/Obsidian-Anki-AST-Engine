@@ -27,8 +27,6 @@ import {
 	resolveCardBlockEndOffset,
 	resolveEditorFile,
 	resolveLivePreviewMode,
-	shouldRebuildCardPreviewDecorations,
-	type CardHeadingLinePosition,
 	type DocumentLine,
 } from './cardPreviewUtils';
 import {
@@ -157,24 +155,30 @@ class CardPreviewBadgeWidget extends WidgetType {
 	}
 }
 
+function getDocument(): Document {
+	// eslint-disable-next-line obsidianmd/prefer-active-doc
+	return typeof activeDocument !== 'undefined' ? activeDocument : document;
+}
+
 export function createCardPreviewBadgeElement(
 	card: ResolvedCard,
 	onMoreAction?: () => void,
 ): HTMLElement {
-	const slot = document.createElement('span');
+	const doc = getDocument();
+	const slot = doc.createElement('span');
 	slot.className = BADGE_SLOT_CLASS;
 
 	const badgeModel = buildHeadingBadgeModel(card);
 	const tooltip = formatCardPreviewTooltip(card);
 	const badge = onMoreAction
-		? document.createElement('button')
-		: document.createElement('span');
+		? doc.createElement('button')
+		: doc.createElement('span');
 	const actionClass = onMoreAction ? ` ${BADGE_CLASS}--action` : '';
 	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`;
-	const label = document.createElement('span');
+	const label = doc.createElement('span');
 	label.className = 'anki-card-preview-badge-label';
 	label.textContent = badgeModel.label;
-	const tooltipElement = document.createElement('span');
+	const tooltipElement = doc.createElement('span');
 	tooltipElement.className = 'anki-card-preview-tooltip';
 	tooltipElement.setAttribute('role', 'tooltip');
 	tooltipElement.textContent = tooltip;
@@ -405,7 +409,7 @@ export class CardPreviewEditorPlugin implements PluginValue {
 	private lastSettingsRevision = -1;
 	private lastLivePreview = false;
 	private lastEditorFilePath: string | undefined;
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private debounceTimer: number | null = null;
 
 	constructor(
 		private readonly view: EditorView,
@@ -460,7 +464,7 @@ export class CardPreviewEditorPlugin implements PluginValue {
 
 	private scheduleDebouncedRebuild(): void {
 		this.clearDebounceTimer();
-		this.debounceTimer = setTimeout(() => {
+		this.debounceTimer = window.setTimeout(() => {
 			this.debounceTimer = null;
 			const decorations = buildCardPreviewDecorations(this.view, this.options);
 			this.view.dispatch({
@@ -471,7 +475,7 @@ export class CardPreviewEditorPlugin implements PluginValue {
 
 	private clearDebounceTimer(): void {
 		if (this.debounceTimer !== null) {
-			clearTimeout(this.debounceTimer);
+			window.clearTimeout(this.debounceTimer);
 			this.debounceTimer = null;
 		}
 	}

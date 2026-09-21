@@ -104,7 +104,7 @@ export function formatCardPreviewSectionTopExtend(settings: AnkiAstSyncSettings)
 }
 
 export function applyCardPreviewLayoutCssVariables(settings: AnkiAstSyncSettings): void {
-	const root = document.documentElement;
+	const root = activeDocument.documentElement;
 	root.style.setProperty(CARD_PREVIEW_INTER_CARD_GAP_VAR, formatCardPreviewInterCardGap(settings));
 	root.style.setProperty(
 		CARD_PREVIEW_SECTION_TOP_EXTEND_VAR,

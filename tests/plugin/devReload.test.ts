@@ -8,12 +8,12 @@ import {
 	type StyleDocument,
 } from '../../plugin/src/devReload';
 
-const PLUGIN_ID = 'obsidian-anki-ast-sync';
+const PLUGIN_ID = 'anki-ast-sync';
 
 function manifest(dir?: string): PluginManifest {
 	return {
 		id: PLUGIN_ID,
-		name: 'Obsidian Anki AST Sync',
+		name: 'Anki AST Sync',
 		version: '0.1.0',
 		minAppVersion: '1.5.0',
 		description: 'test',

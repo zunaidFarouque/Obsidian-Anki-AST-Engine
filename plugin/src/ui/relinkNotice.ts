@@ -14,13 +14,13 @@ export function showRelinkNotice(
 ): void {
 	const source = warning.sources[0];
 	const notice = new Notice('', RELINK_NOTICE_DURATION_MS);
-	notice.noticeEl.empty();
+	notice.messageEl.empty();
 
-	notice.noticeEl.createEl('div', {
+	notice.messageEl.createEl('div', {
 		text: `Re-linked to existing Anki note ${warning.ankiNoteId ?? 'unknown'} in deck "${warning.deck}".`,
 	});
 
-	const links = notice.noticeEl.createEl('div', { cls: 'anki-ast-sync-relink-links' });
+	const links = notice.messageEl.createEl('div', { cls: 'anki-ast-sync-relink-links' });
 
 	if (source?.file) {
 		const vaultLink = links.createEl('a', {

@@ -54,7 +54,15 @@ export function frontmatterFromObsidianMetadata(
 			fields[key] = value.map(String).join(', ');
 			continue;
 		}
-		fields[key] = String(value);
+		if (typeof value === 'string') {
+			fields[key] = value;
+			continue;
+		}
+		if (typeof value === 'number' || typeof value === 'bigint') {
+			fields[key] = String(value);
+			continue;
+		}
+		fields[key] = JSON.stringify(value);
 	}
 
 	return Object.keys(fields).length > 0 ? fields : null;

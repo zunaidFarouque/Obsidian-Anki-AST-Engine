@@ -1,5 +1,4 @@
-import type { App } from 'obsidian';
-import { TFile } from 'obsidian';
+import { TFile, type App } from 'obsidian';
 import type { VaultAdapter } from 'obsidian-anki-ast-engine/vault';
 
 function normalizeVaultPath(path: string): string {
@@ -8,9 +7,10 @@ function normalizeVaultPath(path: string): string {
 
 export function createObsidianVaultAdapter(app: App): VaultAdapter {
 	const adapter = app.vault.adapter;
+	const fileAdapter = adapter as { getBasePath?: () => string } | undefined;
 	const vaultRoot =
-		'getBasePath' in adapter && typeof adapter.getBasePath === 'function'
-			? adapter.getBasePath()
+		typeof fileAdapter?.getBasePath === 'function'
+			? fileAdapter.getBasePath()
 			: '';
 
 	return {

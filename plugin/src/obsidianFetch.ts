@@ -46,12 +46,14 @@ export function createObsidianFetch(): typeof fetch {
 		const url = resolveUrl(input);
 		const method = init?.method ?? 'GET';
 		const headers = normalizeHeaders(init);
-		const body =
-			typeof init?.body === 'string'
-				? init.body
-				: init?.body !== undefined
-					? String(init.body)
-					: undefined;
+		let body: string | ArrayBuffer | undefined;
+		if (typeof init?.body === 'string') {
+			body = init.body;
+		} else if (init?.body instanceof ArrayBuffer) {
+			body = init.body;
+		} else if (init?.body !== undefined && init?.body !== null) {
+			body = JSON.stringify(init.body);
+		}
 
 		const result = await requestUrl({
 			url,
@@ -71,5 +73,5 @@ export function createObsidianFetch(): typeof fetch {
 		});
 	};
 
-	return obsidianFetch as typeof fetch;
+	return obsidianFetch;
 }

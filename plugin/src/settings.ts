@@ -207,7 +207,6 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 				slider
 					.setLimits(1, 6, 1)
 					.setValue(this.plugin.settings.defaultCardDeclarationHeadingLevel)
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.defaultCardDeclarationHeadingLevel = value;
 						await this.plugin.saveSettings();
@@ -228,7 +227,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl('h3', { text: 'Live preview' });
+		new Setting(containerEl).setName("Live preview").setHeading();
 
 		new Setting(containerEl)
 			.setName('Card syntax preview')
@@ -322,7 +321,6 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 				slider
 					.setLimits(0, 1, 0.05)
 					.setValue(this.plugin.settings.cardPreviewSectionTopExtend)
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.cardPreviewSectionTopExtend = value;
 						await this.plugin.saveSettings();
@@ -339,7 +337,6 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 				slider
 					.setLimits(0, 0.8, 0.05)
 					.setValue(this.plugin.settings.cardPreviewInterCardGapEm)
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.cardPreviewInterCardGapEm = value;
 						await this.plugin.saveSettings();
@@ -382,7 +379,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl('h3', { text: 'Advanced' });
+		new Setting(containerEl).setName("Advanced").setHeading();
 
 		new Setting(containerEl)
 			.setName('Note model name')

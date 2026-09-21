@@ -54,10 +54,12 @@ export class CardEnvelopeMarker implements LayerMarker {
 	}
 
 	draw(): HTMLElement {
-		const elt = document.createElement('div');
+		// eslint-disable-next-line obsidianmd/prefer-active-doc
+		const doc = typeof activeDocument !== 'undefined' ? activeDocument : document;
+		const elt = doc.createElement('div');
 		elt.className = `anki-card-envelope anki-card-envelope--${this.outcome}`;
 		if (this.headingStyle !== 'off' && this.headingHeight > 0) {
-			const header = document.createElement('div');
+			const header = doc.createElement('div');
 			header.className = `anki-card-envelope-header anki-card-envelope-header--${this.headingStyle}`;
 			header.style.height = `${this.headingHeight}px`;
 			elt.appendChild(header);
@@ -78,10 +80,8 @@ export class CardEnvelopeMarker implements LayerMarker {
 			return false;
 		}
 		if (this.headingStyle !== 'off' && this.headingHeight > 0) {
-			const headerEl = (typeof dom.querySelector === 'function'
-				? dom.querySelector('.anki-card-envelope-header')
-				: null) as HTMLElement | null;
-			if (!headerEl) {
+			const headerEl = (dom.firstElementChild ?? (dom as unknown as { children?: HTMLElement[] }).children?.[0]) as HTMLElement | null;
+			if (!headerEl || !headerEl.className?.includes('anki-card-envelope-header')) {
 				return false;
 			}
 			headerEl.style.height = `${this.headingHeight}px`;

@@ -1,77 +1,105 @@
-# Obsidian Anki AST Sync (plugin)
+# Anki AST Sync
 
-Obsidian plugin for the [Obsidian-Anki AST Engine](../readme.md). Lives in `plugin/` inside the engine monorepo.
+A deterministic, AST-powered synchronization pipeline bridging **Obsidian** and **Anki**.
 
-## Development
+Traditional sync tools rely on fragile Regular Expressions (Regex) that break when confronted with nested code blocks, LaTeX math, HTML tables, or block transclusions (`![[Source#^block-id]]`).
 
-1. Build the engine dist (required before plugin build):
+**Anki AST Sync** solves this by parsing your Markdown notes into an **Abstract Syntax Tree (AST)**. It understands the semantic structure of your notes, ensuring flawless, non-destructive synchronization with Anki while keeping your notes clean.
 
-   ```bash
-   bun run build
+---
+
+## ✨ Features
+
+* **Deterministic AST Parsing:** Structural delimiters inside code blocks, math formulas, or inline code are safely ignored.
+* **Non-Destructive Surgical ID Injection:** Injects tracking IDs (`<!--anki-id: uuid-->`) by calculating exact byte offsets on the raw file buffer. Never re-serializes your Markdown through a formatter, preserving your formatting, whitespace, and custom syntax 100%.
+* **Live Preview & Sync Parity:** Real-time CodeMirror 6 editor decorations show card boundaries, card types, and sync status badges. Preview errors hard-block Anki writes so you never get broken cards in Anki.
+* **Deep Transclusion Resolution:** Automatically expands Obsidian block embeds (`![[Note#^block-id]]`) into flashcard fields prior to compile.
+* **Local Media Syncing:** Detects images, PDFs, audio, and SVGs, converting them to Base64 payloads and uploading them to Anki via AnkiConnect.
+* **Stock & Custom Card Types:** Supports stock Anki models:
+  * **Basic** (`:::`)
+  * **Reversible** (`:::r`)
+  * **Typed** (`:::t`)
+  * **Cloze** (`{{c1::...}}` or `#anki/cardType/cloze`)
+* **Duplicate Detection:** Scans your entire vault to warn against front collisions and answer mismatches.
+
+---
+
+## 📦 Prerequisites
+
+1. **Anki Desktop** running locally.
+2. **AnkiConnect** add-on installed in Anki (Add-on code: `2055492159`).
+3. **AnkiConnect CORS Setup**:
+   In Anki Desktop, go to **Tools → Add-ons → AnkiConnect → Config** and ensure your `webCorsOriginList` includes Obsidian:
+   ```json
+   {
+       "apiKey": null,
+       "apiPort": 8765,
+       "webCorsOriginList": [
+           "http://localhost",
+           "app://obsidian.md"
+       ]
+   }
    ```
+   *(Restart Anki after modifying this configuration).*
 
-2. Install plugin dependencies and build:
+---
 
-   ```bash
-   cd plugin
-   bun install
-   bun run build
+## 🚀 Quick Start
+
+1. Enable **Anki AST Sync** in Obsidian under **Settings → Community plugins**.
+2. Create a note and enable synchronization by adding `AnkiSync: on` to your frontmatter:
+   ```markdown
+   ---
+   AnkiSync: on
+   target_anki_deck: Spanish
+   ---
+
+   #### What is the capital of France?
+   :::
+   Paris
    ```
+3. Run the command **Anki AST Sync: Sync current note to Anki** (or click the ribbon icon to sync your entire vault).
 
-   Or from repo root: `bun run build:plugin`
+---
 
-3. Deploy into your vault (build + copy):
+## ⌨️ Useful Commands
 
-   ```bash
-   bun run deploy:plugin
-   ```
+* **Check AnkiConnect connection** — verifies Anki is reachable.
+* **Sync vault to Anki** — syncs all eligible vault notes to Anki with media and ID injection.
+* **Dry-run sync vault to Anki** — simulates sync and displays intended actions without modifying files or Anki.
+* **Sync current note to Anki** — fast, single-file sync for the active note.
+* **Create new Anki note** — creates a note pre-populated with `AnkiSync: on` and a starter card.
+* **Toggle Anki sync for current note** — quickly toggles `AnkiSync: on / off`.
+* **Set target Anki deck for current note** — select an Anki deck via fuzzy search.
+* **Insert card template...** — modal picker for Basic, Reversible, Typed, and Cloze skeletons.
+* **Wrap selection as cloze deletion** — wraps selected text in `{{c1::...}}` with intelligent index incrementing.
+* **Jump to next / previous card in note** — rapid navigation between card headings.
+* **Open current card in Anki Desktop** — locates and displays the active card in Anki's card browser.
 
-   Configure the destination once by copying `plugin/deploy.path.example` to `plugin/deploy.path`, or set `OBSIDIAN_PLUGIN_DIR`, or pass a path: `bun run copy:plugin -- "D:/vault/.obsidian/plugins/obsidian-anki-ast-sync"`.
+---
 
-4. Symlink or copy this folder into your vault’s plugins directory (manual alternative):
+## 🛠 Development & Building
 
-   ```
-   <vault>/.obsidian/plugins/obsidian-anki-ast-sync/
-   ```
-
-   Required files: `main.js`, `manifest.json`, `styles.css`.
-
-4. Enable **Obsidian Anki AST Sync** in Obsidian → Settings → Community plugins.
-
-## AnkiConnect CORS
-
-The plugin calls AnkiConnect from the browser. Add your Obsidian origin to `webCorsOriginList` in AnkiConnect config (see [Anki-Integration.md](../Docs/Anki-Integration.md)).
-
-## Commands
-
-- **Check AnkiConnect connection** — verifies Anki is reachable.
-- **Sync vault to Anki** — live sync via the AST engine (base64 media, ID injection).
-- **Dry-run sync vault to Anki** / **Dry-run sync current note to Anki** — simulate sync and preview Anki actions without modifying files.
-- **Sync current note to Anki** — scoped single-file live sync.
-- **Create new Anki note** — create a new note pre-populated with `AnkiSync: on` and starter card.
-- **Toggle Anki sync for current note** — enable/disable Anki sync in frontmatter.
-- **Set target Anki deck for current note** — choose target deck via fuzzy suggester.
-- **Insert card template...** — modal picker for Basic, Reversible, Typed, Cloze, and custom note types.
-- **Insert basic / reversible / typed / cloze card at cursor** — instant hotkey-friendly card skeletons.
-- **Wrap selection as cloze deletion** — wrap text in `{{cN::...}}` with intelligent auto-incrementing.
-- **Jump to next / previous card in note** — rapid navigation between card headings.
-- **Jump to next card with sync issue** — jump directly to cards with syntax warnings/errors.
-- **Open current card in Anki Desktop** — find and browse active card in Anki Desktop.
-- **Reload CSS** — re-read `styles.css` from disk without restarting Obsidian.
-- **Reload plugin** — disable and re-enable this plugin to pick up a new `main.js` build.
-
-Detailed command reference and recommended hotkeys: [Docs/Plugin-Helper-Commands.md](../Docs/Plugin-Helper-Commands.md).
-
-## Watch mode
+This plugin is part of the [Obsidian-Anki-AST-Engine](https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine) repository.
 
 ```bash
-cd plugin
-bun run dev
+# Clone the repository
+git clone https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine.git
+cd Obsidian-Anki-AST-Engine
+
+# Install dependencies (requires bun)
+bun install
+cd plugin && bun install
+
+# Build the plugin
+bun run build:plugin
+
+# Run tests
+bun test
 ```
 
-Rebuilds `main.js` on source changes. After copying updated files into your vault (`bun run deploy:plugin` from repo root):
+---
 
-- **CSS-only changes** — Ctrl+P → **Reload CSS**
-- **`main.js` / TypeScript changes** — Ctrl+P → **Reload plugin**
+## 📄 License
 
-The first time you deploy these reload commands, toggle the plugin once in Settings (or restart Obsidian) so the new palette entries appear.
+MIT License. See [LICENSE](LICENSE) for details.

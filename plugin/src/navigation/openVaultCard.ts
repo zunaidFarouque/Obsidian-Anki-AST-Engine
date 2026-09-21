@@ -6,10 +6,10 @@ function normalizePath(path: string): string {
 
 function toVaultRelativePath(app: App, filePath: string): string {
 	const normalized = normalizePath(filePath);
+	const adapter = app.vault.adapter as { getBasePath?: () => string } | undefined;
 	const vaultRoot = normalizePath(
-		'getBasePath' in app.vault.adapter &&
-			typeof app.vault.adapter.getBasePath === 'function'
-			? app.vault.adapter.getBasePath()
+		typeof adapter?.getBasePath === 'function'
+			? adapter.getBasePath()
 			: '',
 	);
 

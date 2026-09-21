@@ -7,9 +7,9 @@ export function buildPluginConfig(
 	app: App,
 	settings: AnkiAstSyncSettings,
 ): Config {
-	const adapter = app.vault.adapter;
+	const adapter = app.vault.adapter as { getBasePath?: () => string } | undefined;
 	const vaultPath =
-		'getBasePath' in adapter && typeof adapter.getBasePath === 'function'
+		typeof adapter?.getBasePath === 'function'
 			? adapter.getBasePath()
 			: '';
 

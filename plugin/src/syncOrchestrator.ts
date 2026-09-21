@@ -51,20 +51,6 @@ function showLiveRelinkWarnings(
 	}
 }
 
-function logSyncDetails(
-	label: string,
-	actions: SyncAction[],
-	duplicateWarnings: DuplicateWarning[],
-	mediaWarnings: MediaBasenameWarning[],
-	orphans: VaultOrphan[],
-): void {
-	console.info(`[Anki AST Sync] ${label}`, {
-		actions,
-		duplicateWarnings,
-		mediaWarnings,
-		orphans,
-	});
-}
 
 function createProgressHandler(
 	notice: Notice,
@@ -170,7 +156,6 @@ export async function runSyncFlow(
 				mediaWarnings,
 				orphans,
 			});
-			logSyncDetails('dry-run', actions, duplicateWarnings, mediaWarnings, orphans);
 			return;
 		}
 
@@ -272,7 +257,6 @@ export async function runSyncFlow(
 				: undefined,
 		});
 		showLiveRelinkWarnings(app, client, duplicateWarnings);
-		logSyncDetails('live', actions, duplicateWarnings, mediaWarnings, orphans);
 	} catch (error) {
 		notice.hide();
 		const message = error instanceof Error ? error.message : String(error);
@@ -289,7 +273,7 @@ export async function runSyncFlowForActiveFile(
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile || activeFile.extension !== 'md') {
-		new Notice('Open a markdown note to sync.', 8000);
+		new Notice('Open a Markdown note to sync.', 8000);
 		return;
 	}
 
@@ -297,7 +281,7 @@ export async function runSyncFlowForActiveFile(
 	const rawText = await app.vault.read(activeFile);
 	if (!shouldSyncFile(rawText)) {
 		new Notice(
-			'This note is not sync-eligible (AnkiSync not enabled).',
+			'This note is not sync-eligible (ankisync not enabled).',
 			10000,
 		);
 		return;

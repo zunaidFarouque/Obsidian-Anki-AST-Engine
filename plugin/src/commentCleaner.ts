@@ -13,7 +13,7 @@ export async function removeAnkiSyncCommentsFromActiveNote(
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile || activeFile.extension !== 'md') {
-		new Notice('Open a markdown note to remove Anki sync comments.', 6000);
+		new Notice('Open a Markdown note to remove Anki sync comments.', 6000);
 		return;
 	}
 

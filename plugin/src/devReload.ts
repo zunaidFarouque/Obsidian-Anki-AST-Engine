@@ -27,10 +27,14 @@ function resolveStyleDocument(doc?: StyleDocument): StyleDocument {
 	if (doc) {
 		return doc;
 	}
+	if (typeof activeDocument !== 'undefined') {
+		return activeDocument;
+	}
 	if (typeof document === 'undefined') {
 		throw new Error('document is not available');
 	}
-	return document as unknown as StyleDocument;
+	// eslint-disable-next-line obsidianmd/prefer-active-doc
+	return document;
 }
 
 export function resolvePluginStylesPath(manifest: PluginManifest): string {

@@ -14,6 +14,7 @@ export default tseslint.config(
 		'package.json',
 		'package-lock.json',
 		'tsconfig.json',
+		'shims',
 	]),
 	{
 		languageOptions: {
@@ -30,4 +31,32 @@ export default tseslint.config(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		rules: {
+			'obsidianmd/ui/sentence-case': [
+				'warn',
+				{
+					brands: ['Anki', 'AnkiConnect', 'Obsidian', 'Markdown', 'LaTeX', 'MathJax', 'CodeMirror'],
+					acronyms: ['AST', 'URL', 'API', 'CORS', 'UUID', 'CSS', 'HTML', 'GFM', 'ID'],
+					ignoreWords: [
+						'requestUrl',
+						'AnkiSync',
+						'ankisync',
+						'target_anki_deck',
+						'target_Anki_deck',
+						'apiKey',
+						'apikey',
+						':::r',
+						':::t',
+						'c1',
+						'cN',
+						'Basic',
+						'Cloze',
+						'Reversible',
+						'Typed',
+					],
+				},
+			],
+		},
+	},
 );
