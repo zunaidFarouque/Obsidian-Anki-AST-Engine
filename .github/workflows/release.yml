@@ -41,8 +41,8 @@ jobs:
         with:
           subject-path: |
             manifest.json
-            plugin/main.js
-            plugin/styles.css
+            main.js
+            styles.css
 
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
@@ -50,10 +50,10 @@ jobs:
           name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
           files: |
             manifest.json
-            plugin/main.js
-            plugin/styles.css
+            main.js
+            styles.css
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
