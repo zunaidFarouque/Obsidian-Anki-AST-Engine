@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   const { actions, duplicateWarnings, mediaWarnings, orphans } = await runSync(config, { dryRun });
 
   for (const action of actions) {
-    console.log(JSON.stringify(action));
+    process.stdout.write(JSON.stringify(action) + "\n");
   }
 
   for (const warning of duplicateWarnings) {

@@ -1,5 +1,5 @@
 import type { VaultAdapter, VaultFileStat } from "./vaultAdapter";
-import { basename, joinPath } from "../utils/pathUtils";
+import { joinPath } from "../utils/pathUtils";
 
 type StoredFile = {
   text?: string;

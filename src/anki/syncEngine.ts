@@ -5,7 +5,6 @@ import type { Config } from "../config/configParser";
 import { createDeckEnsurer, type DeckEnsurer } from "./deckEnsurer";
 import { createModelEnsurer, type ModelEnsurer } from "./modelEnsurer";
 import {
-  findNoteByFrontInDeck,
   normalizeSyncFieldHtml,
 } from "./frontSearch";
 import { resolveExistingNoteForRelink } from "./noteRelink";

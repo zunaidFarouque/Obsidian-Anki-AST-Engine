@@ -50,17 +50,55 @@ class FakeDOMElement {
 		}
 		return null;
 	}
+
+	createDiv(o?: { cls?: string } | string): FakeDOMElement {
+		return this.createEl('div', o);
+	}
+
+	createSpan(o?: { cls?: string } | string): FakeDOMElement {
+		return this.createEl('span', o);
+	}
+
+	createEl(tag: string, o?: { cls?: string } | string): FakeDOMElement {
+		const el = new FakeDOMElement(tag);
+		if (typeof o === 'string') el.className = o;
+		else if (o?.cls) el.className = o.cls;
+		this.appendChild(el);
+		return el;
+	}
 }
 
 function withFakeDocument<T>(callback: () => T): T {
-	const previous = (globalThis as { document?: unknown }).document;
-	(globalThis as { document: { createElement: (tag: string) => FakeDOMElement } }).document = {
+	const prevDoc = (globalThis as any).document;
+	const prevActiveDoc = (globalThis as any).activeDocument;
+	const fakeDoc = {
 		createElement: (tag: string) => new FakeDOMElement(tag),
+		createDiv: (o?: { cls?: string } | string) => {
+			const el = new FakeDOMElement('div');
+			if (typeof o === 'string') el.className = o;
+			else if (o?.cls) el.className = o.cls;
+			return el;
+		},
+		createSpan: (o?: { cls?: string } | string) => {
+			const el = new FakeDOMElement('span');
+			if (typeof o === 'string') el.className = o;
+			else if (o?.cls) el.className = o.cls;
+			return el;
+		},
+		createEl: (tag: string, o?: { cls?: string } | string) => {
+			const el = new FakeDOMElement(tag);
+			if (typeof o === 'string') el.className = o;
+			else if (o?.cls) el.className = o.cls;
+			return el;
+		},
 	};
+	(globalThis as any).document = fakeDoc;
+	(globalThis as any).activeDocument = fakeDoc;
 	try {
 		return callback();
 	} finally {
-		(globalThis as { document?: unknown }).document = previous;
+		(globalThis as any).document = prevDoc;
+		(globalThis as any).activeDocument = prevActiveDoc;
 	}
 }
 

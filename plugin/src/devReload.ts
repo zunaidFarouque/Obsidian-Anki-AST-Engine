@@ -1,14 +1,5 @@
 import type { Plugin, PluginManifest } from 'obsidian';
 
-declare module 'obsidian' {
-	interface App {
-		plugins: {
-			disablePlugin(id: string): Promise<void>;
-			enablePlugin(id: string): Promise<void>;
-		};
-	}
-}
-
 export type DevReloadResult = {
 	ok: boolean;
 	message: string;
@@ -24,17 +15,7 @@ export type StyleDocument = {
 };
 
 function resolveStyleDocument(doc?: StyleDocument): StyleDocument {
-	if (doc) {
-		return doc;
-	}
-	if (typeof activeDocument !== 'undefined') {
-		return activeDocument;
-	}
-	if (typeof document === 'undefined') {
-		throw new Error('document is not available');
-	}
-	// eslint-disable-next-line obsidianmd/prefer-active-doc
-	return document;
+	return doc ?? activeDocument;
 }
 
 export function resolvePluginStylesPath(manifest: PluginManifest): string {
@@ -92,20 +73,5 @@ export async function reloadPluginCss(
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		return { ok: false, message: `Failed to reload CSS: ${message}` };
-	}
-}
-
-export async function reloadPlugin(plugin: Plugin): Promise<DevReloadResult> {
-	const pluginId = plugin.manifest.id;
-	try {
-		await plugin.app.plugins.disablePlugin(pluginId);
-		await plugin.app.plugins.enablePlugin(pluginId);
-		return { ok: true, message: 'Plugin reloaded.' };
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return {
-			ok: false,
-			message: `Failed to reload plugin "${pluginId}": ${message}`,
-		};
 	}
 }

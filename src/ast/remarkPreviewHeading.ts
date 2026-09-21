@@ -1,4 +1,4 @@
-import type { Heading, Paragraph, PhrasingContent, Root, Text } from "mdast";
+import type { Heading, Paragraph, Root, Text } from "mdast";
 import type { Plugin } from "unified";
 import { visit } from "unist-util-visit";
 

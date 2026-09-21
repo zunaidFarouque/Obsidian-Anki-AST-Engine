@@ -16,11 +16,11 @@ export function showRelinkNotice(
 	const notice = new Notice('', RELINK_NOTICE_DURATION_MS);
 	notice.messageEl.empty();
 
-	notice.messageEl.createEl('div', {
+	notice.messageEl.createDiv({
 		text: `Re-linked to existing Anki note ${warning.ankiNoteId ?? 'unknown'} in deck "${warning.deck}".`,
 	});
 
-	const links = notice.messageEl.createEl('div', { cls: 'anki-ast-sync-relink-links' });
+	const links = notice.messageEl.createDiv({ cls: 'anki-ast-sync-relink-links' });
 
 	if (source?.file) {
 		const vaultLink = links.createEl('a', {
@@ -35,7 +35,7 @@ export function showRelinkNotice(
 
 	if (warning.ankiNoteId !== undefined) {
 		if (source?.file) {
-			links.createEl('span', { text: ' · ' });
+			links.createSpan({ text: ' · ' });
 		}
 
 		const ankiLink = links.createEl('a', {

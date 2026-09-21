@@ -1,5 +1,4 @@
 import type { Content, FootnoteDefinition, Heading, Root } from "mdast";
-import type { ExtractedCard } from "../parser/stateMachine";
 
 function normalizeId(identifier: string): string {
   return identifier.toUpperCase();

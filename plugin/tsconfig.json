@@ -16,10 +16,10 @@
 		"lib": ["ES2021", "DOM"],
 		"baseUrl": ".",
 		"paths": {
-			"obsidian-anki-ast-engine/anki": ["../dist/anki/client.d.ts"],
-			"obsidian-anki-ast-engine/config": ["../dist/config/configParser.d.ts"],
-			"obsidian-anki-ast-engine/sync": ["../dist/syncPipeline.d.ts"],
-			"obsidian-anki-ast-engine/vault": ["../dist/io/vaultAdapter.d.ts"],
+			"obsidian-anki-ast-engine/anki": ["../src/anki/client.ts"],
+			"obsidian-anki-ast-engine/config": ["../src/config/configParser.ts"],
+			"obsidian-anki-ast-engine/sync": ["../src/syncPipeline.ts"],
+			"obsidian-anki-ast-engine/vault": ["../src/io/vaultAdapter.ts"],
 			"obsidian-anki-ast-engine/cardSyntax": ["src/shims/cardSyntax.ts"]
 		}
 	},

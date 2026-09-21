@@ -18,7 +18,6 @@ import { nodesToPreview, nodesToRawText } from "../utils/textPreview";
 import {
   processClozeDeletions,
   transformShorthandClozesInNodes,
-  type ProcessedClozeToken,
 } from "./clozeProcessor";
 import { crossCuttingMessages } from "./crossCuttingRules";
 import { resolveFileDefaults } from "./frontmatterDefaults";
@@ -296,7 +295,7 @@ function resolveCard(
     }
 
     const hasTypedFormatting =
-      /[*_`~\[\]$]/.test(typedBackSource) ||
+      /[*_`~[\]$]/.test(typedBackSource) ||
       /<[a-zA-Z][\s\S]*?>/.test(typedBackSource);
     if (hasTypedFormatting) {
       messages.push({

@@ -64,15 +64,15 @@ export class VaultOrphanModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item',
 				type: 'button',
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: formatOrphanFrontPreview(orphan),
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-meta',
 				text: formatOrphanDeckMeta(orphan),
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-hint',
 				text: formatOrphanUuidHint(orphan),
 			});

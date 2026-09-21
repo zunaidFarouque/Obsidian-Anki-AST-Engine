@@ -153,11 +153,11 @@ export class SyncResultsModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item',
 				type: 'button',
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: truncate(action.syncError ?? 'Unknown error', 160),
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-meta',
 				text: `${basename(action.file)} · ${action.tag}`,
 			});
@@ -201,11 +201,11 @@ export class SyncResultsModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item',
 				type: 'button',
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: `${entry.label}: ${entry.frontPreview}`,
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-meta',
 				text: `${basename(entry.file)} · ${entry.tag}`,
 			});
@@ -232,7 +232,7 @@ export class SyncResultsModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item',
 				type: 'button',
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: warning.message,
 			});
@@ -241,7 +241,7 @@ export class SyncResultsModal extends Modal {
 				.map((source) => source.vaultRelativePath)
 				.join(', ');
 			if (paths) {
-				button.createEl('span', {
+				button.createSpan({
 					cls: 'anki-ast-sync-duplicate-item-meta',
 					text: paths,
 				});
@@ -292,15 +292,15 @@ export class SyncResultsModal extends Modal {
 		const list = container.createEl('ul', { cls: 'anki-ast-sync-duplicate-list' });
 		for (const orphan of orphans) {
 			const item = list.createEl('li');
-			item.createEl('span', {
+			item.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: formatOrphanFrontPreview(orphan),
 			});
-			item.createEl('span', {
+			item.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-meta',
 				text: formatOrphanDeckMeta(orphan),
 			});
-			item.createEl('span', {
+			item.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-hint',
 				text: formatOrphanUuidHint(orphan),
 			});

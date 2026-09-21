@@ -1,6 +1,7 @@
 import esbuild from 'esbuild';
 import process from 'process';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { builtinModules } from 'node:module';
 
@@ -51,9 +52,13 @@ const context = await esbuild.context({
 			fileURLToPath(new URL('.', import.meta.url)),
 			'shims/fs-promises.js',
 		),
+		'tinyglobby': path.join(
+			fileURLToPath(new URL('.', import.meta.url)),
+			'shims/tinyglobby.js',
+		),
 		'fast-glob': path.join(
 			fileURLToPath(new URL('.', import.meta.url)),
-			'shims/fast-glob.js',
+			'shims/tinyglobby.js',
 		),
 		'katex': path.join(
 			fileURLToPath(new URL('.', import.meta.url)),
@@ -87,6 +92,17 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	const pluginDir = fileURLToPath(new URL('.', import.meta.url));
+	const builtMainPath = path.join(pluginDir, 'main.js');
+	const rootMainPath = path.join(repoRoot, 'main.js');
+	if (fs.existsSync(builtMainPath)) {
+		fs.copyFileSync(builtMainPath, rootMainPath);
+	}
+	const builtStylesPath = path.join(pluginDir, 'styles.css');
+	const rootStylesPath = path.join(repoRoot, 'styles.css');
+	if (fs.existsSync(builtStylesPath)) {
+		fs.copyFileSync(builtStylesPath, rootStylesPath);
+	}
 	process.exit(0);
 } else {
 	await context.watch();

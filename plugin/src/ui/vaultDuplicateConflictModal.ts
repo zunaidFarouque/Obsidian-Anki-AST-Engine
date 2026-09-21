@@ -62,11 +62,11 @@ export class VaultDuplicateConflictModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item',
 				type: 'button',
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-front',
 				text: entry.frontPreview,
 			});
-			button.createEl('span', {
+			button.createSpan({
 				cls: 'anki-ast-sync-duplicate-item-meta',
 				text: `${basename(entry.file)} · ${entry.tag}`,
 			});

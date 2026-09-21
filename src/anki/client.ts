@@ -130,7 +130,11 @@ export class AnkiConnectClient {
   constructor(options: AnkiClientOptions) {
     this.url = options.url;
     this.apiKey = options.apiKey;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    const runtimeFetch =
+      typeof globalThis !== "undefined" && "fetch" in globalThis
+        ? (globalThis as unknown as { fetch: typeof fetch })["fetch"]
+        : undefined;
+    this.fetchImpl = options.fetchImpl ?? (runtimeFetch as typeof fetch);
     this.requestLimit = pLimit(
       options.requestConcurrency ?? DEFAULT_INVOKE_CONCURRENCY,
     );
@@ -152,12 +156,14 @@ export class AnkiConnectClient {
           ) {
             throw error;
           }
-          await new Promise((resolve) =>
-            setTimeout(
-              resolve,
-              invokeRetryDelayMs(attempt, this.retryBaseDelayMs),
-            ),
-          );
+          const delayMs = invokeRetryDelayMs(attempt, this.retryBaseDelayMs);
+          await new Promise<void>((resolve) => {
+            if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
+              window.setTimeout(resolve, delayMs);
+            } else {
+              globalThis.setTimeout(resolve, delayMs);
+            }
+          });
         }
       }
 

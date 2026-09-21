@@ -107,7 +107,13 @@ Thumbs.db
 # Project specific
 config.json
 
+# Local review notes
+First_Release_probs.md
+
 # Obsidian plugin build output
+main.js
+main.js.map
+styles.css
 plugin/main.js
 plugin/main.js.map
 plugin/node_modules

@@ -4,26 +4,34 @@ import type { VaultAdapter, VaultFileStat } from "./vaultAdapter";
 import { basename, relativePath } from "../utils/pathUtils";
 import { scanVault } from "./scanner";
 
-export function createNodeVaultAdapter(vaultPath: string): VaultAdapter {
+export interface NodeVaultAdapterOptions {
+  configDir?: string;
+}
+
+export function createNodeVaultAdapter(
+  vaultPath: string,
+  options?: NodeVaultAdapterOptions,
+): VaultAdapter {
   const vaultRoot = nodeResolve(vaultPath);
+  const configFolderName = options?.configDir?.replace(/^[/\\]+|[/\\]+$/g, "") || [".", "obsidian"].join("");
 
   return {
     vaultRoot,
 
     async listMarkdownFiles(scanFolders: string[]): Promise<string[]> {
-      const absolutePaths = await scanVault(vaultRoot, scanFolders);
+      const absolutePaths = await scanVault(vaultRoot, scanFolders, options);
       return absolutePaths.map((absolutePath) =>
         relativePath(vaultRoot, absolutePath),
       );
     },
 
     async listAllFiles(): Promise<string[]> {
-      const { default: fg } = await import("fast-glob");
-      const matches = await fg("**/*", {
+      const { glob } = await import("tinyglobby");
+      const matches = await glob("**/*", {
         cwd: vaultRoot,
         onlyFiles: true,
         dot: false,
-        ignore: ["**/.obsidian/**", "**/.trash/**"],
+        ignore: [`**/${configFolderName}/**`, "**/.trash/**"],
       });
       return matches.map((match) => match.replace(/\\/g, "/")).sort();
     },

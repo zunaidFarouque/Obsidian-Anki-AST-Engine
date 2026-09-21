@@ -155,34 +155,32 @@ class CardPreviewBadgeWidget extends WidgetType {
 	}
 }
 
-function getDocument(): Document {
-	// eslint-disable-next-line obsidianmd/prefer-active-doc
-	return typeof activeDocument !== 'undefined' ? activeDocument : document;
-}
-
 export function createCardPreviewBadgeElement(
 	card: ResolvedCard,
 	onMoreAction?: () => void,
 ): HTMLElement {
-	const doc = getDocument();
-	const slot = doc.createElement('span');
-	slot.className = BADGE_SLOT_CLASS;
+	const slot = activeDocument.createSpan({ cls: BADGE_SLOT_CLASS });
 
 	const badgeModel = buildHeadingBadgeModel(card);
 	const tooltip = formatCardPreviewTooltip(card);
-	const badge = onMoreAction
-		? doc.createElement('button')
-		: doc.createElement('span');
 	const actionClass = onMoreAction ? ` ${BADGE_CLASS}--action` : '';
-	badge.className = `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`;
-	const label = doc.createElement('span');
-	label.className = 'anki-card-preview-badge-label';
-	label.textContent = badgeModel.label;
-	const tooltipElement = doc.createElement('span');
-	tooltipElement.className = 'anki-card-preview-tooltip';
-	tooltipElement.setAttribute('role', 'tooltip');
-	tooltipElement.textContent = tooltip;
+	const badge = onMoreAction
+		? slot.createEl('button', {
+				cls: `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`,
+			})
+		: slot.createSpan({
+				cls: `${BADGE_CLASS} ${BADGE_CLASS}--${badgeModel.displayOutcome}${actionClass}`,
+			});
+	const label = badge.createSpan({
+		cls: 'anki-card-preview-badge-label',
+		text: badgeModel.label,
+	});
 	const tooltipId = nextBadgeAccessibilityId('anki-card-preview-tooltip');
+	const tooltipElement = badge.createSpan({
+		cls: 'anki-card-preview-tooltip',
+		text: tooltip,
+	});
+	tooltipElement.setAttribute('role', 'tooltip');
 	tooltipElement.setAttribute('id', tooltipId);
 	if (onMoreAction) {
 		(badge as HTMLButtonElement).type = 'button';
@@ -198,13 +196,10 @@ export function createCardPreviewBadgeElement(
 	} else {
 		badge.setAttribute('aria-label', tooltip);
 	}
-	badge.appendChild(label);
-	badge.appendChild(tooltipElement);
 	const backOnlyMeta = buildBackOnlyClozeWarningMeta(card);
 	if (backOnlyMeta.hasBackOnlyWarning) {
 		badge.dataset.backOnlyClozeWarning = backOnlyMeta.ruleId ?? 'true';
 	}
-	slot.appendChild(badge);
 	return slot;
 }
 

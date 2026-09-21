@@ -248,14 +248,6 @@ export default class AnkiAstSyncPlugin extends Plugin {
 			},
 		});
 
-		this.addCommand({
-			id: 'reload-plugin',
-			name: 'Reload plugin',
-			callback: () => {
-				void this.reloadSelf();
-			},
-		});
-
 		this.addSettingTab(new AnkiAstSyncSettingTab(this.app, this));
 
 		this.app.workspace.onLayoutReady(() => {
@@ -371,12 +363,6 @@ export default class AnkiAstSyncPlugin extends Plugin {
 	private async reloadCss(): Promise<void> {
 		const { reloadPluginCss } = await import('./devReload');
 		const result = await reloadPluginCss(this);
-		new Notice(result.message, result.ok ? undefined : 12_000);
-	}
-
-	private async reloadSelf(): Promise<void> {
-		const { reloadPlugin } = await import('./devReload');
-		const result = await reloadPlugin(this);
 		new Notice(result.message, result.ok ? undefined : 12_000);
 	}
 

@@ -301,23 +301,11 @@
 
 .markdown-source-view.is-live-preview
 	.cm-content
-	.anki-card-preview-badge:has(.anki-card-preview-badge-label:hover)
+	.anki-card-preview-badge:hover
 	.anki-card-preview-tooltip,
 .markdown-source-view.is-live-preview
 	.cm-content
-	.anki-card-preview-badge:has(.anki-card-preview-badge-label:focus-visible)
-	.anki-card-preview-tooltip {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-.markdown-source-view.is-live-preview
-	.cm-content
-	.anki-card-preview-badge--action:hover
-	.anki-card-preview-tooltip,
-.markdown-source-view.is-live-preview
-	.cm-content
-	.anki-card-preview-badge--action:focus-visible
+	.anki-card-preview-badge:focus-within
 	.anki-card-preview-tooltip {
 	opacity: 1;
 	transform: translateY(0);

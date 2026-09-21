@@ -1,4 +1,4 @@
-import type { Content, Image, Link, Paragraph, Root } from "mdast";
+import type { Content, Link, Paragraph, Root } from "mdast";
 import { resolvePath } from "../utils/pathUtils";
 import { isObsidianEmbed, type ObsidianEmbed } from "./obsidianLinks";
 import { formatWikilink, parseLinktext, type ParsedLinktext } from "../obsidian/linkResolver";

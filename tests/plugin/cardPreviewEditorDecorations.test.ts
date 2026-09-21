@@ -88,20 +88,91 @@ class FakeElement {
 		return null;
 	}
 
+	createSpan(o?: { cls?: string; text?: string; attr?: Record<string, string> } | string): FakeElement {
+		return this.createEl('span', o);
+	}
+
+	createDiv(o?: { cls?: string; text?: string; attr?: Record<string, string> } | string): FakeElement {
+		return this.createEl('div', o);
+	}
+
+	createEl(tag: string, o?: { cls?: string; text?: string; attr?: Record<string, string> } | string): FakeElement {
+		const child = new FakeElement(tag);
+		if (typeof o === 'string') {
+			child.className = o;
+		} else if (o) {
+			if (o.cls) child.className = o.cls;
+			if (o.text) child.textContent = o.text;
+			if (o.attr) {
+				for (const [key, value] of Object.entries(o.attr)) {
+					child.setAttribute(key, value);
+				}
+			}
+		}
+		this.appendChild(child);
+		return child;
+	}
+
 	getChildren(): FakeElement[] {
 		return [...this.children];
 	}
 }
 
 function withFakeDocument<T>(callback: () => T): T {
-	const previous = (globalThis as { document?: unknown }).document;
-	(globalThis as { document: { createElement: (tag: string) => FakeElement } }).document = {
+	const prevDoc = (globalThis as any).document;
+	const prevActiveDoc = (globalThis as any).activeDocument;
+	const fakeDoc = {
 		createElement: (tag: string) => new FakeElement(tag),
+		createSpan: (o?: { cls?: string; text?: string; attr?: Record<string, string> } | string) => {
+			const el = new FakeElement('span');
+			if (typeof o === 'string') el.className = o;
+			else if (o) {
+				if (o.cls) el.className = o.cls;
+				if (o.text) el.textContent = o.text;
+				if (o.attr) {
+					for (const [key, value] of Object.entries(o.attr)) {
+						el.setAttribute(key, value);
+					}
+				}
+			}
+			return el;
+		},
+		createDiv: (o?: { cls?: string; text?: string; attr?: Record<string, string> } | string) => {
+			const el = new FakeElement('div');
+			if (typeof o === 'string') el.className = o;
+			else if (o) {
+				if (o.cls) el.className = o.cls;
+				if (o.text) el.textContent = o.text;
+				if (o.attr) {
+					for (const [key, value] of Object.entries(o.attr)) {
+						el.setAttribute(key, value);
+					}
+				}
+			}
+			return el;
+		},
+		createEl: (tag: string, o?: { cls?: string; text?: string; attr?: Record<string, string> } | string) => {
+			const el = new FakeElement(tag);
+			if (typeof o === 'string') el.className = o;
+			else if (o) {
+				if (o.cls) el.className = o.cls;
+				if (o.text) el.textContent = o.text;
+				if (o.attr) {
+					for (const [key, value] of Object.entries(o.attr)) {
+						el.setAttribute(key, value);
+					}
+				}
+			}
+			return el;
+		},
 	};
+	(globalThis as any).document = fakeDoc;
+	(globalThis as any).activeDocument = fakeDoc;
 	try {
 		return callback();
 	} finally {
-		(globalThis as { document?: unknown }).document = previous;
+		(globalThis as any).document = prevDoc;
+		(globalThis as any).activeDocument = prevActiveDoc;
 	}
 }
 

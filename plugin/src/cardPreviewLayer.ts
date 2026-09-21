@@ -54,15 +54,14 @@ export class CardEnvelopeMarker implements LayerMarker {
 	}
 
 	draw(): HTMLElement {
-		// eslint-disable-next-line obsidianmd/prefer-active-doc
-		const doc = typeof activeDocument !== 'undefined' ? activeDocument : document;
-		const elt = doc.createElement('div');
-		elt.className = `anki-card-envelope anki-card-envelope--${this.outcome}`;
+		const elt = activeDocument.createDiv({
+			cls: `anki-card-envelope anki-card-envelope--${this.outcome}`,
+		});
 		if (this.headingStyle !== 'off' && this.headingHeight > 0) {
-			const header = doc.createElement('div');
-			header.className = `anki-card-envelope-header anki-card-envelope-header--${this.headingStyle}`;
+			const header = elt.createDiv({
+				cls: `anki-card-envelope-header anki-card-envelope-header--${this.headingStyle}`,
+			});
 			header.style.height = `${this.headingHeight}px`;
-			elt.appendChild(header);
 		}
 		this.adjust(elt);
 		return elt;

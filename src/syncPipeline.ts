@@ -20,7 +20,7 @@ import {
   effectiveCardOutcome,
   isAnkiWriteAllowed,
 } from "./cardSyntax/syncEligibility";
-import type { CustomLayoutMap, ResolvedCard, SyncOutcome } from "./cardSyntax/types";
+import type { CustomLayoutMap, SyncOutcome } from "./cardSyntax/types";
 import { buildFootnoteScopeIndex } from "./ast/footnoteScopeIndex";
 import { buildVaultFileIndex } from "./obsidian/vaultIndex";
 import { clearMediaDryRunQueue, uploadMediaPlans } from "./anki/mediaQueue";
@@ -551,17 +551,20 @@ export async function runSync(
           knownModelFields,
         );
 
-        if (card.customFields && card.customFields.length > 0) {
+        if (card.customFields && card.customFields.length > 0 && card.customFields[0]) {
           const firstFieldKey = card.customFields[0].name;
           frontHtml = rawCustomFields[firstFieldKey] || `<p>${card.title}</p>`;
           const remainingVals: string[] = [];
           const seenKeys = new Set<string>([firstFieldKey]);
           for (let i = 1; i < card.customFields.length; i++) {
-            const name = card.customFields[i].name;
+            const fieldItem = card.customFields[i];
+            if (!fieldItem) continue;
+            const name = fieldItem.name;
             if (!seenKeys.has(name)) {
               seenKeys.add(name);
-              if (rawCustomFields[name]) {
-                remainingVals.push(rawCustomFields[name]);
+              const val = rawCustomFields[name];
+              if (val) {
+                remainingVals.push(val);
               }
             }
           }
@@ -623,9 +626,9 @@ export async function runSync(
         tag: card.tag,
         frontHtml,
         backHtml:
-          notePlan.kind === "builtin" && notePlan.builtinType === "typed"
+          (notePlan.kind === "builtin" && notePlan.builtinType === "typed"
             ? notePlan.fields.Back
-            : backHtml,
+            : backHtml) ?? "",
         ankiId: card.ankiId,
         wouldInjectId:
           isExcluded || writeBlocked ? undefined : injectionPlan?.uuid,
