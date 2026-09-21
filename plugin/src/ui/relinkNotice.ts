@@ -34,6 +34,7 @@ export function showRelinkNotice(
 	}
 
 	if (warning.ankiNoteId !== undefined) {
+		const ankiNoteId = warning.ankiNoteId;
 		if (source?.file) {
 			links.createSpan({ text: ' · ' });
 		}
@@ -44,7 +45,7 @@ export function showRelinkNotice(
 		});
 		ankiLink.addEventListener('click', (event) => {
 			event.preventDefault();
-			void openAnkiNote(client, warning.ankiNoteId!);
+			void openAnkiNote(client, ankiNoteId);
 		});
 	}
 }

@@ -1,4 +1,4 @@
-import type { Content, Root } from "mdast";
+import type { RootContent, Root } from "mdast";
 import type { Parent } from "unist";
 import { visit } from "unist-util-visit";
 import { parseMarkdown } from "./processor";
@@ -85,7 +85,7 @@ async function resolveEmbedsInChildren(
       continue;
     }
 
-    const paragraph = child as Content & Parent;
+    const paragraph = child as RootContent & Parent;
     const legacyEmbed = findLegacyEmbedInParagraph(paragraph);
     if (!legacyEmbed) {
       continue;
@@ -116,7 +116,7 @@ async function resolveObsidianEmbed(
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
-): Promise<Content[]> {
+): Promise<RootContent[]> {
   return resolveParsedEmbed(
     embed.data,
     "",
@@ -133,7 +133,7 @@ type LegacyEmbedInfo = {
 };
 
 function findLegacyEmbedInParagraph(
-  paragraph: Content & Parent,
+  paragraph: RootContent & Parent,
 ): LegacyEmbedInfo | null {
   const fullText = paragraph.children
     .map((child) => ("value" in child ? String(child.value) : ""))
@@ -148,7 +148,7 @@ function findLegacyEmbedInParagraph(
   const embedEnd = embedStart + match[0].length;
 
   return {
-    linktext: match[1]!.trim(),
+    linktext: match[1].trim(),
     before: fullText.slice(0, embedStart),
     after: fullText.slice(embedEnd),
   };
@@ -167,7 +167,7 @@ async function resolveParsedEmbed(
     visiting: Set<string>;
     unresolvedEmbeds: string[];
   },
-): Promise<Content[]> {
+): Promise<RootContent[]> {
   const mediaKind = getMediaKind(parsed.path);
   if (mediaKind && !parsed.subpath) {
     return resolveVaultMediaEmbed(parsed, before, after, sourcePath, context);
@@ -195,7 +195,7 @@ async function resolveParsedEmbed(
 
   context.visiting.add(visitKey);
 
-  let grafted: Content[];
+  let grafted: RootContent[];
   if (parsed.subpath) {
     let cache = context.vaultIndex.fileCaches.get(destPath);
     if (!cache) {
@@ -234,7 +234,7 @@ function resolveVaultMediaEmbed(
     linkFormat?: "shortest" | "relative" | "absolute";
     unresolvedEmbeds: string[];
   },
-): Content[] {
+): RootContent[] {
   const mediaKind = getMediaKind(parsed.path);
   if (!mediaKind) {
     const marker = formatWikilink(parsed);
@@ -299,10 +299,10 @@ async function getOrLoadFileCache(
 async function loadFileNodes(
   destPath: string,
   context: { vaultPath: string; vaultIndex: VaultFileIndex; vault?: VaultAdapter },
-): Promise<Content[]> {
+): Promise<RootContent[]> {
   const cache = await getOrLoadFileCache(destPath, context);
   if (cache) {
-    return structuredClone(cache.ast.children) as Content[];
+    return structuredClone(cache.ast.children);
   }
 
   return [];
@@ -310,10 +310,10 @@ async function loadFileNodes(
 
 function buildReplacementNodes(
   before: string,
-  grafted: Content[],
+  grafted: RootContent[],
   after: string,
-): Content[] {
-  const nodes: Content[] = [];
+): RootContent[] {
+  const nodes: RootContent[] = [];
 
   if (before.trim().length > 0) {
     nodes.push(createTextParagraph(before.trim()));
@@ -332,7 +332,7 @@ function buildReplacementNodes(
   return nodes;
 }
 
-function createTextParagraph(text: string): Content {
+function createTextParagraph(text: string): RootContent {
   return {
     type: "paragraph",
     children: [{ type: "text", value: text }],

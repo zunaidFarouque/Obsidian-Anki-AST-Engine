@@ -334,7 +334,7 @@ async function applyDryRunParity(
       continue;
     }
 
-    const [noteInfo] = await client.notesInfo([noteIds[0]!]);
+    const [noteInfo] = await client.notesInfo([noteIds[0]]);
     if (!noteInfo) {
       continue;
     }

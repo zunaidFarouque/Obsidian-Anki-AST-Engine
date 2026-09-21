@@ -1,4 +1,4 @@
-import type { Content, Link, Paragraph, Root } from "mdast";
+import type { RootContent, Link, Paragraph, Root } from "mdast";
 import { resolvePath } from "../utils/pathUtils";
 import { isObsidianEmbed, type ObsidianEmbed } from "./obsidianLinks";
 import { formatWikilink, parseLinktext, type ParsedLinktext } from "../obsidian/linkResolver";
@@ -24,7 +24,7 @@ import {
   soundFileNameFromParagraph,
 } from "./vaultMediaNodes";
 
-type AstNode = Content | ObsidianEmbed;
+type AstNode = RootContent | ObsidianEmbed;
 
 export type MediaUploadTransport = "path" | "base64" | "url";
 
@@ -137,13 +137,14 @@ export function collectResolvedMediaPaths(
       }
 
       if (node.type === "paragraph") {
-        const paragraph = node as Paragraph;
+        const paragraph = node;
         collectWikiMediaFromParagraph(paragraph, tryAddPath);
         collectResolvedMediaFromParagraph(paragraph, tryAddPath);
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as AstNode[]);
+        const parentNode = node as { children: AstNode[] };
+        walk(parentNode.children);
       }
     }
   };
@@ -265,7 +266,7 @@ function visitResolvableMedia(
       }
 
       if (node.type === "paragraph") {
-        const paragraph = node as Paragraph;
+        const paragraph = node;
 
         if (isSoundMediaParagraph(paragraph)) {
           const soundFile = soundFileNameFromParagraph(paragraph);
@@ -294,7 +295,8 @@ function visitResolvableMedia(
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as AstNode[]);
+        const parentNode = node as { children: AstNode[] };
+        walk(parentNode.children);
       }
     }
   };
@@ -331,7 +333,7 @@ function rewriteRemainingMediaEmbeds(
     }
 
     if (child.type === "paragraph") {
-      const replacement = rewriteParagraphMediaEmbeds(child as Paragraph, context);
+      const replacement = rewriteParagraphMediaEmbeds(child, context);
       if (replacement) {
         children.splice(index, 1, ...replacement);
         index += replacement.length - 1;
@@ -340,7 +342,8 @@ function rewriteRemainingMediaEmbeds(
     }
 
     if ("children" in child && Array.isArray(child.children)) {
-      rewriteRemainingMediaEmbeds(child.children as AstNode[], context);
+      const parentNode = child as { children: AstNode[] };
+      rewriteRemainingMediaEmbeds(parentNode.children, context);
     }
   }
 }
@@ -348,7 +351,7 @@ function rewriteRemainingMediaEmbeds(
 function rewriteParagraphMediaEmbeds(
   paragraph: Paragraph,
   context: MediaResolveContext,
-): Content[] | undefined {
+): RootContent[] | undefined {
   const fullText = paragraph.children
     .map((child) => ("value" in child ? String(child.value) : ""))
     .join("");
@@ -357,7 +360,7 @@ function rewriteParagraphMediaEmbeds(
     return undefined;
   }
 
-  const nodes: Content[] = [];
+  const nodes: RootContent[] = [];
   let lastIndex = 0;
   let changed = false;
 
@@ -401,7 +404,7 @@ function rewriteParagraphMediaEmbeds(
 function createMediaNodeFromParsed(
   parsed: ParsedLinktext,
   context: MediaResolveContext,
-): Content | undefined {
+): RootContent | undefined {
   const mediaKind = getMediaKind(parsed.path);
   if (!mediaKind) {
     return undefined;
@@ -489,7 +492,8 @@ export function collectMediaNodes(ast: Root) {
       }
 
       if ("children" in node && Array.isArray(node.children)) {
-        walk(node.children as AstNode[]);
+        const parentNode = node as { children: AstNode[] };
+        walk(parentNode.children);
       }
     }
   };

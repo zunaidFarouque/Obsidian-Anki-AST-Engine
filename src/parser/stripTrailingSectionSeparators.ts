@@ -1,9 +1,9 @@
-import type { Content } from "mdast";
+import type { RootContent } from "mdast";
 
 const ANKI_ID_REGEX =
   /<!--\s*anki-id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*-->/i;
 
-function isAnkiIdHtmlNode(node: Content): boolean {
+function isAnkiIdHtmlNode(node: RootContent): boolean {
   return (
     node.type === "html" &&
     "value" in node &&
@@ -16,7 +16,7 @@ function isAnkiIdHtmlNode(node: Content): boolean {
  * Obsidian before the next H1–H4 heading. Preserves trailing `<!--anki-id-->`
  * html nodes used for vault binding.
  */
-export function stripTrailingSectionSeparators(nodes: Content[]): Content[] {
+export function stripTrailingSectionSeparators(nodes: RootContent[]): RootContent[] {
   const result = [...nodes];
   let index = result.length - 1;
 

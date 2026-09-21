@@ -1,4 +1,4 @@
-import type { Content } from "mdast";
+import type { RootContent } from "mdast";
 import { visit } from "unist-util-visit";
 
 export type ClozeProcessOptions = {
@@ -71,7 +71,7 @@ function parseManualInner(
   }
 
   const number = Number(match[1]);
-  const { text, hint } = splitTextAndHint(match[2]!);
+  const { text, hint } = splitTextAndHint(match[2]);
 
   return {
     kind: "manual",
@@ -109,9 +109,9 @@ function findClozeMatches(
   const matches: ParsedCloze[] = [];
 
   for (const match of text.matchAll(CLOZE_PATTERN)) {
-    const raw = match[0]!;
-    const inner = match[1]!;
-    const start = match.index!;
+    const raw = match[0];
+    const inner = match[1];
+    const start = match.index;
     const end = start + raw.length;
 
     const manual = parseManualInner(inner, raw, start, end);
@@ -258,9 +258,9 @@ export function processClozeDeletions(
 }
 
 export function transformShorthandClozesInNodes(
-  nodes: Content[],
+  nodes: RootContent[],
   tokens: ProcessedClozeToken[],
-): Content[] {
+): RootContent[] {
   const shorthandTokens = tokens.filter((t) => t.isShorthand);
   if (shorthandTokens.length === 0) {
     return nodes;

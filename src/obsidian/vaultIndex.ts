@@ -1,5 +1,5 @@
-import type { Root, Heading } from "mdast";
-import type { Content } from "mdast";
+import type { Root } from "mdast";
+import type { RootContent } from "mdast";
 import { parseMarkdown } from "../ast/processor";
 import { buildBlockIndex, type BlockCacheEntry } from "../ast/blockIdTagging";
 import { stripFrontmatter } from "../io/frontmatterFilter";
@@ -186,7 +186,7 @@ function indexHeadings(ast: Root): HeadingEntry[] {
       return;
     }
 
-    const heading = node as Heading;
+    const heading = node;
     const text = heading.children
       .map((child) => ("value" in child ? String(child.value) : ""))
       .join("")
@@ -234,7 +234,7 @@ export function pickScopedAttachmentMatch(
   }
 
   if (matches.length === 1) {
-    return matches[0]!;
+    return matches[0];
   }
 
   const sourceDir = sourceDirectory(sourcePath);
@@ -247,14 +247,14 @@ export function pickScopedAttachmentMatch(
     return matchDir === sourceDir;
   });
   if (inSameDir.length === 1) {
-    return inSameDir[0]!;
+    return inSameDir[0];
   }
 
   const underSource = matches.filter(
     (match) => sourceDir.length > 0 && match.startsWith(`${sourceDir}/`),
   );
   if (underSource.length === 1) {
-    return underSource[0]!;
+    return underSource[0];
   }
 
   const attachmentPrefixes = [
@@ -266,13 +266,13 @@ export function pickScopedAttachmentMatch(
     attachmentPrefixes.some((prefix) => match.startsWith(prefix)),
   );
   if (inAttachmentFolder.length === 1) {
-    return inAttachmentFolder[0]!;
+    return inAttachmentFolder[0];
   }
 
   if (options.linkFormat === "shortest") {
     const sorted = [...matches].sort((left, right) => left.length - right.length);
-    const shortest = sorted[0]!;
-    if (sorted[1]!.length > shortest.length) {
+    const shortest = sorted[0];
+    if (sorted[1].length > shortest.length) {
       return shortest;
     }
   }
@@ -331,4 +331,4 @@ export function vaultRelativePath(
   return relativePath(vaultPath, absolutePath);
 }
 
-export type { Content };
+export type { RootContent };

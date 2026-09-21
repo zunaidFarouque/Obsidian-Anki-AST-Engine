@@ -47,7 +47,7 @@ export function mergeInjectionMetadata<T extends { ankiId?: string; injectionOff
   }
 
   return graftedCards.map((card, index) => {
-    const source = sourceCards[index]!;
+    const source = sourceCards[index];
     return {
       ...card,
       ankiId: source.ankiId ?? card.ankiId,

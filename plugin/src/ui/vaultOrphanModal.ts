@@ -76,9 +76,10 @@ export class VaultOrphanModal extends Modal {
 				cls: 'anki-ast-sync-duplicate-item-hint',
 				text: formatOrphanUuidHint(orphan),
 			});
-			if (this.client) {
+			const client = this.client;
+			if (client) {
 				button.addEventListener('click', () => {
-					void openAnkiNote(this.client!, orphan.ankiNoteId);
+					void openAnkiNote(client, orphan.ankiNoteId);
 				});
 			} else {
 				button.disabled = true;

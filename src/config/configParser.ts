@@ -40,6 +40,6 @@ export type Config = z.infer<typeof ConfigSchema>;
 export async function loadConfig(configPath?: string): Promise<Config> {
   const resolvedPath = configPath ?? join(process.cwd(), "config.json");
   const raw = await readFile(resolvedPath, "utf8");
-  const parsed = JSON.parse(raw);
+  const parsed: unknown = JSON.parse(raw);
   return ConfigSchema.parse(parsed);
 }

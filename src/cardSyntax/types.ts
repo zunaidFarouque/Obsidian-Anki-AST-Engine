@@ -1,5 +1,5 @@
 /** Shared types for card-syntax v1 (Card-Syntax-Spec Section 0). */
-import type { Content, Root } from "mdast";
+import type { RootContent, Root } from "mdast";
 
 export const BUILT_IN_CARD_TYPES = [
   "basic",
@@ -69,12 +69,12 @@ export interface ResolvedCard {
   ankiTagPath?: string;
   ankiId?: string;
   tag: string;
-  frontNodes: Content[];
-  backNodes: Content[];
+  frontNodes: RootContent[];
+  backNodes: RootContent[];
   sectionDepths: Map<number, string>;
   injectionOffset?: number;
   clozeTokens?: import("./clozeProcessor").ProcessedClozeToken[];
-  customFields?: Array<{ name: string; nodes: Content[] }>;
+  customFields?: Array<{ name: string; nodes: RootContent[] }>;
 }
 
 export type CustomLayoutFieldMapping =

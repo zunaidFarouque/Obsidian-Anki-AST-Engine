@@ -1,4 +1,4 @@
-import type { Content, Root } from "mdast";
+import type { RootContent, Root } from "mdast";
 import type { Plugin } from "unified";
 import { visitParents } from "unist-util-visit-parents";
 
@@ -6,7 +6,7 @@ const COMMENT_PAIR = /%%[\s\S]*?%%/g;
 
 const CODE_LIKE_TYPES = new Set(["code", "inlineCode", "math"]);
 
-function isCodeLikeAncestor(ancestors: Content[]): boolean {
+function isCodeLikeAncestor(ancestors: RootContent[]): boolean {
   return ancestors.some((node) => CODE_LIKE_TYPES.has(node.type));
 }
 
@@ -14,7 +14,7 @@ export function stripObsidianCommentsFromText(value: string): string {
   return value.replace(COMMENT_PAIR, "");
 }
 
-function nodeContainsCommentMarker(node: Content): boolean {
+function nodeContainsCommentMarker(node: RootContent): boolean {
   if (node.type === "code") {
     return false;
   }
@@ -24,13 +24,14 @@ function nodeContainsCommentMarker(node: Content): boolean {
   }
 
   if ("children" in node && Array.isArray(node.children)) {
-    return node.children.some((child) => nodeContainsCommentMarker(child as Content));
+    const parentNode = node as { children: RootContent[] };
+    return parentNode.children.some((child) => nodeContainsCommentMarker(child));
   }
 
   return false;
 }
 
-function flattenBlockText(node: Content): string {
+function flattenBlockText(node: RootContent): string {
   if (node.type === "code") {
     return node.value;
   }
@@ -44,7 +45,7 @@ function flattenBlockText(node: Content): string {
     .join("");
 }
 
-function setBlockText(node: Content, value: string): Content | undefined {
+function setBlockText(node: RootContent, value: string): RootContent | undefined {
   if (node.type === "paragraph") {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
@@ -62,7 +63,7 @@ function setBlockText(node: Content, value: string): Content | undefined {
 
 function stripInlineCommentsFromTree(tree: Root): void {
   visitParents(tree, "text", (node, ancestors) => {
-    if (isCodeLikeAncestor(ancestors as Content[])) {
+    if (isCodeLikeAncestor(ancestors as RootContent[])) {
       return;
     }
 
@@ -70,8 +71,8 @@ function stripInlineCommentsFromTree(tree: Root): void {
   });
 }
 
-function stripBlockCommentsFromChildren(children: Content[]): Content[] {
-  const result: Content[] = [];
+function stripBlockCommentsFromChildren(children: RootContent[]): RootContent[] {
+  const result: RootContent[] = [];
   let inComment = false;
 
   for (const child of children) {
@@ -141,7 +142,7 @@ function stripBlockCommentsFromChildren(children: Content[]): Content[] {
   return result;
 }
 
-function isEmptyParagraph(node: Content): boolean {
+function isEmptyParagraph(node: RootContent): boolean {
   if (node.type !== "paragraph") {
     return false;
   }
@@ -157,20 +158,21 @@ function isEmptyParagraph(node: Content): boolean {
   return flattenBlockText(node).trim().length === 0;
 }
 
-function stripCommentsFromContainer(node: Content): Content {
+function stripCommentsFromContainer(node: RootContent): RootContent {
   if (!("children" in node) || !Array.isArray(node.children)) {
     return node;
   }
 
+  const parentNode = node as { children: RootContent[] };
   return {
     ...node,
     children: stripBlockCommentsFromChildren(
-      node.children as Content[],
-    ) as unknown as typeof node.children,
-  } as Content;
+      parentNode.children,
+    ),
+  } as RootContent;
 }
 
-export function stripObsidianCommentsFromNodes(nodes: Content[]): Content[] {
+export function stripObsidianCommentsFromNodes(nodes: RootContent[]): RootContent[] {
   const root: Root = { type: "root", children: nodes };
   stripInlineCommentsFromTree(root);
 

@@ -1,4 +1,4 @@
-import type { Content, FootnoteDefinition, Image, Parents, Root } from "mdast";
+import type { RootContent, FootnoteDefinition, Image, Parents, Root } from "mdast";
 import rehypeStringify from "rehype-stringify";
 import type { State } from "mdast-util-to-hast";
 import type { Element } from "hast";
@@ -70,36 +70,39 @@ const compiler = unified()
         state.patch(node, result);
         return state.applyData(node, result);
       },
-      inlineMath(state: State, node): Element {
-        const mathNode = node as { value: string };
+      inlineMath(
+        state: State,
+        node: { type: string; value: string; [key: string]: unknown },
+      ): Element {
         const result: Element = {
           type: "element",
           tagName: "span",
           properties: { className: ["math-inline"] },
-          children: [{ type: "text", value: `\\(${mathNode.value}\\)` }],
+          children: [{ type: "text", value: `\\(${node.value}\\)` }],
         };
-        state.patch(node, result);
+        state.patch(node as unknown as Parameters<typeof state.patch>[0], result);
         return result;
       },
-      math(state: State, node): Element {
-        const mathNode = node as { value: string };
+      math(
+        state: State,
+        node: { type: string; value: string; [key: string]: unknown },
+      ): Element {
         const result: Element = {
           type: "element",
           tagName: "p",
           properties: {},
-          children: [{ type: "text", value: `\\[${mathNode.value}\\]` }],
+          children: [{ type: "text", value: `\\[${node.value}\\]` }],
         };
-        state.patch(node, result);
-        return state.applyData(node, result);
+        state.patch(node as unknown as Parameters<typeof state.patch>[0], result);
+        return state.applyData(node as unknown as Parameters<typeof state.patch>[0], result);
       },
-      image(state: State, node): Element {
-        const imageNode = node as Image;
+      image(state: State, node: Image): Element {
         const result: Element = {
           type: "element",
           tagName: "img",
           properties: {
-            src: imageNode.url,
-            alt: imageNode.alt ?? "",
+            src: node.url,
+            alt: node.alt ?? "",
           },
           children: [],
         };
@@ -129,15 +132,18 @@ function compileRoot(root: Root): string {
   return String(compiler.stringify(compiler.runSync(root))).trim();
 }
 
-function stripMathHastAliases(nodes: Content[]): Content[] {
-  const result: Content[] = [];
+function stripMathHastAliases(nodes: RootContent[]): RootContent[] {
+  const result: RootContent[] = [];
 
   for (const node of nodes) {
     if (node.type === "math" || node.type === "inlineMath") {
-      const mathNode = node as Content & { data?: Record<string, unknown> };
+      const mathNode = node as RootContent & { data?: Record<string, unknown> };
       if (mathNode.data) {
-        const { hName, hChildren, hProperties, ...remainingData } = mathNode.data;
-        const cleaned: Content & { data?: Record<string, unknown> } = {
+        const remainingData = { ...mathNode.data };
+        delete remainingData.hName;
+        delete remainingData.hChildren;
+        delete remainingData.hProperties;
+        const cleaned: RootContent & { data?: Record<string, unknown> } = {
           ...mathNode,
         };
         if (Object.keys(remainingData).length > 0) {
@@ -153,8 +159,8 @@ function stripMathHastAliases(nodes: Content[]): Content[] {
     if ("children" in node && Array.isArray(node.children)) {
       result.push({
         ...node,
-        children: stripMathHastAliases(node.children as Content[]),
-      } as Content);
+        children: stripMathHastAliases(node.children as RootContent[]),
+      } as RootContent);
       continue;
     }
 
@@ -164,8 +170,8 @@ function stripMathHastAliases(nodes: Content[]): Content[] {
   return result;
 }
 
-function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
-  const result: Content[] = [];
+function hoistSingleChildMediaParagraphs(nodes: RootContent[]): RootContent[] {
+  const result: RootContent[] = [];
 
   for (const node of nodes) {
     if (
@@ -173,8 +179,11 @@ function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
       node.children.length === 1 &&
       node.children[0]?.type === "image"
     ) {
-      result.push(node.children[0] as Content);
-      continue;
+      const child = node.children[0];
+      if (child) {
+        result.push(child);
+        continue;
+      }
     }
 
     result.push(node);
@@ -183,7 +192,7 @@ function hoistSingleChildMediaParagraphs(nodes: Content[]): Content[] {
   return result;
 }
 
-function cleanFieldNodes(nodes: Content[]): Content[] {
+function cleanFieldNodes(nodes: RootContent[]): RootContent[] {
   return hoistSingleChildMediaParagraphs(
     stripMathHastAliases(
       stripObsidianCommentsFromNodes(stripAuthoringHtmlFromNodes(nodes)),
@@ -191,7 +200,7 @@ function cleanFieldNodes(nodes: Content[]): Content[] {
   );
 }
 
-export function compileCardField(nodes: Content[]): string {
+export function compileCardField(nodes: RootContent[]): string {
   return compileRoot({
     type: "root",
     children: cleanFieldNodes(nodes),
@@ -203,8 +212,8 @@ export type CompileCardFieldsOptions = {
 };
 
 export function compileCardFields(
-  frontNodes: Content[],
-  backNodes: Content[],
+  frontNodes: RootContent[],
+  backNodes: RootContent[],
   options: CompileCardFieldsOptions = {},
 ): CompiledCardFields {
   const strippedFront = cleanFieldNodes(frontNodes);
@@ -224,7 +233,7 @@ export function compileCardFields(
 }
 
 export function compileCustomCardFields(
-  fields: Array<{ name: string; nodes: Content[] }>,
+  fields: Array<{ name: string; nodes: RootContent[] }>,
   options: CompileCardFieldsOptions = {},
 ): Record<string, string> {
   const cleanedFields = fields.map((f) => ({
@@ -240,7 +249,7 @@ export function compileCustomCardFields(
   const result: Record<string, string> = {};
 
   for (let i = 0; i < cleanedFields.length; i += 1) {
-    const field = cleanedFields[i]!;
+    const field = cleanedFields[i];
     const fieldOrder = fieldOrders[i] ?? [];
     const html = compileRoot(
       prepareFootnoteRoot(field.nodes, context, { appendFooterOrder: fieldOrder }),

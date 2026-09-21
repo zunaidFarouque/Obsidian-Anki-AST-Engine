@@ -19,7 +19,7 @@ function splitHighlightText(value: string): PhrasingContent[] {
     }
     parts.push({
       type: "obsidianHighlight",
-      children: [{ type: "text", value: match[1]! }],
+      children: [{ type: "text", value: match[1] }],
     } as unknown as PhrasingContent);
     lastIndex = start + match[0].length;
   }

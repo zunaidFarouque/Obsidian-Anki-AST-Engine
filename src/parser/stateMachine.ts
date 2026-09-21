@@ -1,4 +1,4 @@
-import type { Content, Heading, Root, Text } from "mdast";
+import type { RootContent, Heading, Root, Text } from "mdast";
 import type { Node, Parent } from "unist";
 import { visitParents } from "unist-util-visit-parents";
 import {
@@ -10,8 +10,8 @@ import { stripTrailingAuthoringNodes } from "../ast/stripAuthoringContent";
 
 export type ExtractedCard = {
   tag: string;
-  frontNodes: Content[];
-  backNodes: Content[];
+  frontNodes: RootContent[];
+  backNodes: RootContent[];
   sectionDepths: Map<number, string>;
   ordinal: number;
   ankiId?: string;
@@ -60,8 +60,8 @@ function extractCardsWithDeclarationLevel(
   const contextByDepth = new Map<number, string>();
   let currentDeclaration = "";
   let currentTag = "";
-  let frontNodes: Content[] = [];
-  let backNodes: Content[] = [];
+  let frontNodes: RootContent[] = [];
+  let backNodes: RootContent[] = [];
   let phase: "none" | "front" | "back" = "none";
   let delimiterEndOffset: number | undefined;
 
@@ -133,7 +133,7 @@ function extractCardsWithDeclarationLevel(
     }
   };
 
-  const handleContent = (child: Content) => {
+  const handleContent = (child: RootContent) => {
     if (phase === "front") {
       const split = splitNodeAtDelimiter(child, delimiter);
       if (split) {
@@ -165,7 +165,7 @@ function extractCardsWithDeclarationLevel(
     }
 
     if (child.type === "heading") {
-      const heading = child as Heading;
+      const heading = child;
 
       if (heading.depth < declarationLevel) {
         if (phase !== "none") {
@@ -203,8 +203,8 @@ function extractCardsLegacy(
   const cards: ExtractedCard[] = [];
   let currentTag = "";
   let originatingDepth = Number.POSITIVE_INFINITY;
-  let frontNodes: Content[] = [];
-  let backNodes: Content[] = [];
+  let frontNodes: RootContent[] = [];
+  let backNodes: RootContent[] = [];
   let phase: "none" | "front" | "back" = "none";
   let delimiterEndOffset: number | undefined;
 
@@ -241,7 +241,7 @@ function extractCardsLegacy(
     }
 
     if (child.type === "heading") {
-      const heading = child as Heading;
+      const heading = child;
       if (phase !== "none" && heading.depth <= originatingDepth) {
         finalizeCard();
       }
@@ -286,14 +286,14 @@ function extractCardsLegacy(
   return cards;
 }
 
-function createTextParagraph(text: string): Content {
+function createTextParagraph(text: string): RootContent {
   return {
     type: "paragraph",
     children: [{ type: "text", value: text }],
   };
 }
 
-function isWithinBody(node: Content, bodyStartOffset: number): boolean {
+function isWithinBody(node: RootContent, bodyStartOffset: number): boolean {
   if (bodyStartOffset === 0) {
     return true;
   }
@@ -308,8 +308,8 @@ function isWithinBody(node: Content, bodyStartOffset: number): boolean {
 
 function buildCard(
   tag: string,
-  frontNodes: Content[],
-  backNodes: Content[],
+  frontNodes: RootContent[],
+  backNodes: RootContent[],
   sectionDepths: Map<number, string>,
   ordinal: number,
   delimiterEndOffset?: number,
@@ -348,7 +348,7 @@ function getHeadingText(heading: Heading): string {
     .trim();
 }
 
-function extractAnkiId(backNodes: Content[]): string | undefined {
+function extractAnkiId(backNodes: RootContent[]): string | undefined {
   for (let index = backNodes.length - 1; index >= 0; index -= 1) {
     const node = backNodes[index];
     if (node?.type === "html" && "value" in node) {
@@ -362,7 +362,7 @@ function extractAnkiId(backNodes: Content[]): string | undefined {
   return undefined;
 }
 
-function isRemovableAnkiIdHtmlNode(node: Content): boolean {
+function isRemovableAnkiIdHtmlNode(node: RootContent): boolean {
   if (node.type !== "html" || !("value" in node)) {
     return false;
   }
@@ -371,7 +371,7 @@ function isRemovableAnkiIdHtmlNode(node: Content): boolean {
   return ANKI_ID_REGEX.test(value) || ANKI_ID_COMMENT_HINT.test(value);
 }
 
-function getInjectionOffset(backNodes: Content[]): number | undefined {
+function getInjectionOffset(backNodes: RootContent[]): number | undefined {
   const nodes = [...backNodes];
 
   while (nodes.length > 0) {
@@ -388,13 +388,13 @@ function getInjectionOffset(backNodes: Content[]): number | undefined {
 }
 
 type SplitResult = {
-  front?: Content;
-  back?: Content;
+  front?: RootContent;
+  back?: RootContent;
   delimiterEndOffset?: number;
 };
 
 function splitNodeAtDelimiter(
-  node: Content,
+  node: RootContent,
   delimiter: string,
 ): SplitResult | null {
   let splitInfo:
@@ -427,7 +427,7 @@ function splitNodeAtDelimiter(
 
       splitInfo = {
         parent,
-        textNode: visited as Text,
+        textNode: visited,
         ancestors: [...ancestors],
         index,
       };
@@ -457,8 +457,8 @@ function splitNodeAtDelimiter(
     .slice(delimiterIndex + delimiterLength)
     .trimStart();
 
-  const frontClone = structuredClone(node) as Content;
-  const backClone = structuredClone(node) as Content;
+  const frontClone = structuredClone(node);
+  const backClone = structuredClone(node);
 
   const frontTextNode = findCorrespondingTextNode(frontClone, parent, index);
   const backTextNode = findCorrespondingTextNode(backClone, parent, index);
@@ -489,7 +489,7 @@ function splitNodeAtDelimiter(
 }
 
 function findCorrespondingTextNode(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): Text | undefined {
@@ -505,7 +505,7 @@ function findCorrespondingTextNode(
       const immediateParent = ancestors[ancestors.length - 1] as Parent;
       const index = immediateParent.children.indexOf(visited);
       if (index === childIndex && parentCount === 0) {
-        found = visited as Text;
+        found = visited;
       }
     }
 
@@ -535,7 +535,7 @@ function findCorrespondingTextNode(
 
     const index = immediateParent.children.indexOf(visited);
     if (index === childIndex) {
-      match = visited as Text;
+      match = visited;
     }
   });
 
@@ -543,7 +543,7 @@ function findCorrespondingTextNode(
 }
 
 function trimChildrenAfterIndex(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -567,7 +567,7 @@ function trimChildrenAfterIndex(
 }
 
 function trimChildrenBeforeIndex(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -586,7 +586,7 @@ function trimChildrenBeforeIndex(
 }
 
 function removeChildAtPath(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -603,7 +603,7 @@ function removeChildAtPath(
   });
 }
 
-function isEmptyNode(node: Content): boolean {
+function isEmptyNode(node: RootContent): boolean {
   if (node.type === "text") {
     return node.value.trim().length === 0;
   }

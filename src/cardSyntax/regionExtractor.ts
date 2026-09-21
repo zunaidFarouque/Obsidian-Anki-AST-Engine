@@ -1,4 +1,4 @@
-import type { Content, Text } from "mdast";
+import type { RootContent, Text } from "mdast";
 import type { Node, Parent } from "unist";
 import { visit } from "unist-util-visit";
 import { visitParents } from "unist-util-visit-parents";
@@ -15,12 +15,12 @@ const IGNORED_ANCESTOR_TYPES = new Set(["code", "inlineCode", "math"]);
 
 export type MdastFieldRegion = {
   name: string;
-  nodes: Content[];
+  nodes: RootContent[];
 };
 
 export type ExtractedCardRegions = {
-  textNodes: Content[];
-  backNodes: Content[];
+  textNodes: RootContent[];
+  backNodes: RootContent[];
   fields: MdastFieldRegion[];
   regions: CardRegions;
   hasEmbeddedReversibleDelimiter: boolean;
@@ -35,14 +35,14 @@ type DelimiterMatch = {
 };
 
 type SplitAtDelimiterResult = {
-  front?: Content;
-  back?: Content;
+  front?: RootContent;
+  back?: RootContent;
   delimiter: DelimiterRegion;
 };
 
-export function extractCardRegions(bodyNodes: Content[], customDelimiter = ":::"): ExtractedCardRegions {
-  const textNodes: Content[] = [];
-  const backNodes: Content[] = [];
+export function extractCardRegions(bodyNodes: RootContent[], customDelimiter = ":::"): ExtractedCardRegions {
+  const textNodes: RootContent[] = [];
+  const backNodes: RootContent[] = [];
   const fields: MdastFieldRegion[] = [];
   const delimiters: DelimiterRegion[] = [];
 
@@ -137,7 +137,7 @@ export function extractCardRegions(bodyNodes: Content[], customDelimiter = ":::"
   };
 }
 
-function scanEmbeddedReservedDelimiters(bodyNodes: Content[]): {
+function scanEmbeddedReservedDelimiters(bodyNodes: RootContent[]): {
   hasReversible: boolean;
   hasTyped: boolean;
 } {
@@ -175,8 +175,8 @@ function scanEmbeddedReservedDelimiters(bodyNodes: Content[]): {
 }
 
 function buildCardRegions(
-  textNodes: Content[],
-  backNodes: Content[],
+  textNodes: RootContent[],
+  backNodes: RootContent[],
   fields: MdastFieldRegion[],
   delimiters: DelimiterRegion[],
 ): CardRegions {
@@ -207,7 +207,7 @@ function buildCardRegions(
   return regions;
 }
 
-function nodesRange(nodes: Content[]): ReturnType<typeof createSourceRange> | undefined {
+function nodesRange(nodes: RootContent[]): ReturnType<typeof createSourceRange> | undefined {
   if (nodes.length === 0) {
     return undefined;
   }
@@ -249,7 +249,7 @@ function nodesRange(nodes: Content[]): ReturnType<typeof createSourceRange> | un
 }
 
 function splitNodeAtFirstDelimiter(
-  node: Content,
+  node: RootContent,
   customDelimiter = ":::",
 ): SplitAtDelimiterResult | null {
   let splitInfo:
@@ -292,7 +292,7 @@ function splitNodeAtFirstDelimiter(
 
     splitInfo = {
       parent,
-      textNode: visited as Text,
+      textNode: visited,
       index,
       match,
     };
@@ -308,8 +308,8 @@ function splitNodeAtFirstDelimiter(
     .slice(match.index + match.length)
     .trimStart();
 
-  const frontClone = structuredClone(node) as Content;
-  const backClone = structuredClone(node) as Content;
+  const frontClone = structuredClone(node);
+  const backClone = structuredClone(node);
 
   const frontTextNode = findCorrespondingTextNode(frontClone, parent, index);
   const backTextNode = findCorrespondingTextNode(backClone, parent, index);
@@ -471,7 +471,7 @@ function findFirstDelimiterInText(
 }
 
 function findCorrespondingTextNode(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): Text | undefined {
@@ -490,7 +490,7 @@ function findCorrespondingTextNode(
       const immediateParent = ancestors[ancestors.length - 1] as Parent;
       const index = immediateParent.children.indexOf(visited);
       if (index === childIndex && parentCount === 0) {
-        found = visited as Text;
+        found = visited;
       }
     }
 
@@ -520,7 +520,7 @@ function findCorrespondingTextNode(
 
     const index = immediateParent.children.indexOf(visited);
     if (index === childIndex) {
-      match = visited as Text;
+      match = visited;
     }
   });
 
@@ -528,7 +528,7 @@ function findCorrespondingTextNode(
 }
 
 function trimChildrenAfterIndex(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -552,7 +552,7 @@ function trimChildrenAfterIndex(
 }
 
 function trimChildrenBeforeIndex(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -570,7 +570,7 @@ function trimChildrenBeforeIndex(
 }
 
 function removeChildAtPath(
-  root: Content,
+  root: RootContent,
   targetParent: Parent,
   childIndex: number,
 ): void {
@@ -587,7 +587,7 @@ function removeChildAtPath(
   });
 }
 
-function isEmptyNode(node: Content): boolean {
+function isEmptyNode(node: RootContent): boolean {
   if (node.type === "text") {
     return node.value.trim().length === 0;
   }

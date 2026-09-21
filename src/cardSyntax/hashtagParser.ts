@@ -41,7 +41,7 @@ function extractHashtags(text: string): string[] {
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(text)) !== null) {
-    tags.push(match[1]!);
+    tags.push(match[1]);
   }
 
   return tags;
@@ -148,7 +148,7 @@ export function parseHeadingHashtags(text: string): HashtagParseResult {
   const result: HashtagParseResult = { userTags, errors };
 
   if (cardTypeTags.length === 1) {
-    const typeName = cardTypeTags[0]!;
+    const typeName = cardTypeTags[0];
     if (isValidCardType(typeName)) {
       result.cardType = typeName;
     }

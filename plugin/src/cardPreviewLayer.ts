@@ -238,7 +238,7 @@ export function calculateCardEnvelopeMarkers(
 	const markers: CardEnvelopeMarker[] = [];
 
 	for (let index = 0; index < pairs.length; index += 1) {
-		const { card, heading } = pairs[index]!;
+		const { card, heading } = pairs[index];
 		const nextHeadingStart = pairs[index + 1]?.heading.from ?? doc.length + 1;
 		const cardBlockEndOffset = resolveCardBlockEndOffset(lines, card, nextHeadingStart);
 

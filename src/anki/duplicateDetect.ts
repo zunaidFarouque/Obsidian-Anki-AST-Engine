@@ -88,8 +88,8 @@ export function detectVaultFrontCollisions(
     const uniqueBacks = new Set(group.map((card) => card.backHtml));
     const kind =
       uniqueBacks.size > 1 ? "back_mismatch" : "vault_front_collision";
-    const deck = group[0]!.deck;
-    const frontHtml = group[0]!.frontHtml;
+    const deck = group[0].deck;
+    const frontHtml = group[0].frontHtml;
     const sources = group.map((card) => ({
       file: card.file,
       tag: card.tag,

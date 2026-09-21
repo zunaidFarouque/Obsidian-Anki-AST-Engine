@@ -50,7 +50,7 @@ jobs:
           name: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          generate_release_notes: false
+          generate_release_notes: true
           files: |
             manifest.json
             main.js

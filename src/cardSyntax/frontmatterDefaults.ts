@@ -106,7 +106,7 @@ export function parseCustomLayoutMap(
         if (parts.length === 2) {
           parsed = parts;
         } else if (parts.length === 3) {
-          parsed = { [parts[0]!]: [parts[1]!, parts[2]!] };
+          parsed = { [parts[0]]: [parts[1], parts[2]] };
         } else {
           return null;
         }
@@ -156,11 +156,10 @@ export function parseCustomLayoutMap(
           ];
         }
       } else if (item && typeof item === "object") {
-        const noteType = String(
-          (item as any).noteType ?? (item as any).name ?? "",
-        ).trim();
-        const front = String((item as any).front ?? "").trim();
-        const back = String((item as any).back ?? "").trim();
+        const obj = item as Record<string, unknown>;
+        const noteType = String(obj["noteType"] ?? obj["name"] ?? "").trim();
+        const front = String(obj["front"] ?? "").trim();
+        const back = String(obj["back"] ?? "").trim();
         if (noteType && front && back) {
           result[noteType] = { front, back };
         }
@@ -169,14 +168,12 @@ export function parseCustomLayoutMap(
     return Object.keys(result).length > 0 ? result : null;
   }
 
-  if (
-    "front" in parsed &&
-    "back" in parsed &&
-    typeof (parsed as any).front === "string" &&
-    typeof (parsed as any).back === "string"
-  ) {
-    const front = (parsed as any).front.trim();
-    const back = (parsed as any).back.trim();
+  const parsedRecord = parsed as Record<string, unknown>;
+  const parsedFront = parsedRecord["front"];
+  const parsedBack = parsedRecord["back"];
+  if (typeof parsedFront === "string" && typeof parsedBack === "string") {
+    const front = parsedFront.trim();
+    const back = parsedBack.trim();
     if (front.length > 0 && back.length > 0) {
       const targetNoteType = customCardDefault?.trim() || "*";
       return { [targetNoteType]: { front, back } };
@@ -200,8 +197,9 @@ export function parseCustomLayoutMap(
       "front" in val &&
       "back" in val
     ) {
-      const front = String((val as any).front).trim();
-      const back = String((val as any).back).trim();
+      const valRecord = val as Record<string, unknown>;
+      const front = String(valRecord["front"] ?? "").trim();
+      const back = String(valRecord["back"] ?? "").trim();
       if (front && back) {
         result[key.trim()] = { front, back };
       }

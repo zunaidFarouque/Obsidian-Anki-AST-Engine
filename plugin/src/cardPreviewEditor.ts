@@ -226,7 +226,7 @@ function findCoveredLineStarts(
 	let firstIdx = lines.length;
 	while (low <= high) {
 		const mid = (low + high) >> 1;
-		if (lines[mid]!.from >= startOffset) {
+		if (lines[mid].from >= startOffset) {
 			firstIdx = mid;
 			high = mid - 1;
 		} else {
@@ -235,7 +235,7 @@ function findCoveredLineStarts(
 	}
 	const starts: number[] = [];
 	for (let i = firstIdx; i < lines.length; i += 1) {
-		const line = lines[i]!;
+		const line = lines[i];
 		if (line.from >= endOffsetExclusive) {
 			break;
 		}
@@ -282,7 +282,7 @@ export function buildCardPreviewDecorations(
 	const interCardGapEm = previewSettings.cardPreviewInterCardGapEm ?? 0;
 
 	for (let index = 0; index < pairs.length; index += 1) {
-		const { card, heading } = pairs[index]!;
+		const { card, heading } = pairs[index];
 		const badgeModel = buildHeadingBadgeModel(card);
 		const nextHeadingStart = pairs[index + 1]?.heading.from ?? doc.length + 1;
 		const cardBlockEndOffset = resolveCardBlockEndOffset(lines, card, nextHeadingStart);

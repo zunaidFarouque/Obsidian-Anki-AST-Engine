@@ -1,4 +1,4 @@
-import type { Content, Heading, Root } from "mdast";
+import type { RootContent, Heading, Root } from "mdast";
 
 export type TypeDeclaration = {
   kind: "cardType" | "noteType";
@@ -129,7 +129,7 @@ export function buildOutlineFromAst(
       continue;
     }
 
-    const heading = child as Heading;
+    const heading = child;
     headings.push({
       depth: heading.depth,
       text: getHeadingText(heading),
@@ -161,14 +161,14 @@ export function findNearestTypeDeclaration(
 export function collectHeadingsFromAst(ast: Root): Heading[] {
   const headings: Heading[] = [];
 
-  const visit = (node: Content) => {
+  const visit = (node: RootContent) => {
     if (node.type === "heading") {
-      headings.push(node as Heading);
+      headings.push(node);
     }
 
     if ("children" in node && Array.isArray(node.children)) {
       for (const child of node.children) {
-        visit(child as Content);
+        visit(child);
       }
     }
   };

@@ -90,7 +90,7 @@ export async function buildAnkiMediaNameMap(
 
   for (const [sanitizedBasename, group] of groups) {
     if (group.length === 1) {
-      const entry = group[0]!;
+      const entry = group[0];
       nameByVaultPath.set(entry.vaultRelativePath, sanitizedBasename);
       assignments.push({
         vaultRelativePath: entry.vaultRelativePath,

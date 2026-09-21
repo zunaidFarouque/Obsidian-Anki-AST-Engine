@@ -5,7 +5,7 @@ export const CARD_PREVIEW_SECTION_TOP_EXTEND_VAR = '--anki-card-preview-section-
 
 export function parseMarkdownHeadingLevel(line: string): number | null {
 	const match = line.match(/^(#{1,6})\s+/);
-	return match ? match[1]!.length : null;
+	return match ? match[1].length : null;
 }
 
 function priorNonBlankLine(
@@ -13,7 +13,7 @@ function priorNonBlankLine(
 	headingIndex: number,
 ): { from: number; text: string } | undefined {
 	for (let index = headingIndex - 1; index >= 0; index -= 1) {
-		if (lines[index]!.text.trim() !== '') {
+		if (lines[index].text.trim() !== '') {
 			return lines[index];
 		}
 	}
@@ -78,12 +78,12 @@ export function findBeforeMidCardHrLineStarts(
 	const lineByFrom = new Map(lines.map((line) => [line.from, line] as const));
 	const marked = new Set<number>();
 	for (let index = 1; index < coveredLineStarts.length; index += 1) {
-		const hrFrom = coveredLineStarts[index]!;
+		const hrFrom = coveredLineStarts[index];
 		const hrLine = lineByFrom.get(hrFrom);
 		if (!hrLine || !isMarkdownThematicBreakLine(hrLine.text)) {
 			continue;
 		}
-		marked.add(coveredLineStarts[index - 1]!);
+		marked.add(coveredLineStarts[index - 1]);
 	}
 	return [...marked];
 }

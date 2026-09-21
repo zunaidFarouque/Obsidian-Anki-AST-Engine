@@ -25,7 +25,7 @@ export function remarkObsidianLinks() {
         return;
       }
 
-      const paragraph = node as Paragraph;
+      const paragraph = node;
       const nodes = extractEmbedsFromParagraph(paragraph);
       if (!nodes) {
         return;
@@ -154,7 +154,7 @@ function createObsidianEmbed(
 function createParagraph(text: string, position?: Paragraph["position"]): Paragraph {
   return {
     type: "paragraph",
-    children: [{ type: "text", value: text } as Text],
+    children: [{ type: "text", value: text }],
     position,
   };
 }

@@ -209,8 +209,8 @@ export function zipCardsToHeadings<T>(
 ): Array<{ card: ResolvedCard; heading: T }> {
 	const count = Math.min(cards.length, headings.length);
 	return Array.from({ length: count }, (_, index) => ({
-		card: cards[index]!,
-		heading: headings[index]!,
+		card: cards[index],
+		heading: headings[index],
 	}));
 }
 
@@ -312,7 +312,7 @@ export function findLineRangeForOffset(
 	let high = lines.length - 1;
 	while (low <= high) {
 		const mid = (low + high) >> 1;
-		const line = lines[mid]!;
+		const line = lines[mid];
 		if (offset < line.from) {
 			high = mid - 1;
 		} else if (offset > line.to) {
@@ -565,7 +565,7 @@ export function mapCardsToHeadingLines(
 		);
 		if (fallbackIndex >= 0) {
 			usedFallbackIndices.add(fallbackIndex);
-			pairs.push({ card, heading: fallbackHeadings[fallbackIndex]! });
+			pairs.push({ card, heading: fallbackHeadings[fallbackIndex] });
 		}
 	}
 

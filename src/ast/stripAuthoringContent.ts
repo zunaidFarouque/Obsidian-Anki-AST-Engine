@@ -1,10 +1,10 @@
-import type { Content } from "mdast";
+import type { RootContent } from "mdast";
 import { stripObsidianCommentsFromNodes } from "./remarkObsidianComment";
 
 export const ANKI_ID_REGEX =
   /<!--\s*anki-id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*-->/i;
 
-export function isAnkiIdHtmlNode(node: Content): boolean {
+export function isAnkiIdHtmlNode(node: RootContent): boolean {
   return (
     node.type === "html" &&
     "value" in node &&
@@ -12,11 +12,11 @@ export function isAnkiIdHtmlNode(node: Content): boolean {
   );
 }
 
-export function isAuthoringHtmlNode(node: Content): boolean {
+export function isAuthoringHtmlNode(node: RootContent): boolean {
   return node.type === "html" && "value" in node && !isAnkiIdHtmlNode(node);
 }
 
-function isEmptyParagraph(node: Content): boolean {
+function isEmptyParagraph(node: RootContent): boolean {
   if (node.type !== "paragraph") {
     return false;
   }
@@ -36,15 +36,15 @@ function isEmptyParagraph(node: Content): boolean {
   return text.trim().length === 0;
 }
 
-export function isObsidianCommentOnlyNode(node: Content): boolean {
+export function isObsidianCommentOnlyNode(node: RootContent): boolean {
   return stripObsidianCommentsFromNodes([node]).length === 0;
 }
 
-export function stripAuthoringHtmlFromNodes(nodes: Content[]): Content[] {
+export function stripAuthoringHtmlFromNodes(nodes: RootContent[]): RootContent[] {
   return nodes.filter((node) => !isAuthoringHtmlNode(node));
 }
 
-export function stripTrailingAuthoringNodes(nodes: Content[]): Content[] {
+export function stripTrailingAuthoringNodes(nodes: RootContent[]): RootContent[] {
   const result = [...nodes];
 
   while (result.length > 0) {
@@ -81,12 +81,12 @@ export function stripTrailingAuthoringNodes(nodes: Content[]): Content[] {
 }
 
 export function contentEndOffsetFromNodes(
-  nodes: Content[],
+  nodes: RootContent[],
   fallbackStart: number,
 ): number {
   let trimmed = stripTrailingAuthoringNodes(nodes);
 
-  while (trimmed.length > 0 && isAnkiIdHtmlNode(trimmed[trimmed.length - 1]!)) {
+  while (trimmed.length > 0 && isAnkiIdHtmlNode(trimmed[trimmed.length - 1])) {
     trimmed = trimmed.slice(0, -1);
     trimmed = stripTrailingAuthoringNodes(trimmed);
   }

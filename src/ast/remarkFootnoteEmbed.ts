@@ -1,5 +1,5 @@
 import type {
-  Content,
+  RootContent,
   FootnoteDefinition,
   FootnoteReference,
   List,
@@ -29,14 +29,14 @@ function normalizeId(identifier: string): string {
 }
 
 function collectCardLocalDefs(
-  frontNodes: Content[],
-  backNodes: Content[],
+  frontNodes: RootContent[],
+  backNodes: RootContent[],
 ): Map<string, FootnoteDefinition> {
   const definitions = new Map<string, FootnoteDefinition>();
 
   for (const node of [...frontNodes, ...backNodes]) {
     if (node.type === "footnoteDefinition") {
-      const definition = node as FootnoteDefinition;
+      const definition = node;
       const id = normalizeId(definition.identifier);
       if (!definitions.has(id)) {
         definitions.set(id, definition);
@@ -48,8 +48,8 @@ function collectCardLocalDefs(
 }
 
 export function buildFootnoteEmbedContext(
-  frontNodes: Content[],
-  backNodes: Content[],
+  frontNodes: RootContent[],
+  backNodes: RootContent[],
   options: BuildFootnoteEmbedContextOptions = {},
 ): FootnoteEmbedContext {
   const definitions = new Map<string, FootnoteDefinition>();
@@ -69,7 +69,7 @@ export function buildFootnoteEmbedContext(
   const frontOrder: string[] = [];
   const backOrder: string[] = [];
 
-  const markReference = (nodes: Content[], sideOrder: string[]) => {
+  const markReference = (nodes: RootContent[], sideOrder: string[]) => {
     visit({ type: "root", children: nodes }, (visited) => {
       if (visited.type !== "footnoteReference") {
         return;
@@ -98,9 +98,9 @@ export function buildFootnoteEmbedContext(
 }
 
 function replaceFootnoteReferences(
-  nodes: Content[],
+  nodes: RootContent[],
   context: FootnoteEmbedContext,
-): Content[] {
+): RootContent[] {
   const idToNumber = new Map(
     context.order.map((id, index) => [id, index + 1] as const),
   );
@@ -114,7 +114,7 @@ function replaceFootnoteReferences(
       return;
     }
 
-    const reference = node as FootnoteReference;
+    const reference = node;
     const number = idToNumber.get(normalizeId(reference.identifier));
     if (!number) {
       return;
@@ -132,7 +132,7 @@ function replaceFootnoteReferences(
 function buildFootnoteFooter(
   context: FootnoteEmbedContext,
   sideOrder: string[],
-): Content[] {
+): RootContent[] {
   if (sideOrder.length === 0) {
     return [];
   }
@@ -157,7 +157,7 @@ function buildFootnoteFooter(
 }
 
 export function buildMultiFieldFootnoteEmbedContext(
-  fieldNodesList: Content[][],
+  fieldNodesList: RootContent[][],
   options: BuildFootnoteEmbedContextOptions = {},
 ): {
   context: FootnoteEmbedContext;
@@ -174,7 +174,7 @@ export function buildMultiFieldFootnoteEmbedContext(
   for (const nodes of fieldNodesList) {
     for (const node of nodes) {
       if (node.type === "footnoteDefinition") {
-        const definition = node as FootnoteDefinition;
+        const definition = node;
         const id = normalizeId(definition.identifier);
         if (!definitions.has(id)) {
           definitions.set(id, definition);
@@ -221,10 +221,10 @@ export function buildMultiFieldFootnoteEmbedContext(
 }
 
 export function prepareFootnoteNodes(
-  nodes: Content[],
+  nodes: RootContent[],
   context: FootnoteEmbedContext,
   options: { appendFooterFor?: "front" | "back"; appendFooterOrder?: string[] },
-): Content[] {
+): RootContent[] {
   const prepared = replaceFootnoteReferences(nodes, context);
   const sideOrder =
     options.appendFooterOrder ??
@@ -242,7 +242,7 @@ export function prepareFootnoteNodes(
 }
 
 export function prepareFootnoteRoot(
-  nodes: Content[],
+  nodes: RootContent[],
   context: FootnoteEmbedContext,
   options: { appendFooterFor?: "front" | "back"; appendFooterOrder?: string[] },
 ): Root {

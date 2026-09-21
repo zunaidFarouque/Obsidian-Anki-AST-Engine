@@ -1,5 +1,5 @@
 import { normalize, join } from "node:path";
-import type { Content } from "mdast";
+import type { RootContent } from "mdast";
 import type { VaultFileIndex, FileCache } from "./vaultIndex";
 import { findBlockById, extractHeadingSection } from "../ast/blockIdTagging";
 
@@ -66,7 +66,7 @@ export function getFirstLinkpathDest(
   } else if (!target.includes("/")) {
     const basenameMatches = findBasenameMatches(target, vaultIndex);
     if (basenameMatches.length === 1) {
-      return basenameMatches[0]!;
+      return basenameMatches[0];
     }
 
     if (basenameMatches.length > 1) {
@@ -76,7 +76,7 @@ export function getFirstLinkpathDest(
           (match === sourceDir || match.startsWith(`${sourceDir}/`)),
       );
       if (localMatches.length === 1) {
-        return localMatches[0]!;
+        return localMatches[0];
       }
       return null;
     }
@@ -113,7 +113,7 @@ function basenameNoExt(path: string): string {
 export function resolveSubpath(
   fileCache: FileCache,
   subpath: string,
-): Content[] | null {
+): RootContent[] | null {
   if (!subpath.startsWith("#")) {
     return null;
   }

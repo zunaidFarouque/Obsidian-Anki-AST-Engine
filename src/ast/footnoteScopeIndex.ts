@@ -1,4 +1,4 @@
-import type { Content, FootnoteDefinition, Heading, Root } from "mdast";
+import type { RootContent, FootnoteDefinition, Heading, Root } from "mdast";
 
 function normalizeId(identifier: string): string {
   return identifier.toUpperCase();
@@ -11,7 +11,7 @@ function getHeadingText(heading: Heading): string {
     .trim();
 }
 
-function isWithinBody(node: Content, bodyStartOffset: number): boolean {
+function isWithinBody(node: RootContent, bodyStartOffset: number): boolean {
   if (bodyStartOffset === 0) {
     return true;
   }
@@ -24,9 +24,9 @@ function isWithinBody(node: Content, bodyStartOffset: number): boolean {
   return start >= bodyStartOffset;
 }
 
-function collectFootnoteDefinitions(node: Content): FootnoteDefinition[] {
+function collectFootnoteDefinitions(node: RootContent): FootnoteDefinition[] {
   if (node.type === "footnoteDefinition") {
-    return [node as FootnoteDefinition];
+    return [node];
   }
 
   if (!("children" in node) || !Array.isArray(node.children)) {
@@ -34,8 +34,9 @@ function collectFootnoteDefinitions(node: Content): FootnoteDefinition[] {
   }
 
   const definitions: FootnoteDefinition[] = [];
-  for (const child of node.children) {
-    definitions.push(...collectFootnoteDefinitions(child as Content));
+  const parentNode = node as { children: RootContent[] };
+  for (const child of parentNode.children) {
+    definitions.push(...collectFootnoteDefinitions(child));
   }
   return definitions;
 }
@@ -133,7 +134,7 @@ export function buildFootnoteScopeIndex(
     }
 
     if (child.type === "heading") {
-      const heading = child as Heading;
+      const heading = child;
 
       if (heading.depth < declarationLevel) {
         inCard = false;

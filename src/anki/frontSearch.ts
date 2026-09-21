@@ -113,7 +113,7 @@ function extractMediaSrcTokens(html: string): string[] {
   const pattern = /\bsrc="([^"]+)"/gi;
   let match = pattern.exec(html);
   while (match) {
-    tokens.push(match[1]!);
+    tokens.push(match[1]);
     match = pattern.exec(html);
   }
   return [...new Set(tokens)].sort();

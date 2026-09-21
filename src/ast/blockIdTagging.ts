@@ -1,4 +1,4 @@
-import type { Content, Heading, Root, Text, Paragraph } from "mdast";
+import type { RootContent, Root, Text, Paragraph } from "mdast";
 import type { Node, Parent } from "unist";
 import { isObsidianEmbed } from "./obsidianLinks";
 
@@ -30,7 +30,7 @@ export function buildBlockIndex(ast: Root): BlockCacheEntry[] {
 
   ast.children.forEach((node, index) => {
     if (isBlockContainer(node)) {
-      const inlineId = getInlineBlockId(node as Content & Parent);
+      const inlineId = getInlineBlockId(node as RootContent & Parent);
       if (inlineId) {
         entries.push({ id: inlineId, nodeIndex: index });
         return;
@@ -64,7 +64,7 @@ export function buildBlockIndex(ast: Root): BlockCacheEntry[] {
   return entries;
 }
 
-export function findBlockById(ast: Root, blockId: string): Content[] | null {
+export function findBlockById(ast: Root, blockId: string): RootContent[] | null {
   const entry = buildBlockIndex(ast).find((item) => item.id === blockId);
   if (!entry) {
     return null;
@@ -76,11 +76,11 @@ export function findBlockById(ast: Root, blockId: string): Content[] | null {
   }
 
   if (isObsidianEmbed(node)) {
-    return [structuredClone(node) as Content];
+    return [structuredClone(node)];
   }
 
   if (isBlockContainer(node)) {
-    return cloneBlockContent(node as Content & Parent);
+    return cloneBlockContent(node as RootContent & Parent);
   }
 
   return null;
@@ -89,7 +89,7 @@ export function findBlockById(ast: Root, blockId: string): Content[] | null {
 export function extractHeadingSection(
   ast: Root,
   headingText: string,
-): Content[] | null {
+): RootContent[] | null {
   const normalizedTarget = headingText.trim().toLowerCase();
   let startIndex = -1;
   let startDepth = 0;
@@ -100,7 +100,7 @@ export function extractHeadingSection(
       continue;
     }
 
-    const heading = node as Heading;
+    const heading = node;
     const text = heading.children
       .map((child) => ("value" in child ? String(child.value) : ""))
       .join("")
@@ -118,7 +118,7 @@ export function extractHeadingSection(
     return null;
   }
 
-  const section: Content[] = [];
+  const section: RootContent[] = [];
   for (let index = startIndex; index < ast.children.length; index += 1) {
     const node = ast.children[index];
     if (!node) {
@@ -126,19 +126,19 @@ export function extractHeadingSection(
     }
 
     if (node.type === "heading") {
-      const depth = (node as Heading).depth;
+      const depth = (node).depth;
       if (depth <= startDepth) {
         break;
       }
     }
 
-    section.push(structuredClone(node) as Content);
+    section.push(structuredClone(node));
   }
 
   return section.length > 0 ? section : null;
 }
 
-function getInlineBlockId(node: Content & Parent): string | undefined {
+function getInlineBlockId(node: RootContent & Parent): string | undefined {
   const lastChild = node.children[node.children.length - 1];
   if (!lastChild || lastChild.type !== "text") {
     return undefined;
@@ -173,7 +173,7 @@ function getStandaloneBlockIdAfter(
   return undefined;
 }
 
-function isStandaloneBlockIdParagraph(node: Content): node is Paragraph {
+function isStandaloneBlockIdParagraph(node: RootContent): node is Paragraph {
   return node.type === "paragraph";
 }
 
@@ -186,7 +186,7 @@ function getStandaloneBlockIdFromParagraph(node: Paragraph): string | undefined 
   return text.match(STANDALONE_BLOCK_ID_PATTERN)?.[1];
 }
 
-function isBlockContainer(node: Node): node is Content & Parent {
+function isBlockContainer(node: Node): node is RootContent & Parent {
   if (node.type === "root") {
     return false;
   }
@@ -199,8 +199,8 @@ function isBlockContainer(node: Node): node is Content & Parent {
   );
 }
 
-function cloneBlockContent(node: Content & Parent): Content[] {
-  const cloned = structuredClone(node) as Content & Parent;
+function cloneBlockContent(node: RootContent & Parent): RootContent[] {
+  const cloned = structuredClone(node);
   const lastChild = cloned.children[cloned.children.length - 1];
 
   if (lastChild?.type === "text") {
@@ -217,5 +217,5 @@ function cloneBlockContent(node: Content & Parent): Content[] {
     return cloned.children.length > 0 ? [cloned] : [];
   }
 
-  return [cloned as Content];
+  return [cloned];
 }

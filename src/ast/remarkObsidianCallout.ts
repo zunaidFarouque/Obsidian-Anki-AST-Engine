@@ -24,7 +24,7 @@ function parseCalloutBlockquote(blockquote: Blockquote): ObsidianCallout | null 
     return null;
   }
 
-  const lines = getParagraphText(firstChild as Paragraph).split(/\r?\n/);
+  const lines = getParagraphText(firstChild).split(/\r?\n/);
   const match = lines[0]?.match(CALLOUT_RE);
   if (!match) {
     return null;
@@ -42,7 +42,7 @@ function parseCalloutBlockquote(blockquote: Blockquote): ObsidianCallout | null 
 
   return {
     type: "obsidianCallout",
-    calloutType: match[1]!,
+    calloutType: match[1],
     title: match[2]?.trim() || undefined,
     children,
   };
@@ -55,7 +55,7 @@ export const remarkObsidianCallout: Plugin<[], Root> = () => {
         return;
       }
 
-      const callout = parseCalloutBlockquote(node as Blockquote);
+      const callout = parseCalloutBlockquote(node);
       if (!callout) {
         return;
       }

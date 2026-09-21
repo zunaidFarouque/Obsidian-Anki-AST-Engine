@@ -32,7 +32,7 @@ export function removeAnkiSyncComments(text: string): {
 	let count = 0;
 
 	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i]!;
+		const line = lines[i];
 
 		if (STANDALONE_COMMENT_LINE.test(line)) {
 			count++;

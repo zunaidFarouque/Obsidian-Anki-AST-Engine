@@ -1,11 +1,11 @@
-import type { Content, Image, Link, Paragraph } from "mdast";
+import type { RootContent, Image, Link, Paragraph } from "mdast";
 import type { MediaKind } from "../obsidian/vaultIndex";
 
 export function createResolvedMediaNode(
   kind: MediaKind,
   ankiFileName: string,
   displayText?: string,
-): Content {
+): RootContent {
   if (kind === "rasterImage" || kind === "svg") {
     const image: Image = {
       type: "image",
@@ -38,7 +38,7 @@ export function createResolvedMediaNode(
 
 export const SOUND_TAG_PATTERN = /^\[sound:([^\]]+)\]$/;
 
-export function isSoundMediaParagraph(node: Content): boolean {
+export function isSoundMediaParagraph(node: RootContent): boolean {
   if (node.type !== "paragraph" || node.children.length !== 1) {
     return false;
   }
@@ -57,7 +57,7 @@ export function soundFileNameFromParagraph(node: Paragraph): string | null {
   return match?.[1] ?? null;
 }
 
-export function isPdfLinkParagraph(node: Content): boolean {
+export function isPdfLinkParagraph(node: RootContent): boolean {
   if (node.type !== "paragraph" || node.children.length !== 1) {
     return false;
   }

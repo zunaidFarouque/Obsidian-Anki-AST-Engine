@@ -78,7 +78,7 @@ export function getBodyStartOffset(rawText: string): number {
   }
 
   let offset = match[0].length;
-  while (offset < rawText.length && /\s/.test(rawText[offset]!)) {
+  while (offset < rawText.length && /\s/.test(rawText[offset])) {
     offset += 1;
   }
   return offset;

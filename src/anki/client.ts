@@ -120,6 +120,20 @@ function buildAddNoteRequest(note: AddNoteParams): Record<string, unknown> {
   };
 }
 
+declare const window:
+  | {
+      setTimeout: (handler: () => void, timeout?: number) => number;
+      fetch: typeof fetch;
+    }
+  | undefined;
+
+function getRuntimeGlobal(): Record<string, unknown> {
+  if (typeof window !== "undefined") {
+    return window as unknown as Record<string, unknown>;
+  }
+  return new Function("return this")() as Record<string, unknown>;
+}
+
 export class AnkiConnectClient {
   private readonly url: string;
   private readonly apiKey?: string;
@@ -130,11 +144,9 @@ export class AnkiConnectClient {
   constructor(options: AnkiClientOptions) {
     this.url = options.url;
     this.apiKey = options.apiKey;
-    const runtimeFetch =
-      typeof globalThis !== "undefined" && "fetch" in globalThis
-        ? (globalThis as unknown as { fetch: typeof fetch })["fetch"]
-        : undefined;
-    this.fetchImpl = options.fetchImpl ?? (runtimeFetch as typeof fetch);
+    const globalScope = getRuntimeGlobal();
+    const fallbackFetch = globalScope["fetch"] as typeof fetch;
+    this.fetchImpl = options.fetchImpl ?? fallbackFetch;
     this.requestLimit = pLimit(
       options.requestConcurrency ?? DEFAULT_INVOKE_CONCURRENCY,
     );
@@ -158,10 +170,14 @@ export class AnkiConnectClient {
           }
           const delayMs = invokeRetryDelayMs(attempt, this.retryBaseDelayMs);
           await new Promise<void>((resolve) => {
-            if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
+            if (typeof window !== "undefined") {
               window.setTimeout(resolve, delayMs);
             } else {
-              globalThis.setTimeout(resolve, delayMs);
+              const nodeTimeout = getRuntimeGlobal()["setTimeout"] as (
+                fn: () => void,
+                ms?: number,
+              ) => void;
+              nodeTimeout(resolve, delayMs);
             }
           });
         }

@@ -1,4 +1,4 @@
-import type { Heading, Paragraph, Root, Text } from "mdast";
+import type { Heading, Root, Text } from "mdast";
 import type { Plugin } from "unified";
 import { visit } from "unist-util-visit";
 
@@ -11,7 +11,7 @@ export const remarkPreviewHeading: Plugin<[], Root> = () => {
         return;
       }
 
-      const paragraph = node as Paragraph;
+      const paragraph = node;
       if (paragraph.children.some((child) => child.type !== "text")) {
         return;
       }
@@ -26,11 +26,11 @@ export const remarkPreviewHeading: Plugin<[], Root> = () => {
         return;
       }
 
-      const depth = match[1]!.length as Heading["depth"];
+      const depth = match[1].length as Heading["depth"];
       const heading: Heading = {
         type: "heading",
         depth,
-        children: [{ type: "text", value: match[2]!.trim() }],
+        children: [{ type: "text", value: match[2].trim() }],
       };
 
       parent.children[index] = heading;

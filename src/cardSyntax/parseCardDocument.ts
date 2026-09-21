@@ -1,4 +1,4 @@
-import type { Content, Heading, Root } from "mdast";
+import type { RootContent, Root } from "mdast";
 import { parseMarkdown } from "../ast/processor";
 import {
   contentEndOffsetFromNodes,
@@ -168,7 +168,7 @@ function resolveCard(
   );
   const ancestorDecls = ancestors.map((ancestor, index) =>
     toHeadingDeclaration(
-      ancestorHashtagResults[index]!,
+      ancestorHashtagResults[index],
       ancestor.depth,
       stripAllHashtags(ancestor.text),
     ),
@@ -422,7 +422,7 @@ function resolveCard(
   };
 }
 
-function createTextParagraph(text: string): Content {
+function createTextParagraph(text: string): RootContent {
   return {
     type: "paragraph",
     children: [{ type: "text", value: text }],
@@ -511,7 +511,7 @@ function stripAllHashtags(text: string): string {
   return text.replace(HASHTAG_STRIP_PATTERN, "").replace(/\s+/g, " ").trim();
 }
 
-function isWithinBody(node: Content, bodyStartOffset: number): boolean {
+function isWithinBody(node: RootContent, bodyStartOffset: number): boolean {
   const start = node.position?.start?.offset;
   if (start === undefined) {
     return true;
@@ -524,7 +524,7 @@ function collectCardBodyNodes(
   cardHeading: OutlineHeading,
   outline: ReturnType<typeof buildOutlineFromAst>,
   bodyStartOffset: number,
-): Content[] {
+): RootContent[] {
   const declarationLevel = outline.cardDeclarationLevel;
   let startIndex = ast.children.indexOf(cardHeading.node);
 
@@ -538,12 +538,12 @@ function collectCardBodyNodes(
   }
 
   if (startIndex !== -1) {
-    const nodes: Content[] = [];
+    const nodes: RootContent[] = [];
     for (let i = startIndex + 1; i < ast.children.length; i++) {
-      const child = ast.children[i]!;
+      const child = ast.children[i];
       if (
         child.type === "heading" &&
-        (child as Heading).depth <= declarationLevel
+        (child).depth <= declarationLevel
       ) {
         break;
       }
@@ -558,7 +558,7 @@ function collectCardBodyNodes(
   const cardStart = cardHeading.node.position?.start?.offset ?? 0;
   const cardEnd = findCardEndOffset(ast, cardStart, declarationLevel);
 
-  const nodes: Content[] = [];
+  const nodes: RootContent[] = [];
   for (const child of ast.children) {
     if (!isWithinBody(child, bodyStartOffset)) {
       continue;
@@ -588,7 +588,7 @@ function findCardEndOffset(
       continue;
     }
 
-    const heading = child as Heading;
+    const heading = child;
     const start = heading.position?.start?.offset;
     if (start === undefined || start <= cardStart) {
       continue;
@@ -709,7 +709,7 @@ function collectCardHashtags(
 
 function cardRange(
   cardHeading: OutlineHeading,
-  bodyNodes: Content[],
+  bodyNodes: RootContent[],
   fileLength: number,
 ): ReturnType<typeof createSourceRange> {
   const start = cardHeading.node.position?.start?.offset ?? 0;
@@ -724,7 +724,7 @@ function cardRange(
 
 const ANKI_ID_COMMENT_HINT = /<!--\s*anki-id\s*-->/i;
 
-function isRemovableAnkiIdHtmlNode(node: Content): boolean {
+function isRemovableAnkiIdHtmlNode(node: RootContent): boolean {
   if (node.type !== "html" || !("value" in node)) {
     return false;
   }
@@ -733,7 +733,7 @@ function isRemovableAnkiIdHtmlNode(node: Content): boolean {
   return ANKI_ID_REGEX.test(value) || ANKI_ID_COMMENT_HINT.test(value);
 }
 
-function getInjectionOffset(nodes: Content[]): number | undefined {
+function getInjectionOffset(nodes: RootContent[]): number | undefined {
   const list = [...nodes];
 
   while (list.length > 0) {
@@ -749,18 +749,18 @@ function getInjectionOffset(nodes: Content[]): number | undefined {
   return lastNode?.position?.end?.offset;
 }
 
-function extractAnkiId(nodes: Content[]): string | undefined {
+function extractAnkiId(nodes: RootContent[]): string | undefined {
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index];
     if (!node) continue;
     let foundId: string | undefined;
-    visit(node, (visited: any) => {
+    visit(node, (visited) => {
       if (foundId) return;
       if (
-        (visited.type === "html" || visited.type === "text") &&
-        "value" in visited
+        "value" in visited &&
+        typeof visited.value === "string"
       ) {
-        const match = String(visited.value).match(ANKI_ID_REGEX);
+        const match = visited.value.match(ANKI_ID_REGEX);
         if (match?.[1]) {
           foundId = match[1];
         }

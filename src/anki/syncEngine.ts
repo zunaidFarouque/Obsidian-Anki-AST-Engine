@@ -654,7 +654,7 @@ async function batchResolveExistingNoteIds(
 
   const existingByIndex = new Map<number, number | undefined>();
   for (let i = 0; i < prepared.length; i += 1) {
-    const entry = prepared[i]!;
+    const entry = prepared[i];
     const noteIds = results[i] ?? [];
     if (noteIds.length > 1) {
       throw new Error(`Duplicate Anki notes for obsidian id ${entry.uuid}`);
@@ -782,7 +782,7 @@ async function syncPreparedAdds(
       );
 
       for (let i = 0; i < chunk.length; i += 1) {
-        const entry = chunk[i]!;
+        const entry = chunk[i];
         const noteId = noteIds[i];
         if (noteId !== null && noteId !== undefined) {
           results[entry.index] = {
@@ -869,7 +869,7 @@ async function syncFileCardsBatched(
   const prepared = prepareCardItemsWithConfig(items, config);
   await ensureDecksForItems(context, items);
 
-  const results: CardSyncResult[] = new Array(items.length);
+  const results: CardSyncResult[] = new Array<CardSyncResult>(items.length);
   let existingByIndex: Map<number, number | undefined>;
 
   const modelErrors = await ensureModelsForPrepared(context, prepared, config);
