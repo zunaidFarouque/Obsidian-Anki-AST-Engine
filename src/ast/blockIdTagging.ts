@@ -30,7 +30,7 @@ export function buildBlockIndex(ast: Root): BlockCacheEntry[] {
 
   ast.children.forEach((node, index) => {
     if (isBlockContainer(node)) {
-      const inlineId = getInlineBlockId(node as RootContent & Parent);
+      const inlineId = getInlineBlockId(node);
       if (inlineId) {
         entries.push({ id: inlineId, nodeIndex: index });
         return;
@@ -80,7 +80,7 @@ export function findBlockById(ast: Root, blockId: string): RootContent[] | null 
   }
 
   if (isBlockContainer(node)) {
-    return cloneBlockContent(node as RootContent & Parent);
+    return cloneBlockContent(node);
   }
 
   return null;

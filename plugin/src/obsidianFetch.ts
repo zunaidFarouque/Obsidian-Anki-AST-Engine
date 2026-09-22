@@ -1,4 +1,5 @@
 import { requestUrl } from 'obsidian';
+import type { FetchLike } from 'obsidian-anki-ast-engine/anki';
 
 function resolveUrl(input: RequestInfo | URL): string {
 	if (typeof input === 'string') {
@@ -38,8 +39,8 @@ function normalizeHeaders(init?: RequestInit): Record<string, string> {
 /**
  * Obsidian's requestUrl bypasses browser CORS. Use this instead of fetch for AnkiConnect.
  */
-export function createObsidianFetch(): typeof fetch {
-	const obsidianFetch = async (
+export function createObsidianFetch(): FetchLike {
+	const obsidianFetch: FetchLike = async (
 		input: RequestInfo | URL,
 		init?: RequestInit,
 	): Promise<Response> => {
@@ -73,5 +74,5 @@ export function createObsidianFetch(): typeof fetch {
 		});
 	};
 
-	return obsidianFetch as unknown as typeof fetch;
+	return obsidianFetch;
 }

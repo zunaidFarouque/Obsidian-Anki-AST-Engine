@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from 'obsidian';
 import type AnkiAstSyncPlugin from './main';
 
 export interface AnkiAstSyncSettings {
@@ -82,6 +82,10 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: AnkiAstSyncPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	override getSettingDefinitions(): SettingDefinitionItem[] {
+		return [];
 	}
 
 	display(): void {

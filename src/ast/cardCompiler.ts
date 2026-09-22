@@ -159,7 +159,7 @@ function stripMathHastAliases(nodes: RootContent[]): RootContent[] {
     if ("children" in node && Array.isArray(node.children)) {
       result.push({
         ...node,
-        children: stripMathHastAliases(node.children as RootContent[]),
+        children: stripMathHastAliases(node.children),
       } as RootContent);
       continue;
     }

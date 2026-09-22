@@ -36,10 +36,15 @@ export class AnkiConnectError extends Error {
   }
 }
 
+export type FetchLike = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
 export type AnkiClientOptions = {
   url: string;
   apiKey?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
   requestConcurrency?: number;
   retryBaseDelayMs?: number;
 };
@@ -123,30 +128,50 @@ function buildAddNoteRequest(note: AddNoteParams): Record<string, unknown> {
 declare const window:
   | {
       setTimeout: (handler: () => void, timeout?: number) => number;
-      fetch: typeof fetch;
+      fetch: FetchLike;
     }
   | undefined;
 
-function getRuntimeGlobal(): Record<string, unknown> {
+declare const global:
+  | {
+      setTimeout: (handler: () => void, timeout?: number) => void;
+      fetch: FetchLike;
+    }
+  | undefined;
+
+function resolveDefaultFetch(): FetchLike {
   if (typeof window !== "undefined") {
-    return window as unknown as Record<string, unknown>;
+    return window.fetch;
   }
-  return new Function("return this")() as Record<string, unknown>;
+  if (typeof global !== "undefined") {
+    return global.fetch;
+  }
+  throw new Error("No fetch implementation available in the current environment.");
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (typeof window !== "undefined") {
+      window.setTimeout(resolve, ms);
+    } else if (typeof global !== "undefined") {
+      global.setTimeout(resolve, ms);
+    } else {
+      resolve();
+    }
+  });
 }
 
 export class AnkiConnectClient {
   private readonly url: string;
   private readonly apiKey?: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
   private readonly requestLimit: ReturnType<typeof pLimit>;
   private readonly retryBaseDelayMs: number;
 
   constructor(options: AnkiClientOptions) {
     this.url = options.url;
     this.apiKey = options.apiKey;
-    const globalScope = getRuntimeGlobal();
-    const fallbackFetch = globalScope["fetch"] as typeof fetch;
-    this.fetchImpl = options.fetchImpl ?? fallbackFetch;
+    this.fetchImpl = options.fetchImpl ?? resolveDefaultFetch();
     this.requestLimit = pLimit(
       options.requestConcurrency ?? DEFAULT_INVOKE_CONCURRENCY,
     );
@@ -169,17 +194,7 @@ export class AnkiConnectClient {
             throw error;
           }
           const delayMs = invokeRetryDelayMs(attempt, this.retryBaseDelayMs);
-          await new Promise<void>((resolve) => {
-            if (typeof window !== "undefined") {
-              window.setTimeout(resolve, delayMs);
-            } else {
-              const nodeTimeout = getRuntimeGlobal()["setTimeout"] as (
-                fn: () => void,
-                ms?: number,
-              ) => void;
-              nodeTimeout(resolve, delayMs);
-            }
-          });
+          await delay(delayMs);
         }
       }
 
