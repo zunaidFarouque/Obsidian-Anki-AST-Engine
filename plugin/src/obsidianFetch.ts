@@ -1,16 +1,12 @@
 import { requestUrl } from 'obsidian';
 import type { FetchLike } from 'obsidian-anki-ast-engine/anki';
 
-function resolveUrl(input: RequestInfo | URL): string {
+function resolveUrl(input: string | URL): string {
 	if (typeof input === 'string') {
 		return input;
 	}
 
-	if (input instanceof URL) {
-		return input.href;
-	}
-
-	return input.url;
+	return input.href;
 }
 
 function normalizeHeaders(init?: RequestInit): Record<string, string> {
@@ -41,7 +37,7 @@ function normalizeHeaders(init?: RequestInit): Record<string, string> {
  */
 export function createObsidianFetch(): FetchLike {
 	const obsidianFetch: FetchLike = async (
-		input: RequestInfo | URL,
+		input: string | URL,
 		init?: RequestInit,
 	): Promise<Response> => {
 		const url = resolveUrl(input);
