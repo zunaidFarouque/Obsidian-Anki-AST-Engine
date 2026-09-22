@@ -30,6 +30,12 @@ if (existsSync(pluginManifest)) {
   copyFileSync(pluginManifest, rootManifest);
 }
 
+const pluginVersions = path.join(pluginDir, "versions.json");
+const rootVersions = path.join(rootDir, "versions.json");
+if (existsSync(pluginVersions)) {
+  copyFileSync(pluginVersions, rootVersions);
+}
+
 if (isBun) {
   try {
     execSync("bun run scripts/build-dist.ts", { cwd: rootDir, stdio: "inherit" });
