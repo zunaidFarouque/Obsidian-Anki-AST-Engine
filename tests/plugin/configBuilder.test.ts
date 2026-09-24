@@ -17,7 +17,6 @@ const baseSettings: AnkiAstSyncSettings = {
 	includeParentHeadersAsTags: true,
 	autoCreateDecks: true,
 	autoCreateStockNoteModels: true,
-	noteModelName: 'Basic',
 	syncTagPrefix: 'obsidian-id',
 	orphanHandling: 'ask',
 	orphanIgnoreTag: 'obsidian-sync-ignore',
@@ -55,7 +54,6 @@ describe('configBuilder', () => {
 			...baseSettings,
 			scanFolders: 'Notes',
 			ankiConnectApiKey: 'secret',
-			noteModelName: 'Basic (and reversed card)',
 			syncTagPrefix: 'vault-card-id',
 		};
 
@@ -72,7 +70,7 @@ describe('configBuilder', () => {
 		expect(config.vaultPath).toBe('C:/Vault');
 		expect(config.scanFolders).toEqual(['Notes']);
 		expect(config.ankiConnectApiKey).toBe('secret');
-		expect(config.noteModelName).toBe('Basic (and reversed card)');
+		expect(config.noteModelName).toBe('Basic');
 		expect(config.syncTagPrefix).toBe('vault-card-id');
 	});
 });

@@ -132,7 +132,7 @@ export async function openActiveCardInAnki(
 
 	const bounds = findEnclosingCardBounds(lines, cur.line, headingLevel);
 	if (!bounds) {
-		new Notice('Place your Cursor inside an Anki card first.', 4000);
+		new Notice('Place your cursor inside an Anki card first.', 4000);
 		return;
 	}
 

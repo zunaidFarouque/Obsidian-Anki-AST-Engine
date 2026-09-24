@@ -632,3 +632,146 @@
 	opacity: 1;
 	transform: translateY(0);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Settings Tab Styles                                                        */
+/* -------------------------------------------------------------------------- */
+
+.anki-ast-settings-banner {
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: 1.1em 1.3em;
+	margin-bottom: 1.5em;
+}
+
+.anki-ast-settings-banner-title {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+	margin-bottom: 0.3em;
+}
+
+.anki-ast-settings-banner-desc {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	line-height: var(--line-height-normal);
+	margin: 0;
+}
+
+.anki-ast-settings-callout {
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: 1em 1.25em;
+	margin: 0.75em 0 1.25em;
+}
+
+.anki-ast-settings-callout p {
+	margin: 0.3em 0;
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-normal);
+}
+
+.anki-ast-settings-callout details {
+	margin-top: 0.6em;
+}
+
+.anki-ast-settings-callout summary {
+	cursor: pointer;
+	font-weight: var(--font-semibold);
+	color: var(--text-accent);
+	font-size: var(--font-ui-small);
+}
+
+.anki-ast-settings-callout pre {
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	padding: 0.6em 0.8em;
+	font-size: var(--font-smaller);
+	overflow-x: auto;
+	margin: 0.5em 0;
+}
+
+.anki-ast-connection-status {
+	margin-top: 0.5em;
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-medium);
+	padding: 0.35em 0.75em;
+	border-radius: var(--radius-s);
+	display: inline-block;
+}
+
+.anki-ast-connection-status--ok {
+	color: var(--text-success);
+	background-color: color-mix(in srgb, var(--color-green, #238636) 15%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-green, #238636) 35%, transparent);
+}
+
+.anki-ast-connection-status--error {
+	color: var(--text-error);
+	background-color: color-mix(in srgb, var(--color-red, #da3633) 15%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-red, #da3633) 35%, transparent);
+}
+
+.anki-ast-connection-status--testing {
+	color: var(--text-muted);
+	background-color: var(--background-secondary-alt);
+}
+
+.anki-ast-guide-container {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: 1.1em 1.3em;
+	background-color: var(--background-secondary);
+	margin-top: 1.5em;
+}
+
+.anki-ast-guide-container summary {
+	cursor: pointer;
+	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-medium);
+	color: var(--text-normal);
+}
+
+.anki-ast-guide-content {
+	margin-top: 1em;
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-normal);
+}
+
+.anki-ast-guide-content h4 {
+	margin: 1.2em 0 0.4em;
+	color: var(--text-accent);
+	font-size: var(--font-ui-medium);
+}
+
+.anki-ast-guide-content pre {
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	padding: 0.6em 0.8em;
+	overflow-x: auto;
+	margin: 0.4em 0 0.8em;
+}
+
+.anki-ast-guide-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0.6em 0 1.2em;
+	font-size: var(--font-ui-smaller);
+}
+
+.anki-ast-guide-table th,
+.anki-ast-guide-table td {
+	border: 1px solid var(--background-modifier-border);
+	padding: 0.45em 0.65em;
+	text-align: left;
+}
+
+.anki-ast-guide-table th {
+	background-color: var(--background-secondary-alt);
+	font-weight: var(--font-semibold);
+}
+

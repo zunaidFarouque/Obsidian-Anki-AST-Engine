@@ -1,6 +1,6 @@
 {
   "name": "obsidian-anki-ast-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A deterministic, headless Node.js synchronization pipeline bridging Obsidian and Anki.",
   "homepage": "https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine",
   "main": "main.js",

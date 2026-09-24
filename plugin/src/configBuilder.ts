@@ -21,7 +21,7 @@ export function buildPluginConfig(
 		defaultEngineTag: settings.defaultEngineTag || 'Obsidian-Anki-AST',
 		ankiConnectUrl: settings.ankiConnectUrl || 'http://127.0.0.1:8765',
 		ankiConnectApiKey: settings.ankiConnectApiKey || undefined,
-		noteModelName: settings.noteModelName || 'Basic',
+		noteModelName: 'Basic',
 		noteModelType: 'basic',
 		autoCreateDecks: settings.autoCreateDecks ?? true,
 		autoCreateStockNoteModels: settings.autoCreateStockNoteModels ?? true,

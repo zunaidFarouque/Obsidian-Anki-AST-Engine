@@ -21,7 +21,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 
 		registerPluginIcons(addIcon);
 
-		this.addRibbonIcon(ANKI_SYNC_STAR_ICON_ID, 'Anki AST Sync', () => {
+		this.addRibbonIcon(ANKI_SYNC_STAR_ICON_ID, 'Anki AST sync', () => {
 			void this.syncVaultToAnki();
 		});
 
@@ -220,7 +220,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'open-card-in-anki',
-			name: 'Open current card in Anki Desktop',
+			name: 'Open current card in Anki desktop',
 			editorCheckCallback: (checking, editor) => {
 				if (checking) return !!editor;
 				void import('./navigation/cardNavigation').then((m) =>
@@ -288,7 +288,7 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		this.cardPreview = undefined;
 	}
 
-	private async createAnkiClient(): Promise<AnkiConnectClient> {
+	async createAnkiClient(): Promise<AnkiConnectClient> {
 		const { AnkiConnectClient } = await import('obsidian-anki-ast-engine/anki');
 		return new AnkiConnectClient({
 			url: this.settings.ankiConnectUrl,
@@ -297,16 +297,23 @@ export default class AnkiAstSyncPlugin extends Plugin {
 		});
 	}
 
-	private async checkAnkiConnect(): Promise<void> {
-		const client = await this.createAnkiClient();
-
+	async checkAnkiConnect(
+		showNotice = true,
+	): Promise<{ ok: boolean; version?: number; error?: string }> {
 		try {
+			const client = await this.createAnkiClient();
 			const version = await client.version();
-			new Notice(`AnkiConnect OK (API version ${version})`);
+			if (showNotice) {
+				new Notice(`AnkiConnect OK (API version ${version})`);
+			}
+			return { ok: true, version };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			new Notice(`AnkiConnect error: ${message}`, 12000);
+			if (showNotice) {
+				new Notice(`AnkiConnect error: ${message}`, 12000);
+			}
 			console.error('AnkiConnect check failed:', error);
+			return { ok: false, error: message };
 		}
 	}
 
