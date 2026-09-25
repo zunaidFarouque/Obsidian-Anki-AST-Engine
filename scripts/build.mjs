@@ -10,6 +10,18 @@ console.log("Building Obsidian plugin...");
 const isBun = typeof process.versions.bun !== "undefined";
 const runner = isBun ? "bun" : "npm";
 
+// Ensure plugin dependencies are installed (needed when root-only install was run,
+// e.g. Obsidian review build verification).
+const pluginNodeModules = path.join(pluginDir, "node_modules");
+if (!existsSync(pluginNodeModules)) {
+  console.log("Installing plugin dependencies...");
+  try {
+    execSync(`${runner} install`, { cwd: pluginDir, stdio: "inherit" });
+  } catch (err) {
+    console.warn("Could not install plugin dependencies directly; falling back to root node_modules:", err?.message || err);
+  }
+}
+
 execSync(`${runner} run build`, { cwd: pluginDir, stdio: "inherit" });
 
 const pluginMain = path.join(pluginDir, "main.js");

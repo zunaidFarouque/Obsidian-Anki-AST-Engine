@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
+import type { SettingDefinitionItem } from 'obsidian';
 import type AnkiAstSyncPlugin from './main';
 
 export interface AnkiAstSyncSettings {
@@ -82,6 +83,10 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: AnkiAstSyncPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	override getSettingDefinitions(): SettingDefinitionItem[] {
+		return [];
 	}
 
 	display(): void {
@@ -566,9 +571,7 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 			'---',
 			'AnkiSync: on',
 			'target_anki_deck: Computer Science',
-			'anki_tags:',
-			'  - algorithms',
-			'  - revision',
+			'file_anki_tags: algorithms, revision',
 			'---',
 		]);
 
@@ -577,46 +580,54 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 			text: '2. Card types and syntax',
 		});
 
-		guideContent.createEl('p', { text: 'Basic card (question & answer):' });
+		guideContent.createEl('p', { text: 'Basic card with body question and answer:' });
 		renderGuideCode(guideContent, [
-			'#### What is the time complexity of binary search?',
+			'#### Binary Search',
+			'What is the time complexity of binary search?',
 			':::',
 			'O(log n) because the search space halves on every step.',
 		]);
 
-		guideContent.createEl('p', { text: 'Inline basic card:' });
+		guideContent.createEl('p', { text: 'Basic card using heading as front:' });
 		renderGuideCode(guideContent, [
-			'#### What is the speed of light in vacuum? ::: ~300,000 km/s',
-		]);
-
-		guideContent.createEl('p', { text: 'Reversible card (generates two Anki cards):' });
-		renderGuideCode(guideContent, [
-			'#### Bonjour :::r Hello',
-		]);
-
-		guideContent.createEl('p', { text: 'Typed answer card (prompts you to type the answer):' });
-		renderGuideCode(guideContent, [
-			'#### What command lists directory contents in Linux?',
-			':::t',
-			'ls',
-		]);
-
-		guideContent.createEl('p', { text: 'Cloze deletion card (cloze deletions or #Anki/cardType/cloze):' });
-		renderGuideCode(guideContent, [
-			'#### Photosynthesis',
+			'#### What is the speed of light in vacuum?',
 			':::',
-			'In plants, {{c1::chlorophyll}} absorbs light to convert {{c2::carbon dioxide}} and water into glucose.',
+			'Approximately 3 × 10⁸ m/s.',
 		]);
 
-		guideContent.createEl('p', { text: 'Custom Anki note type (matching any custom Anki model fields):' });
+		guideContent.createEl('p', { text: 'Reversible card generating forward and reverse cards:' });
 		renderGuideCode(guideContent, [
-			'#### Ephemeral #anki/noteType/Vocabulary',
+			'#### French Vocabulary',
+			'Bonjour',
+			':::r',
+			'Hello',
+		]);
+
+		guideContent.createEl('p', { text: 'Typed answer card testing spelling with optional pipes:' });
+		renderGuideCode(guideContent, [
+			'#### Linux Commands',
+			'What command lists directory contents in Linux?',
+			':::t',
+			'ls | dir',
+		]);
+
+		guideContent.createEl('p', { text: 'Cloze card with front deletions and optional back extra:' });
+		renderGuideCode(guideContent, [
+			'#### Photosynthesis #anki/cardType/cloze',
+			'In plants, {{c1::chlorophyll}} absorbs light to convert {{c2::carbon dioxide}} and water into glucose.',
+			':::',
+			'Optional back extra: Takes place in chloroplast organelles.',
+		]);
+
+		guideContent.createEl('p', { text: 'Custom Anki note type matching model fields:' });
+		renderGuideCode(guideContent, [
+			'#### Ephemeral #anki/noteType/Vocab',
 			'::: Word',
-			'Ephemeral',
+			'ephemeral',
 			'::: Definition',
-			'Lasting for a very short time.',
+			'Lasting for a very short time; transitory.',
 			'::: Example',
-			'Fame in the digital age is often ephemeral.',
+			'Fashions are ephemeral, but style endures.',
 		]);
 
 		guideContent.createDiv({
@@ -639,12 +650,14 @@ export class AnkiAstSyncSettingTab extends PluginSettingTab {
 			tr.createEl('td', { text: desc });
 		};
 
-		addRow('AnkiSync', 'on | off', 'Enables or disables synchronization for this note.');
+		addRow('AnkiSync', 'on | off | true | false', 'Enables or disables synchronization for this note.');
 		addRow('target_anki_deck', 'Deck Name', 'Overrides the default target Anki deck for all cards in this note.');
-		addRow('anki_tags', 'List of tags', 'Applies extra tags to all cards in this note.');
-		addRow('card_declaration_heading_level', '1 to 6', 'Overrides the card heading level for this note.');
+		addRow('file_anki_tags', 'tag1, tag2', 'Comma-separated tags added to every card in this note.');
+		addRow('cardDeclarationHeadingLevel', '1 to 6', 'Overrides the card heading level for this note (default 4 for ####).');
 		addRow('delimiter', 'String (e.g. :::)', 'Overrides the card front/back delimiter for this note.');
-		addRow('anki_cardDefault', 'basic | cloze | reversible | typed', 'Default card type for cards without explicit delimiters.');
+		addRow('includeParentHeadersAsTags', 'true | false', 'Toggles hierarchical tags from ancestor headings.');
+		addRow('anki_cardDefault', 'basic | cloze | reversible | typed', 'Default built-in card type for cards without explicit delimiters.');
+		addRow('anki_customCardDefault', 'Custom Note Type', 'Default custom note type (e.g. Vocab) when using ::: FieldName blocks.');
 
 		guideContent.createDiv({
 			cls: 'setting-item-heading anki-ast-guide-heading',

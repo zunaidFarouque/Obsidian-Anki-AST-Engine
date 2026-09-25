@@ -20,15 +20,16 @@ Traditional flashcard sync tools rely on fragile Regular Expressions (Regex) tha
 - [📦 Prerequisites & Setup](#-prerequisites--setup)
 - [🚀 Quick Start](#-quick-start)
 - [📝 Card Syntax Reference](#-card-syntax-reference)
-  - [Basic Cards](#1-basic-cards)
-  - [Inline Basic Cards](#2-inline-basic-cards)
-  - [Reversible Cards](#3-reversible-cards)
-  - [Typed Answer Cards](#4-typed-answer-cards)
-  - [Cloze Deletions](#5-cloze-deletions)
-  - [Custom Anki Note Models](#6-custom-anki-note-models)
-  - [Hierarchical Header Tags](#7-hierarchical-header-tags)
-  - [Media & Attachments](#8-media--attachments)
-  - [Block Transclusions & Embeds](#9-block-transclusions--embeds)
+  - [Syntax Fundamentals](#syntax-fundamentals)
+  - [1. Basic Cards](#1-basic-cards-basic)
+  - [2. Reversible Cards](#2-reversible-cards-reversible)
+  - [3. Typed Answer Cards](#3-typed-answer-cards-typed)
+  - [4. Cloze Deletions](#4-cloze-deletions-cloze)
+  - [5. Custom Anki Note Models](#5-custom-anki-note-models-custom)
+  - [6. Section Inheritance & Outline Isolation](#6-section-inheritance--outline-tree-isolation)
+  - [7. Reserved Hashtags vs User Tags](#7-reserved-hashtags-vs-user-tags)
+  - [8. Media & Attachments](#8-media--attachments)
+  - [9. Block Transclusions & Embeds](#9-block-transclusions--embeds)
 - [⚙️ Frontmatter Configuration](#️-frontmatter-configuration)
 - [👁 Live Preview & Diagnostic Badges](#-live-preview--diagnostic-badges)
 - [⌨️ Available Commands](#️-available-commands)
@@ -44,7 +45,7 @@ Traditional flashcard sync tools rely on fragile Regular Expressions (Regex) tha
 ## ✨ Core Features
 
 * **Deterministic AST Parsing:** Structural delimiters inside fenced code blocks, inline code, or math formulas (`$...$`, `$$...$$`) are safely ignored.
-* **Non-Destructive Surgical ID Injection:** Generates unique tracking UUIDs (`<!--anki-id: uuid-->`) by calculating exact byte offsets on raw file buffers. It **never** round-trips Markdown through a serializer, preserving 100% of your vault's original indentation, line endings, and custom syntax.
+* **Non-Destructive Surgical ID Injection:** Generates unique tracking UUIDs (`&lt;!--anki-id: uuid--&gt;`) by calculating exact byte offsets on raw file buffers. It **never** round-trips Markdown through a serializer, preserving 100% of your vault's original indentation, line endings, and custom syntax.
 * **Live Preview & Sync Parity:** Real-time CodeMirror 6 editor decorations display card envelopes, resolved types, and sync status badges (`SYNC`, `WARN`, `SKIP`, `ERROR`). The preview parser and the sync engine share the exact same underlying logic.
 * **Write Hard-Gating:** Preview errors (`error` and `skip`) hard-block writes to Anki so malformed cards will never corrupt your Anki collection.
 * **Deep Transclusion Resolution:** Seamlessly expands Obsidian block embeds (`![[SourceNote#^block-id]]`). The engine recursively fetches, parses, and grafts transcluded content directly into your flashcards prior to sync.
@@ -81,7 +82,7 @@ flowchart TD
     end
 
     subgraph WriteBack ["Vault Safe Write-Back"]
-        SurgicalInject["Surgical Buffer Splice <!--anki-id: uuid-->"]
+        SurgicalInject["Surgical Buffer Splice [anki-id: uuid comment]"]
     end
 
     Note --> FrontFilter
@@ -103,7 +104,7 @@ flowchart TD
 ```
 
 ### Why AST Parsing Matters
-1. **Never Re-formats Your Notes:** Unlike other sync tools that parse Markdown into a data model and then regenerate Markdown (destroying your personal formatting), Anki AST Sync reads the AST as a read-only spatial map to compute byte indices. The only write operation performed on your note is splicing a tiny HTML comment (`<!--anki-id: uuid-->`) right at the calculated offset.
+1. **Never Re-formats Your Notes:** Unlike other sync tools that parse Markdown into a data model and then regenerate Markdown (destroying your personal formatting), Anki AST Sync reads the AST as a read-only spatial map to compute byte indices. The only write operation performed on your note is splicing a tiny HTML comment (`&lt;!--anki-id: uuid--&gt;`) right at the calculated offset at the end of the card.
 2. **Context-Aware Delimiters:** If you write `:::` or `---` inside a Python code block or a LaTeX matrix, regex-based tools break. An AST parser knows that node belongs to `code` or `math` and ignores it completely.
 
 ---
@@ -142,12 +143,13 @@ In Anki Desktop, open **Tools → Add-ons → AnkiConnect → Config** and ensur
 ## 🚀 Quick Start
 
 ### Step 1: Enable Sync on a Note
-Add `AnkiSync: on` to your note frontmatter. Optionally set a target deck:
+Add `AnkiSync: on` to your note frontmatter. You can optionally set a target deck and tags:
 
 ```markdown
 ---
 AnkiSync: on
 target_anki_deck: General Knowledge
+file_anki_tags: geography, capitals
 ---
 
 #### What is the capital of Australia?
@@ -167,89 +169,180 @@ You have several convenient ways to sync:
 
 ## 📝 Card Syntax Reference
 
-### 1. Basic Cards
-Standard question and answer flashcards using a heading declaration and delimiter (`:::`):
+### Syntax Fundamentals
+* **Card Heading Boundary:** Each flashcard begins at a heading level matching your configured level (default: `####` level 4) and continues until the next heading of equal or shallower depth.
+* **Line-Start Delimiters:** Structural delimiters (`:::`, `:::r`, `:::t`, `::: FieldName`) **must be placed on their own line** (at line-start). Delimiters cannot be placed inline in the middle of a line or inside headings.
+* **Code & Math Protection:** Delimiters inside code fences, inline code, or LaTeX math blocks (`$...$`, `$$...$$`) are ignored by the AST parser.
 
+---
+
+### 1. Basic Cards (`basic`)
+Maps to Anki's standard **Basic** model (Fields: `Front`, `Back`). Requires a line-start `:::` delimiter (`BAS-01`).
+
+#### Standard Question and Answer (Body Front)
+Write your question in the card body before the delimiter, and the answer after it:
 ```markdown
-#### What is the time complexity of binary search?
+#### Binary Search
+What is the time complexity of binary search in the worst case?
 :::
-O(log n) because the search space is halved in every iteration.
+O(log n) because the search space is halved in each step.
 ```
 
-### 2. Inline Basic Cards
-For concise facts, you can author cards on a single line:
-
+#### Heading as Front
+When the `:::` delimiter immediately follows the heading (empty front body), the heading text itself is used as the Front:
 ```markdown
-#### What is the speed of light in vacuum? ::: ~300,000 km/s
+#### What is the speed of light in vacuum?
+:::
+Approximately 3 × 10⁸ m/s.
 ```
 
-### 3. Reversible Cards
-Generates two separate Anki cards: **Card 1** (Front → Back) and **Card 2** (Back → Front):
+#### Bare Mustache & Cloze Handling
+* **Bare `{{word}}` (`BAS-03`):** On a basic card, bare `{{word}}` emits a warning and stays literal text.
+* **Manual Cloze `{{c1::...}}` on Basic (`BAS-04`):** By default, stays literal with a warning, unless the setting `inferClozeFromManualSyntaxOnBasic` is enabled.
 
-```markdown
-#### Bonjour :::r Hello
-```
+---
 
-Multi-line format:
+### 2. Reversible Cards (`reversible`)
+Generates **two cards** in Anki (Card 1: Front → Back, Card 2: Back → Front) using the **Basic (and reversed card)** model.
+
+#### Using `:::r` Delimiter (No Tag Needed)
 ```markdown
-#### Photosynthesis equation
+#### French Vocabulary
+Bonjour
 :::r
-6CO2 + 6H2O + light energy -> C6H12O6 + 6O2
+Hello
 ```
 
-### 4. Typed Answer Cards
-Prompts you to type the answer in Anki's review screen to test spelling or code recall:
+*(Heading-as-front is also supported when `:::r` immediately follows the heading).*
 
+#### Using `#anki/cardType/reversible` Tag
 ```markdown
-#### What command prints the current working directory in Linux?
+#### Chemical Elements #anki/cardType/reversible
+Gold
+:::
+Au
+```
+
+---
+
+### 3. Typed Answer Cards (`typed`)
+Prompts you to type the answer in Anki's review screen using the **Basic (type in the answer)** model.
+
+#### Using `:::t` Delimiter
+```markdown
+#### Linux Commands
+What command prints the current working directory in Linux?
 :::t
 pwd
 ```
 
-### 5. Cloze Deletions
-Supports standard Anki cloze syntax and convenient shorthand:
-
-#### Standard Cloze
+#### Multiple Acceptable Answers (`TYP-05`)
+Separate alternative acceptable answers on the answer line with pipes (`|`):
 ```markdown
-#### The Krebs Cycle
-:::
+#### Capital of France
+Name a major city in France:
+:::t
+Paris | Lyon | Marseille
+```
+
+#### Important Rules for Typed Cards
+* **Single-line answer (`TYP-04`):** Only the first non-empty line of the Back region is tested. Subsequent lines are ignored and trigger a warning.
+* **Plain text (`TYP-03`, `TYP-03b`):** Markdown/HTML formatting (bold, italics, links) is stripped; formatting triggers a warning badge.
+
+---
+
+### 4. Cloze Deletions (`cloze`)
+Maps to Anki's **Cloze** model (Fields: `Text`, `Back Extra`).
+
+> [!IMPORTANT]
+> **Cloze deletions MUST be in the Text region** (before `:::`, or the whole card body if no `:::` is present).
+> **Never put `:::` before the cloze text** — that places the deletions in the Back Extra field and triggers a fatal `CLZ-11` error!
+
+#### Standard Cloze (Without Back Extra)
+```markdown
+#### The Krebs Cycle #anki/cardType/cloze
 The citric acid cycle takes place in the {{c1::mitochondrial matrix}} and generates {{c2::NADH}} and {{c3::FADH2}}.
 ```
 
-#### Shorthand Cloze
-Use the command **Wrap selection as cloze deletion** or type shorthand `{{...}}`. When cloze inference is enabled in settings, the engine automatically formats it:
+#### Cloze with Optional Back Extra
+Use `:::` after the cloze text to provide additional context or reference material:
 ```markdown
-#### Mitochondria
+#### The Krebs Cycle #anki/cardType/cloze
+The citric acid cycle takes place in the {{c1::mitochondrial matrix}} and generates {{c2::NADH}} and {{c3::FADH2}}.
 :::
-The inner mitochondrial membrane contains folds called {{cristae}} that expand surface area.
+Extra reference: Discovered by Hans Krebs in 1937. It consists of eight enzymatic reactions.
 ```
 
-### 6. Custom Anki Note Models
-Match any custom Anki note model and field structure using `#anki/noteType/<ModelName>` on the heading:
+#### Cloze Hints
+Add hints using `::` inside the deletion:
+```markdown
+#### Organelles #anki/cardType/cloze
+The {{c1::mitochondria::powerhouse organelle}} produces ATP.
+```
+
+#### Shorthand Cloze & Auto-Numbering (`CLZ-04`, `CLZ-05`)
+Under a `#anki/cardType/cloze` heading or when `anki_cardDefault: cloze` is set, you can write shorthand `{{term}}` or `{{term::hint}}` without typing `c1::` or `c2::`. The engine automatically groups identical terms and numbers them in sequence:
+```markdown
+### Biochemistry #anki/cardType/cloze
+
+#### Cellular Respiration
+{{Glucose}} and {{oxygen}} produce {{carbon dioxide}} and water. Breakdown of {{glucose}} begins with glycolysis.
+```
+*Result:* Both `{{glucose}}` occurrences become `c1`, `{{oxygen}}` becomes `c2`, and `{{carbon dioxide}}` becomes `c3`.
+
+---
+
+### 5. Custom Anki Note Models (`custom`)
+Synchronize cards directly to any custom Anki note model and field layout.
 
 ```markdown
-#### Ubiquitous #anki/noteType/Vocabulary
+#### Ephemeral #anki/noteType/Vocab
 ::: Word
-Ubiquitous
+ephemeral
 ::: Definition
-Present, appearing, or found everywhere.
+Lasting for a very short time; transitory.
 ::: Example
-Smartphones have become ubiquitous in daily modern life.
+Fashions are ephemeral, but style endures.
 ```
 
-### 7. Hierarchical Header Tags
-When **Include parent headers as tags** is enabled (default), ancestor headings above your card are automatically converted into hierarchical Anki tags:
+* **Field Delimiters (`DEL-04`):** Each field starts with `::: FieldName` at line-start, followed by exactly one space, then the field name matching your Anki model (case-insensitive).
+* **Order Independent (`CUS-06`):** Fields can appear in any order.
+* **Typo Protection (`CUS-02`):** If a field name does not match the Anki model, an error is surfaced showing valid field names.
+* **File-Wide Default:** Add `anki_customCardDefault: Vocab` in frontmatter so any card with `::: FieldName` blocks resolves to `Vocab` without needing a heading tag.
+
+---
+
+### 6. Section Inheritance & Outline Tree Isolation
+Headings shallower than the card declaration level (`#`, `##`, `###` when cards are `####`) can declare card or note types for an entire section:
 
 ```markdown
-# Computer Science
-## Data Structures
-### Trees
+### Medical Vocabulary #anki/noteType/Vocab
 
-#### What is a self-balancing binary search tree?
-:::
-An AVL tree or Red-Black tree.
+#### Card 1
+::: Word
+prognosis
+::: Definition
+The likely course of a medical condition.
+
+#### Card 2
+::: Word
+etiology
+::: Definition
+The cause or set of causes of a disease.
 ```
-*Synced Tags in Anki:* `Computer_Science::Data_Structures::Trees`
+
+* **Card Heading Wins (`RES-01`):** A type tag on a card heading overrides any inherited section type.
+* **Nearest Ancestor Wins (`RES-03`):** Nested sections inherit from the closest ancestor with a type tag.
+* **Sibling Isolation (`RES-02`):** Sibling sections do not inherit tags from adjacent sections.
+
+---
+
+### 7. Reserved Hashtags vs User Tags
+* **Engine Directives (`STR-04`):** Hashtags starting with `#anki/` (e.g. `#anki/cardType/cloze`, `#anki/noteType/Vocab`) or `#anki_card_*` are engine directives. They are used for type resolution and are **never** synced to Anki as tags.
+* **User Tags:** Any other hashtags on headings (e.g. `#biology`, `#exam-2026`) ARE synced to Anki as tags.
+* **Hierarchical Tags:** When `includeParentHeadersAsTags` is enabled, heading titles in the ancestor chain are concatenated into hierarchical tags (e.g. `Biology::Genetics`).
+
+---
 
 ### 8. Media & Attachments
 Embed media using standard Markdown or Obsidian wikilinks:
@@ -260,7 +353,9 @@ Embed media using standard Markdown or Obsidian wikilinks:
 ![[heart-diagram.png]]
 The left ventricle pumps oxygenated blood through the aortic valve.
 ```
-The engine resolves the file from your vault or attachment folder, generates a Base64 payload, and uploads it safely to Anki's media storage.
+The engine resolves the file from your vault or attachment folder, generates a Base64 payload, and uploads it safely to Anki's media storage via AnkiConnect.
+
+---
 
 ### 9. Block Transclusions & Embeds
 Seamlessly reuse content from other vault notes without duplication:
@@ -282,10 +377,13 @@ Configure synchronization behavior per file using YAML frontmatter properties:
 | :--- | :--- | :--- | :--- |
 | `AnkiSync` | `boolean` / `string` | `off` | Set to `on` or `true` to enable sync for the note. |
 | `target_anki_deck` | `string` | Settings default | Overrides the target Anki deck for all cards in this note. |
-| `anki_tags` | `string[]` | `[]` | Extra Anki tags applied to every card in this note. |
-| `card_declaration_heading_level` | `number (1–6)` | `4` | Heading level defining card envelopes for this note (e.g. `3` for `###`). |
+| `file_anki_tags` | `string` | `""` | Comma-separated extra tags applied to all cards in this note. |
+| `cardDeclarationHeadingLevel` | `number (1–6)` | `4` | Heading level defining card envelopes for this note (default: `4` for `####`). |
 | `delimiter` | `string` | `:::` | Overrides front/back separator for this note. |
-| `anki_cardDefault` | `string` | `basic` | Default card type when no delimiter is present (`basic`, `cloze`, `reversible`, `typed`). |
+| `includeParentHeadersAsTags` | `boolean` | `true` | Toggles hierarchical tags from ancestor headings. |
+| `anki_cardDefault` | `string` | `basic` | Default built-in card type (`basic`, `cloze`, `reversible`, `typed`). |
+| `anki_customCardDefault` | `string` | — | Default custom note type (e.g. `Vocab`) when using `::: FieldName` blocks. |
+| `anki_customLayoutMap` | `object` / `string` | — | Custom field mapping for remapping fields. |
 
 ---
 
@@ -294,9 +392,9 @@ Configure synchronization behavior per file using YAML frontmatter properties:
 When **Live card preview** is enabled in Settings, the CodeMirror 6 editor renders interactive visual indicators directly beside card headings:
 
 * 🟢 **SYNC**: The card syntax is valid and ready to be synchronized to Anki.
-* 🟡 **WARN**: The card will sync, but has potential formatting issues (e.g. cloze deletion with no back extra).
-* ⚪ **SKIP**: The card will be skipped (e.g. duplicate front detected in vault).
-* 🔴 **ERROR**: Structural error (e.g. missing card body or mismatched fields). **Writes to Anki are hard-blocked** to prevent corrupting your collection.
+* 🟡 **WARN**: The card will sync, but has potential formatting issues (e.g. formatting inside a typed answer, bare mustache on basic card).
+* ⚪ **SKIP**: The card will be skipped (e.g. basic card missing `:::`, cloze card with no deletions in Text, duplicate front in vault).
+* 🔴 **ERROR**: Structural error (e.g. cloze with `:::r`, cloze deletions only in Back Extra, conflicting tags). **Writes to Anki are hard-blocked** to prevent corrupting your collection.
 
 ### Interactive Card Inspector
 Click any badge in the editor to open the **Card Preview Inspector Modal**:
@@ -323,7 +421,7 @@ Access these anytime via the Command Palette (`Ctrl/Cmd + P`):
 | **Set target Anki deck for current note** | Fuzzy-search your Anki decks to set `target_anki_deck`. |
 | **Insert card template...** | Modal picker to insert Basic, Reversible, Typed, or Cloze card templates. |
 | **Wrap selection as cloze deletion** | Wraps selected text in `{{c1::...}}` with intelligent auto-incrementing. |
-| **Jump to next / previous card** | Fast navigation between card headings in long notes. |
+| **Jump to next / previous card in note** | Fast navigation between card headings in long notes. |
 | **Jump to next card with sync issue** | Jumps directly to the next card with a warning or error badge. |
 | **Open current card in Anki desktop** | Locates and displays the active card inside Anki's Card Browser. |
 
@@ -438,7 +536,7 @@ bun run sync
 * Check the Live Preview badge on the card heading in Obsidian. If it shows 🔴 **ERROR**, click the badge to inspect the exact syntax issue.
 
 ### Does this plugin modify my Markdown files?
-Only in one minimal, non-destructive way: when a card is first synchronized to Anki, the plugin splices a small tracking comment (`<!--anki-id: uuid-->`) directly into the card heading. It never reformats, re-indents, or rewrites your Markdown.
+Only in one minimal, non-destructive way: when a card is first synchronized to Anki, the plugin splices a small tracking comment (`&lt;!--anki-id: uuid--&gt;`) directly at the end of the card content. It never touches your headings, and never reformats, re-indents, or rewrites your Markdown.
 
 ---
 

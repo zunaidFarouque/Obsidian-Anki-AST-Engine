@@ -1,6 +1,6 @@
 {
   "name": "obsidian-anki-ast-engine",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A deterministic, headless Node.js synchronization pipeline bridging Obsidian and Anki.",
   "homepage": "https://github.com/zunaidFarouque/Obsidian-Anki-AST-Engine",
   "main": "main.js",
@@ -69,6 +69,7 @@
     "@types/node": "^20.10.6",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
+    "esbuild": "0.25.5",
     "eslint": "^8.56.0",
     "obsidian": "latest",
     "prettier": "^3.1.1",
