@@ -177,7 +177,7 @@ You have several convenient ways to sync:
 ---
 
 ### 1. Basic Cards (`basic`)
-Maps to Anki's standard **Basic** model (Fields: `Front`, `Back`). Requires a line-start `:::` delimiter (`BAS-01`).
+Maps to Anki's standard **Basic** model (Fields: `Front`, `Back`). Requires a line-start `:::` delimiter.
 
 #### Standard Question and Answer (Body Front)
 Write your question in the card body before the delimiter, and the answer after it:
@@ -197,8 +197,8 @@ Approximately 3 × 10⁸ m/s.
 ```
 
 #### Bare Mustache & Cloze Handling
-* **Bare `{{word}}` (`BAS-03`):** On a basic card, bare `{{word}}` emits a warning and stays literal text.
-* **Manual Cloze `{{c1::...}}` on Basic (`BAS-04`):** By default, stays literal with a warning, unless the setting `inferClozeFromManualSyntaxOnBasic` is enabled.
+* **Bare `{{word}}`:** On a basic card, bare `{{word}}` emits a warning and stays literal text.
+* **Manual Cloze `{{c1::...}}` on Basic:** By default, stays literal with a warning, unless the setting `inferClozeFromManualSyntaxOnBasic` is enabled.
 
 ---
 
@@ -236,7 +236,7 @@ What command prints the current working directory in Linux?
 pwd
 ```
 
-#### Multiple Acceptable Answers (`TYP-05`)
+#### Multiple Acceptable Answers
 Separate alternative acceptable answers on the answer line with pipes (`|`):
 ```markdown
 #### Capital of France
@@ -246,8 +246,8 @@ Paris | Lyon | Marseille
 ```
 
 #### Important Rules for Typed Cards
-* **Single-line answer (`TYP-04`):** Only the first non-empty line of the Back region is tested. Subsequent lines are ignored and trigger a warning.
-* **Plain text (`TYP-03`, `TYP-03b`):** Markdown/HTML formatting (bold, italics, links) is stripped; formatting triggers a warning badge.
+* **Single-line answer:** Only the first non-empty line of the Back region is tested. Subsequent lines are ignored and trigger a warning.
+* **Plain text:** Markdown/HTML formatting (bold, italics, links) is stripped; formatting triggers a warning badge.
 
 ---
 
@@ -256,7 +256,7 @@ Maps to Anki's **Cloze** model (Fields: `Text`, `Back Extra`).
 
 > [!IMPORTANT]
 > **Cloze deletions MUST be in the Text region** (before `:::`, or the whole card body if no `:::` is present).
-> **Never put `:::` before the cloze text** — that places the deletions in the Back Extra field and triggers a fatal `CLZ-11` error!
+> **Never put `:::` before the cloze text** — that places the deletions in the Back Extra field and triggers a fatal error!
 
 #### Standard Cloze (Without Back Extra)
 ```markdown
@@ -280,7 +280,7 @@ Add hints using `::` inside the deletion:
 The {{c1::mitochondria::powerhouse organelle}} produces ATP.
 ```
 
-#### Shorthand Cloze & Auto-Numbering (`CLZ-04`, `CLZ-05`)
+#### Shorthand Cloze & Auto-Numbering
 Under a `#anki/cardType/cloze` heading or when `anki_cardDefault: cloze` is set, you can write shorthand `{{term}}` or `{{term::hint}}` without typing `c1::` or `c2::`. The engine automatically groups identical terms and numbers them in sequence:
 ```markdown
 ### Biochemistry #anki/cardType/cloze
@@ -305,9 +305,9 @@ Lasting for a very short time; transitory.
 Fashions are ephemeral, but style endures.
 ```
 
-* **Field Delimiters (`DEL-04`):** Each field starts with `::: FieldName` at line-start, followed by exactly one space, then the field name matching your Anki model (case-insensitive).
-* **Order Independent (`CUS-06`):** Fields can appear in any order.
-* **Typo Protection (`CUS-02`):** If a field name does not match the Anki model, an error is surfaced showing valid field names.
+* **Field Delimiters:** Each field starts with `::: FieldName` at line-start, followed by exactly one space, then the field name matching your Anki model (case-insensitive).
+* **Order Independent:** Fields can appear in any order.
+* **Typo Protection:** If a field name does not match the Anki model, an error is surfaced showing valid field names.
 * **File-Wide Default:** Add `anki_customCardDefault: Vocab` in frontmatter so any card with `::: FieldName` blocks resolves to `Vocab` without needing a heading tag.
 
 ---
@@ -331,14 +331,14 @@ etiology
 The cause or set of causes of a disease.
 ```
 
-* **Card Heading Wins (`RES-01`):** A type tag on a card heading overrides any inherited section type.
-* **Nearest Ancestor Wins (`RES-03`):** Nested sections inherit from the closest ancestor with a type tag.
-* **Sibling Isolation (`RES-02`):** Sibling sections do not inherit tags from adjacent sections.
+* **Card Heading Wins:** A type tag on a card heading overrides any inherited section type.
+* **Nearest Ancestor Wins:** Nested sections inherit from the closest ancestor with a type tag.
+* **Sibling Isolation:** Sibling sections do not inherit tags from adjacent sections.
 
 ---
 
 ### 7. Reserved Hashtags vs User Tags
-* **Engine Directives (`STR-04`):** Hashtags starting with `#anki/` (e.g. `#anki/cardType/cloze`, `#anki/noteType/Vocab`) or `#anki_card_*` are engine directives. They are used for type resolution and are **never** synced to Anki as tags.
+* **Engine Directives:** Hashtags starting with `#anki/` (e.g. `#anki/cardType/cloze`, `#anki/noteType/Vocab`) or `#anki_card_*` are engine directives. They are used for type resolution and are **never** synced to Anki as tags.
 * **User Tags:** Any other hashtags on headings (e.g. `#biology`, `#exam-2026`) ARE synced to Anki as tags.
 * **Hierarchical Tags:** When `includeParentHeadersAsTags` is enabled, heading titles in the ancestor chain are concatenated into hierarchical tags (e.g. `Biology::Genetics`).
 
